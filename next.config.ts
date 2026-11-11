@@ -1,9 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // cacheComponents requires the Node.js runtime and uses setTimeout() internally.
+  // Cloudflare Workers' workerd runtime has an incompatible setTimeout() implementation
+  // which causes the Worker to hang and never send a response.
+  // Keep this DISABLED for Cloudflare Workers deployments.
+  cacheComponents: false,
+
+  // partialPrefetching is tightly coupled to cacheComponents (PPR).
+  // Must be disabled when cacheComponents is false.
+  partialPrefetching: false,
+
   turbopack: {
     rules: {
       "*.css": {

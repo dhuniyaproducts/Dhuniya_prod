@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+
+  // Worker name — must match the deployed worker: dhuniya-prod.dhuniyaproducts20.workers.dev
+  "name": "dhuniya-prod",
+
+  // OpenNext Cloudflare adapter output entrypoint
+  "main": ".open-next/worker.js",
+
+  // Use a recent compatibility date that includes nodejs_compat GA support and modern workerd runtime fixes.
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Static assets directory produced by OpenNext build
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  }
+}
+
