@@ -87,7 +87,7 @@ function ToastContainer({
 }) {
   if (toasts.length === 0) return null;
   return (
-    <div className="fixed bottom-20 sm:bottom-6 right-4 z-[70] flex flex-col gap-2 max-w-sm w-full pointer-events-none px-3 sm:px-0">
+    <div className="print-hide fixed bottom-20 sm:bottom-6 right-4 z-[70] flex flex-col gap-2 max-w-sm w-full pointer-events-none px-3 sm:px-0">
       {toasts.map((t) => (
         <div
           key={t.id}
@@ -382,27 +382,63 @@ function Invoice({ order, product, rate, onClose }: {
   const productName = product?.name ?? "Sweet Item";
   const productUnit = product?.unit ?? "kg";
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-3 sm:p-4 backdrop-blur-xs flex items-center justify-center">
+    <div className="invoice-modal-overlay fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-3 sm:p-4 backdrop-blur-xs flex items-center justify-center">
       <style dangerouslySetInnerHTML={{
         __html: `
         @media print {
-          body { background: white !important; }
-          body * { visibility: hidden !important; }
-          #printable-invoice, #printable-invoice * { visibility: visible !important; }
+          @page {
+            size: portrait;
+            margin: 10mm;
+          }
+          html, body {
+            background: #ffffff !important;
+            color: #0f172a !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+          }
+          aside, header, main, nav, .print-hide, .toast-container {
+            display: none !important;
+          }
+          .invoice-modal-overlay {
+            position: static !important;
+            display: block !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+            overflow: visible !important;
+            height: auto !important;
+            min-height: 0 !important;
+          }
+          .invoice-card {
+            border: none !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            max-width: 100% !important;
+            border-radius: 0 !important;
+            overflow: visible !important;
+            height: auto !important;
+          }
           #printable-invoice {
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
+            position: static !important;
+            display: block !important;
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 !important;
-            padding: 32px !important;
-            box-shadow: none !important;
+            padding: 0 !important;
             border: none !important;
+            box-shadow: none !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
           }
         }
       ` }} />
-      <div className="my-5 w-full max-w-[760px] rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+      <div className="invoice-card my-5 w-full max-w-[760px] rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
         <div className="border-b border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50 flex items-center justify-between print:hidden gap-2">
           <div>
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-600">Official Bill</p>
@@ -420,16 +456,16 @@ function Invoice({ order, product, rate, onClose }: {
             </button>
           </div>
         </div>
-        <article id="printable-invoice" className="p-4 sm:p-8 md:p-12">
+        <article id="printable-invoice" className="p-6 sm:p-8 print:p-0">
           {/* Header */}
-          <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-6 sm:flex-row">
+          <div className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-4 print:pb-3 sm:flex-row">
             <div>
               <div className="flex items-center gap-2 text-amber-600">
                 <Sparkles className="size-5 sm:size-6" />
                 <span className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Dhuniya Products</span>
               </div>
-              <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-amber-700">Eastern Traditional Sweets</p>
-              <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+              <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-amber-700">Eastern Traditional Sweets</p>
+              <p className="mt-1 text-xs text-slate-500 leading-relaxed">
                 Registration: KDS/1597 · Mobile: 0756656135<br />
                 138, France City, Maruthamunai
               </p>
@@ -438,52 +474,52 @@ function Invoice({ order, product, rate, onClose }: {
               <span className="inline-block rounded-md bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">
                 Customer Invoice
               </span>
-              <p className="mt-1.5 text-xl sm:text-2xl font-mono font-bold text-slate-900">{order.id}</p>
-              <p className="mt-1 text-xs text-slate-500">Date: {dateLabel(order.date)}</p>
+              <p className="mt-1 text-xl sm:text-2xl font-mono font-bold text-slate-900">{order.id}</p>
+              <p className="mt-0.5 text-xs text-slate-500">Date: {dateLabel(order.date)}</p>
             </div>
           </div>
 
           {/* Details */}
-          <div className="grid gap-4 sm:gap-6 border-b border-slate-200 py-6 sm:grid-cols-2">
+          <div className="grid gap-3 sm:gap-6 border-b border-slate-200 py-4 print:py-3 sm:grid-cols-2">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Billed To</p>
-              <p className="mt-1 text-base sm:text-lg font-bold text-slate-900">{order.customer}</p>
-              <p className="mt-0.5 text-xs text-slate-600">Order ID: {order.id}</p>
-              {order.notes && <p className="mt-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 inline-block">Note: {order.notes}</p>}
+              <p className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{order.customer}</p>
+              <p className="text-xs text-slate-600">Order ID: {order.id}</p>
+              {order.notes && <p className="mt-1 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 inline-block">Note: {order.notes}</p>}
             </div>
             <div className="sm:text-right">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Handover Schedule</p>
-              <p className="mt-1 text-base sm:text-lg font-bold text-slate-900">{dateLabel(order.deliveryDate)}</p>
-              <p className="mt-0.5 text-xs text-slate-500">Order Status: <span className="font-semibold text-slate-800">{order.status}</span></p>
-              <p className="mt-0.5 text-xs text-slate-400">Payment Due on Receipt</p>
+              <p className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{dateLabel(order.deliveryDate)}</p>
+              <p className="text-xs text-slate-500">Order Status: <span className="font-semibold text-slate-800">{order.status}</span></p>
+              <p className="text-xs text-slate-400">Payment Due on Receipt</p>
             </div>
           </div>
 
           {/* Table */}
-          <div className="mt-6 overflow-x-auto">
+          <div className="mt-4 print:mt-3 overflow-x-auto">
             <table className="w-full min-w-[360px] text-left text-sm">
               <thead className="border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th className="pb-3">Sweet Product</th>
-                  <th className="pb-3 text-right">Quantity</th>
-                  <th className="pb-3 text-right">Rate</th>
-                  <th className="pb-3 text-right">Amount</th>
+                  <th className="pb-2.5">Sweet Product</th>
+                  <th className="pb-2.5 text-right">Quantity</th>
+                  <th className="pb-2.5 text-right">Rate</th>
+                  <th className="pb-2.5 text-right">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 <tr className="border-b border-slate-100">
-                  <td className="py-3 font-semibold text-slate-900">{productName}</td>
-                  <td className="py-3 text-right font-medium text-slate-700">{order.qty} {productUnit}</td>
-                  <td className="py-3 text-right text-slate-700">{money(rate)}</td>
-                  <td className="py-3 text-right font-bold text-slate-900">{money(total)}</td>
+                  <td className="py-2.5 font-semibold text-slate-900">{productName}</td>
+                  <td className="py-2.5 text-right font-medium text-slate-700">{order.qty} {productUnit}</td>
+                  <td className="py-2.5 text-right text-slate-700">{money(rate)}</td>
+                  <td className="py-2.5 text-right font-bold text-slate-900">{money(total)}</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
           {/* Total */}
-          <div className="mt-6 flex justify-end">
-            <div className="w-full max-w-[240px] border-t-2 border-slate-900 pt-3">
+          <div className="mt-4 print:mt-3 flex justify-end">
+            <div className="w-full max-w-[240px] border-t-2 border-slate-900 pt-2.5">
               <div className="flex items-center justify-between text-sm sm:text-base font-bold text-slate-900">
                 <span>Grand Total:</span>
                 <span className="text-xl sm:text-2xl text-amber-600">{money(total)}</span>
@@ -491,7 +527,7 @@ function Invoice({ order, product, rate, onClose }: {
             </div>
           </div>
 
-          <p className="mt-8 sm:mt-12 border-t border-slate-200 pt-4 text-center text-xs text-slate-400">
+          <p className="mt-6 print:mt-4 border-t border-slate-200 pt-3 text-center text-xs text-slate-400">
             Thank you for choosing Dhuniya Products. We take pride in authentic eastern sweets.
           </p>
         </article>
@@ -2072,8 +2108,46 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
 }
 
 // --- Root Component ---
+const VALID_TABS = ["Dashboard", "Orders", "Products"] as const;
+type TabType = (typeof VALID_TABS)[number];
+
+const normalizeTab = (raw: string | null | undefined): TabType => {
+  if (!raw) return "Dashboard";
+  const clean = raw.replace(/^[#?]/, "").trim().toLowerCase();
+  if (clean === "orders" || clean.includes("orders")) return "Orders";
+  if (clean === "products" || clean.includes("products")) return "Products";
+  return "Dashboard";
+};
+
+const getInitialTab = (): TabType => {
+  if (typeof window === "undefined") return "Dashboard";
+  try {
+    // 1. Check URL query search param (?tab=orders)
+    const searchParams = new URLSearchParams(window.location.search);
+    const tabParam = searchParams.get("tab");
+    if (tabParam) {
+      const normalized = normalizeTab(tabParam);
+      if (normalized !== "Dashboard") return normalized;
+    }
+
+    // 2. Check URL hash (#orders)
+    if (window.location.hash) {
+      const normalized = normalizeTab(window.location.hash);
+      if (normalized !== "Dashboard") return normalized;
+    }
+
+    // 3. Check persistent localStorage
+    const saved = localStorage.getItem("dhuniya_active_tab");
+    if (saved) {
+      const normalized = normalizeTab(saved);
+      if (normalized !== "Dashboard") return normalized;
+    }
+  } catch { }
+  return "Dashboard";
+};
+
 export default function Home() {
-  const [active, setActive] = useState("Dashboard");
+  const [active, setActiveState] = useState<TabType>("Dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -2081,6 +2155,52 @@ export default function Home() {
   const [initialProductFilter, setInitialProductFilter] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const setActive = (tab: string) => {
+    const nextTab = normalizeTab(tab);
+    setActiveState(nextTab);
+    try {
+      localStorage.setItem("dhuniya_active_tab", nextTab);
+      const url = new URL(window.location.href);
+      if (nextTab === "Dashboard") {
+        url.searchParams.delete("tab");
+        url.hash = "";
+      } else {
+        url.searchParams.set("tab", nextTab.toLowerCase());
+        url.hash = nextTab.toLowerCase();
+      }
+      window.history.replaceState(null, "", url.toString());
+    } catch { }
+  };
+
+  useEffect(() => {
+    try {
+      const targetTab = getInitialTab();
+      if (targetTab !== "Dashboard") {
+        setActiveState(targetTab);
+      }
+      const url = new URL(window.location.href);
+      if (targetTab !== "Dashboard") {
+        url.searchParams.set("tab", targetTab.toLowerCase());
+        url.hash = targetTab.toLowerCase();
+        window.history.replaceState(null, "", url.toString());
+      }
+    } catch { }
+
+    const handleLocationChange = () => {
+      try {
+        const currentTab = getInitialTab();
+        setActiveState(currentTab);
+      } catch { }
+    };
+
+    window.addEventListener("hashchange", handleLocationChange);
+    window.addEventListener("popstate", handleLocationChange);
+    return () => {
+      window.removeEventListener("hashchange", handleLocationChange);
+      window.removeEventListener("popstate", handleLocationChange);
+    };
+  }, []);
 
   const addToast = (type: "success" | "error" | "info", message: string) => {
     const id = Math.random().toString(36).slice(2);
