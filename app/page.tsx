@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { getSupabase } from "@/lib/supabase";
 import {
   ArrowRight,
   Bell,
@@ -34,6 +35,7 @@ type Product = {
   unit: string;
   price: number;
   active: boolean;
+  imageUrl?: string;
 };
 
 type Order = {
@@ -449,7 +451,7 @@ function Invoice({ order, product, rate, onClose }: {
 }
 
 // --- Product Modal ---
-type ProductFormData = { name: string; unit: string; price: string; active: boolean };
+type ProductFormData = { name: string; unit: string; price: string; active: boolean; imageUrl?: string };
 
 function ProductModal({
   initial,
@@ -465,6 +467,7 @@ function ProductModal({
     unit: initial?.unit ?? "kg",
     price: initial?.price?.toString() ?? "",
     active: initial?.active ?? true,
+    imageUrl: initial?.imageUrl ?? "",
   });
   const [errors, setErrors] = useState<Partial<ProductFormData>>({});
 
@@ -497,7 +500,7 @@ function ProductModal({
             <input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="e.g. Motichoor Ladoo"
+              placeholder="e.g. Musket Halwa"
               className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${
                 errors.name ? "border-rose-400 bg-rose-50/30" : "border-slate-300"
               }`}
@@ -523,12 +526,22 @@ function ProductModal({
               type="number"
               value={form.price}
               onChange={(e) => setForm({ ...form, price: e.target.value })}
-              placeholder="480"
+              placeholder="1200"
               className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${
                 errors.price ? "border-rose-400 bg-rose-50/30" : "border-slate-300"
               }`}
             />
             {errors.price && <p className="mt-1 text-xs text-rose-600">{errors.price}</p>}
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-bold text-slate-700">Image URL (Cloudflare Images / CDN)</label>
+            <input
+              type="url"
+              value={form.imageUrl ?? ""}
+              onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+              placeholder="https://imagedelivery.net/... (optional)"
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all"
+            />
           </div>
           <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
             <div>
@@ -621,9 +634,13 @@ function ProductsPage({
                   <div key={p.id} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm hover:border-amber-300 transition-all space-y-3">
                     <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40 shadow-2xs">
-                          {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
-                        </div>
+                        {p.imageUrl ? (
+                          <img src={p.imageUrl} alt={p.name} className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40 shadow-2xs" />
+                        ) : (
+                          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40 shadow-2xs">
+                            {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <p className="font-bold text-slate-900 text-base truncate">{p.name}</p>
                           <p className="text-xs font-semibold text-amber-700">{money(p.price)} / {p.unit}</p>
@@ -706,9 +723,13 @@ function ProductsPage({
                       <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 font-bold text-xs">
-                              {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
-                            </div>
+                            {p.imageUrl ? (
+                              <img src={p.imageUrl} alt={p.name} className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40" />
+                            ) : (
+                              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 font-bold text-xs">
+                                {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
+                              </div>
+                            )}
                             <span className="font-bold text-slate-900">{p.name}</span>
                           </div>
                         </td>
@@ -1994,6 +2015,78 @@ export default function Home() {
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
   const [nextProductId, setNextProductId] = useState(4);
   const [initialProductFilter, setInitialProductFilter] = useState<number | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Load from Supabase on mount (with localStorage fallback)
+  useEffect(() => {
+    const client = getSupabase();
+    if (client) {
+      setIsSyncing(true);
+      // Fetch Products
+      client
+        .from("products")
+        .select("*")
+        .order("id", { ascending: true })
+        .then(({ data, error }) => {
+          if (!error && data && data.length > 0) {
+            setProducts(
+              data.map((p: any) => ({
+                id: Number(p.id),
+                name: p.name,
+                unit: p.unit,
+                price: Number(p.price),
+                active: Boolean(p.active),
+                imageUrl: p.image_url || undefined,
+              }))
+            );
+            const maxId = Math.max(...data.map((p: any) => Number(p.id)), 0);
+            setNextProductId(maxId + 1);
+          } else {
+            try {
+              const local = localStorage.getItem("dhuniya_products");
+              if (local) setProducts(JSON.parse(local));
+            } catch {}
+          }
+        });
+
+      // Fetch Orders
+      client
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .then(({ data, error }) => {
+          if (!error && data && data.length > 0) {
+            setOrders(
+              data.map((o: any) => ({
+                id: o.id,
+                date: o.date,
+                deliveryDate: o.delivery_date,
+                customer: o.customer,
+                productId: Number(o.product_id),
+                qty: Number(o.qty),
+                rate: o.rate ? Number(o.rate) : undefined,
+                status: o.status,
+                notes: o.notes || undefined,
+              }))
+            );
+          } else {
+            try {
+              const local = localStorage.getItem("dhuniya_orders");
+              if (local) setOrders(JSON.parse(local));
+            } catch {}
+          }
+          setIsSyncing(false);
+        });
+    } else {
+      // LocalStorage fallback
+      try {
+        const localP = localStorage.getItem("dhuniya_products");
+        if (localP) setProducts(JSON.parse(localP));
+        const localO = localStorage.getItem("dhuniya_orders");
+        if (localO) setOrders(JSON.parse(localO));
+      } catch {}
+    }
+  }, []);
 
   // Navigate to Orders filtered by a specific sweet
   const viewProductOrders = (productId: number) => {
@@ -2003,19 +2096,79 @@ export default function Home() {
 
   // Product CRUD
   const addProduct = (data: ProductFormData) => {
-    setProducts((prev) => [
-      ...prev,
-      { id: nextProductId, name: data.name, unit: data.unit, price: Number(data.price), active: data.active },
-    ]);
+    const newId = nextProductId;
+    const newProduct: Product = {
+      id: newId,
+      name: data.name,
+      unit: data.unit,
+      price: Number(data.price),
+      active: data.active,
+      imageUrl: data.imageUrl || undefined,
+    };
+    setProducts((prev) => {
+      const updated = [...prev, newProduct];
+      try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     setNextProductId((n) => n + 1);
+
+    const client = getSupabase();
+    if (client) {
+      client.from("products").insert({
+        name: data.name,
+        unit: data.unit,
+        price: Number(data.price),
+        active: data.active,
+        image_url: data.imageUrl || null,
+      }).then();
+    }
   };
+
   const editProduct = (id: number, data: ProductFormData) => {
-    setProducts((prev) =>
-      prev.map((p) => p.id === id ? { ...p, name: data.name, unit: data.unit, price: Number(data.price), active: data.active } : p)
-    );
+    setProducts((prev) => {
+      const updated = prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              name: data.name,
+              unit: data.unit,
+              price: Number(data.price),
+              active: data.active,
+              imageUrl: data.imageUrl || undefined,
+            }
+          : p
+      );
+      try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    const client = getSupabase();
+    if (client) {
+      client
+        .from("products")
+        .update({
+          name: data.name,
+          unit: data.unit,
+          price: Number(data.price),
+          active: data.active,
+          image_url: data.imageUrl || null,
+        })
+        .eq("id", id)
+        .then();
+    }
   };
+
   const deleteProduct = (id: number) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+    setProducts((prev) => {
+      const updated = prev.filter((p) => p.id !== id);
+      try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    const client = getSupabase();
+    if (client) {
+      client.from("products").delete().eq("id", id).then();
+    }
   };
 
   // Order CRUD
@@ -2031,11 +2184,31 @@ export default function Home() {
       status: "Pending",
       notes: data.notes || undefined,
     };
-    setOrders((prev) => [newOrder, ...prev]);
+    setOrders((prev) => {
+      const updated = [newOrder, ...prev];
+      try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    const client = getSupabase();
+    if (client) {
+      client.from("orders").insert({
+        id: newOrder.id,
+        date: newOrder.date,
+        delivery_date: newOrder.deliveryDate,
+        customer: newOrder.customer,
+        product_id: newOrder.productId,
+        qty: newOrder.qty,
+        rate: newOrder.rate ?? null,
+        status: newOrder.status,
+        notes: newOrder.notes ?? null,
+      }).then();
+    }
   };
+
   const editOrder = (id: string, data: OrderFormData) => {
-    setOrders((prev) =>
-      prev.map((o) =>
+    setOrders((prev) => {
+      const updated = prev.map((o) =>
         o.id === id
           ? {
               ...o,
@@ -2047,14 +2220,52 @@ export default function Home() {
               notes: data.notes || undefined,
             }
           : o
-      )
-    );
+      );
+      try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    const client = getSupabase();
+    if (client) {
+      client
+        .from("orders")
+        .update({
+          customer: data.customer,
+          product_id: Number(data.productId),
+          qty: Number(data.qty),
+          rate: data.rate ? Number(data.rate) : null,
+          delivery_date: data.deliveryDate,
+          notes: data.notes || null,
+        })
+        .eq("id", id)
+        .then();
+    }
   };
+
   const deleteOrder = (id: string) => {
-    setOrders((prev) => prev.filter((o) => o.id !== id));
+    setOrders((prev) => {
+      const updated = prev.filter((o) => o.id !== id);
+      try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    const client = getSupabase();
+    if (client) {
+      client.from("orders").delete().eq("id", id).then();
+    }
   };
+
   const updateStatus = (id: string, status: string) => {
-    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+    setOrders((prev) => {
+      const updated = prev.map((o) => (o.id === id ? { ...o, status } : o));
+      try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    const client = getSupabase();
+    if (client) {
+      client.from("orders").update({ status }).eq("id", id).then();
+    }
   };
 
   const generateInvoice = (order: Order) => setInvoiceOrder(order);

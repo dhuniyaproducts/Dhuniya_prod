@@ -11,6 +11,23 @@ const nextConfig: NextConfig = {
   // Must be disabled when cacheComponents is false.
   partialPrefetching: false,
 
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "imagedelivery.net",
+      },
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+      },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
+    ],
+  },
+
   turbopack: {
     rules: {
       "*.css": {
