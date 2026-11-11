@@ -41,4 +41,3 @@ export type DbOrder = {
   notes?: string | null;
   created_at?: string;
 };
-
