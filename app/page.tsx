@@ -71,23 +71,46 @@ const STATUS_STYLES: Record<Status, { bg: string; text: string; dot: string; bor
   Cancelled: { bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-500", border: "border-rose-200" },
 };
 
-// --- Seed Data ---
-const PRODUCTS_SEED: Product[] = [
-  { id: 1, name: "Motichoor Ladoo", unit: "kg", price: 480, active: true },
-  { id: 2, name: "Kaju Katli", unit: "kg", price: 920, active: true },
-  { id: 3, name: "Gulab Jamun", unit: "kg", price: 360, active: true },
-];
+// --- Toast Notification Types ---
+type Toast = {
+  id: string;
+  type: "success" | "error" | "info";
+  message: string;
+};
 
-const ORDERS_SEED: Order[] = [
-  { id: "ORD-1048", date: "2026-10-30", deliveryDate: "2026-10-31", customer: "Sharma Sweets", productId: 1, qty: 8, status: "Confirmed", notes: "Extra saffron" },
-  { id: "ORD-1047", date: "2026-10-30", deliveryDate: "2026-10-31", customer: "Anita Caterers", productId: 1, qty: 6.5, status: "In Production" },
-  { id: "ORD-1046", date: "2026-10-30", deliveryDate: "2026-11-01", customer: "Ramesh Kumar", productId: 1, qty: 4, status: "Confirmed" },
-  { id: "ORD-1045", date: "2026-10-30", deliveryDate: "2026-10-30", customer: "The Grand Hotel", productId: 2, qty: 7, status: "Ready to Bill" },
-  { id: "ORD-1044", date: "2026-10-30", deliveryDate: "2026-10-30", customer: "Priya Events", productId: 2, qty: 5, status: "Ready to Bill", notes: "Gift packaging" },
-  { id: "ORD-1043", date: "2026-10-30", deliveryDate: "2026-11-02", customer: "Rajasthan Bhoj", productId: 3, qty: 5.25, status: "Confirmed" },
-  { id: "ORD-1042", date: "2026-10-30", deliveryDate: "2026-11-03", customer: "Neha Gupta", productId: 3, qty: 3.5, status: "Pending" },
-  { id: "ORD-1041", date: "2026-10-29", deliveryDate: "2026-10-30", customer: "Meera Banquets", productId: 2, qty: 12, status: "Ready to Bill" },
-];
+function ToastContainer({
+  toasts,
+  onDismiss,
+}: {
+  toasts: Toast[];
+  onDismiss: (id: string) => void;
+}) {
+  if (toasts.length === 0) return null;
+  return (
+    <div className="fixed bottom-20 sm:bottom-6 right-4 z-[70] flex flex-col gap-2 max-w-sm w-full pointer-events-none px-3 sm:px-0">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={`pointer-events-auto flex items-center justify-between gap-3 p-3.5 rounded-xl shadow-lg border text-xs font-semibold animate-in slide-in-from-bottom-2 transition-all ${t.type === "success"
+              ? "bg-emerald-600 text-white border-emerald-700"
+              : t.type === "error"
+                ? "bg-rose-600 text-white border-rose-700"
+                : "bg-slate-900 text-white border-slate-800"
+            }`}
+        >
+          <div className="flex items-center gap-2">
+            {t.type === "success" && <CheckCircle2 className="size-4 shrink-0 text-emerald-200" />}
+            {t.type === "error" && <X className="size-4 shrink-0 text-rose-200" />}
+            <span>{t.message}</span>
+          </div>
+          <button onClick={() => onDismiss(t.id)} className="opacity-70 hover:opacity-100 p-0.5">
+            <X className="size-3.5" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // --- Helpers ---
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -112,13 +135,22 @@ const getTodayStr = () => {
       const m = String(d.getMonth() + 1).padStart(2, "0");
       const day = String(d.getDate()).padStart(2, "0");
       return `${y}-${m}-${day}`;
-    } catch {}
+    } catch { }
   }
   return "2026-10-30";
 };
 
-let nextOrderNum = 1049;
-const genOrderId = () => `ORD-${nextOrderNum++}`;
+const genOrderId = (existingOrders: Order[]) => {
+  let maxNum = 1000;
+  for (const o of existingOrders) {
+    const match = o.id.match(/^ORD-(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+  return `ORD-${maxNum + 1}`;
+};
 
 const getHandoverBadge = (deliveryDateStr: string) => {
   if (!deliveryDateStr) return null;
@@ -139,7 +171,7 @@ const getHandoverBadge = (deliveryDateStr: string) => {
     } else if (diffDays <= 3) {
       return { label: `In ${diffDays} days`, style: "bg-blue-50 text-blue-700 border-blue-200" };
     }
-  } catch {}
+  } catch { }
   return null;
 };
 
@@ -186,7 +218,7 @@ function PageHeader({ title, onMenu, action }: { title: string; onMenu?: () => v
           year: "numeric",
         }).format(now)
       );
-    } catch {}
+    } catch { }
   }, []);
 
   return (
@@ -268,9 +300,8 @@ function Sidebar({ active, setActive, open, setOpen, orderCount }: {
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[280px] sm:w-[260px] flex-col border-r border-slate-800 bg-[#0f172a] text-slate-200 px-5 py-6 transition-transform duration-200 lg:translate-x-0 ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-[280px] sm:w-[260px] flex-col border-r border-slate-800 bg-[#0f172a] text-slate-200 px-5 py-6 transition-transform duration-200 lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         {/* Brand with close button on mobile */}
         <div className="flex items-center justify-between px-1">
@@ -303,21 +334,19 @@ function Sidebar({ active, setActive, open, setOpen, orderCount }: {
               <button
                 key={label}
                 onClick={() => { setActive(label); setOpen(false); }}
-                className={`flex h-11 items-center gap-3 rounded-xl px-3.5 text-sm font-semibold transition-all ${
-                  isActive
-                    ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
-                    : "text-slate-400 hover:text-white hover:bg-slate-800/70"
-                }`}
+                className={`flex h-11 items-center gap-3 rounded-xl px-3.5 text-sm font-semibold transition-all ${isActive
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/70"
+                  }`}
               >
                 <Icon className={`size-[18px] ${isActive ? "text-white" : "text-slate-400"}`} />
                 <span>{label}</span>
                 {label === "Orders" && (
                   <span
-                    className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                      isActive
-                        ? "bg-amber-700 text-white"
-                        : "bg-slate-800 text-amber-300 border border-slate-700"
-                    }`}
+                    className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold ${isActive
+                      ? "bg-amber-700 text-white"
+                      : "bg-slate-800 text-amber-300 border border-slate-700"
+                      }`}
                   >
                     {orderCount}
                   </span>
@@ -347,11 +376,32 @@ function Sidebar({ active, setActive, open, setOpen, orderCount }: {
 
 // --- Invoice ---
 function Invoice({ order, product, rate, onClose }: {
-  order: Order; product: Product; rate: number; onClose: () => void;
+  order: Order; product?: Product | null; rate: number; onClose: () => void;
 }) {
   const total = order.qty * rate;
+  const productName = product?.name ?? "Sweet Item";
+  const productUnit = product?.unit ?? "kg";
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-3 sm:p-4 backdrop-blur-xs flex items-center justify-center">
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        @media print {
+          body { background: white !important; }
+          body * { visibility: hidden !important; }
+          #printable-invoice, #printable-invoice * { visibility: visible !important; }
+          #printable-invoice {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 32px !important;
+            box-shadow: none !important;
+            border: none !important;
+          }
+        }
+      ` }} />
       <div className="my-5 w-full max-w-[760px] rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
         <div className="border-b border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50 flex items-center justify-between print:hidden gap-2">
           <div>
@@ -360,17 +410,17 @@ function Invoice({ order, product, rate, onClose }: {
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
             <Button variant="outline" size="sm" onClick={() => window.print()} className="border-slate-300 text-slate-700 text-xs h-8 px-2.5 sm:px-3">
-              <Printer className="size-3.5" /> <span className="hidden sm:inline">Print</span>
+              <Printer className="size-3.5" /> <span className="hidden sm:inline">Print Bill</span>
             </Button>
             <Button size="sm" onClick={() => window.print()} className="bg-amber-600 text-white hover:bg-amber-700 text-xs h-8 px-2.5 sm:px-3">
-              <Download className="size-3.5" /> <span className="hidden sm:inline">PDF</span>
+              <Download className="size-3.5" /> <span className="hidden sm:inline">Download PDF</span>
             </Button>
             <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700" aria-label="Close invoice">
               <X className="size-4" />
             </button>
           </div>
         </div>
-        <article className="p-4 sm:p-8 md:p-12">
+        <article id="printable-invoice" className="p-4 sm:p-8 md:p-12">
           {/* Header */}
           <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-6 sm:flex-row">
             <div>
@@ -422,8 +472,8 @@ function Invoice({ order, product, rate, onClose }: {
               </thead>
               <tbody>
                 <tr className="border-b border-slate-100">
-                  <td className="py-3 font-semibold text-slate-900">{product.name}</td>
-                  <td className="py-3 text-right font-medium text-slate-700">{order.qty} {product.unit}</td>
+                  <td className="py-3 font-semibold text-slate-900">{productName}</td>
+                  <td className="py-3 text-right font-medium text-slate-700">{order.qty} {productUnit}</td>
                   <td className="py-3 text-right text-slate-700">{money(rate)}</td>
                   <td className="py-3 text-right font-bold text-slate-900">{money(total)}</td>
                 </tr>
@@ -501,9 +551,8 @@ function ProductModal({
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="e.g. Musket Halwa"
-              className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${
-                errors.name ? "border-rose-400 bg-rose-50/30" : "border-slate-300"
-              }`}
+              className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.name ? "border-rose-400 bg-rose-50/30" : "border-slate-300"
+                }`}
             />
             {errors.name && <p className="mt-1 text-xs text-rose-600">{errors.name}</p>}
           </div>
@@ -527,9 +576,8 @@ function ProductModal({
               value={form.price}
               onChange={(e) => setForm({ ...form, price: e.target.value })}
               placeholder="1200"
-              className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${
-                errors.price ? "border-rose-400 bg-rose-50/30" : "border-slate-300"
-              }`}
+              className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.price ? "border-rose-400 bg-rose-50/30" : "border-slate-300"
+                }`}
             />
             {errors.price && <p className="mt-1 text-xs text-rose-600">{errors.price}</p>}
           </div>
@@ -553,14 +601,12 @@ function ProductModal({
               role="switch"
               aria-checked={form.active}
               onClick={() => setForm({ ...form, active: !form.active })}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${
-                form.active ? "bg-amber-600" : "bg-slate-300"
-              }`}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${form.active ? "bg-amber-600" : "bg-slate-300"
+                }`}
             >
               <span
-                className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                  form.active ? "translate-x-5" : "translate-x-0"
-                }`}
+                className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.active ? "translate-x-5" : "translate-x-0"
+                  }`}
               />
             </button>
           </div>
@@ -655,9 +701,8 @@ function ProductsPage({
                         </div>
                       </div>
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
-                          p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"
-                        }`}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"
+                          }`}
                       >
                         <span className={`size-1.5 rounded-full ${p.active ? "bg-emerald-500" : "bg-slate-400"}`} />
                         {p.active ? "Active" : "Archived"}
@@ -710,95 +755,94 @@ function ProductsPage({
             <div className="hidden sm:block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  <tr>
-                    <th className="px-6 py-4">Sweet Product</th>
-                    <th className="px-6 py-4">Unit</th>
-                    <th className="px-6 py-4">Standard Rate</th>
-                    <th className="px-6 py-4">Active Production Demand</th>
-                    <th className="px-6 py-4">Catalog Status</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {products.map((p) => {
-                    const activeOrders = orders.filter(
-                      (o) => o.productId === p.id && !["Completed", "Cancelled"].includes(o.status)
-                    );
-                    const totalOrderedKg = activeOrders.reduce((sum, o) => sum + o.qty, 0);
+                  <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th className="px-6 py-4">Sweet Product</th>
+                      <th className="px-6 py-4">Unit</th>
+                      <th className="px-6 py-4">Standard Rate</th>
+                      <th className="px-6 py-4">Active Production Demand</th>
+                      <th className="px-6 py-4">Catalog Status</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {products.map((p) => {
+                      const activeOrders = orders.filter(
+                        (o) => o.productId === p.id && !["Completed", "Cancelled"].includes(o.status)
+                      );
+                      const totalOrderedKg = activeOrders.reduce((sum, o) => sum + o.qty, 0);
 
-                    return (
-                      <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            {p.imageUrl ? (
-                              <img src={p.imageUrl} alt={p.name} className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40" />
-                            ) : (
-                              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 font-bold text-xs">
-                                {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              {p.imageUrl ? (
+                                <img src={p.imageUrl} alt={p.name} className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40" />
+                              ) : (
+                                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 font-bold text-xs">
+                                  {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
+                                </div>
+                              )}
+                              <span className="font-bold text-slate-900">{p.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 font-medium text-slate-600">{p.unit}</td>
+                          <td className="px-6 py-4 font-bold text-slate-900">
+                            {money(p.price)}
+                            <span className="ml-1 text-xs font-normal text-slate-400">/ {p.unit}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            {activeOrders.length > 0 ? (
+                              <div>
+                                <p className="font-bold text-slate-900">
+                                  {totalOrderedKg.toFixed(2)} {p.unit}
+                                </p>
+                                <button
+                                  onClick={() => onViewProductOrders(p.id)}
+                                  className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-700 hover:underline"
+                                >
+                                  {activeOrders.length} order{activeOrders.length !== 1 ? "s" : ""} · See who ordered & handover →
+                                </button>
                               </div>
+                            ) : (
+                              <span className="text-xs text-slate-400">No active orders</span>
                             )}
-                            <span className="font-bold text-slate-900">{p.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 font-medium text-slate-600">{p.unit}</td>
-                        <td className="px-6 py-4 font-bold text-slate-900">
-                          {money(p.price)}
-                          <span className="ml-1 text-xs font-normal text-slate-400">/ {p.unit}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          {activeOrders.length > 0 ? (
-                            <div>
-                              <p className="font-bold text-slate-900">
-                                {totalOrderedKg.toFixed(2)} {p.unit}
-                              </p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"
+                              }`}>
+                              <span className={`size-1.5 rounded-full ${p.active ? "bg-emerald-500" : "bg-slate-400"}`} />
+                              {p.active ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
                               <button
-                                onClick={() => onViewProductOrders(p.id)}
-                                className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-700 hover:underline"
+                                onClick={() => setEditProduct(p)}
+                                className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                                title="Edit sweet"
                               >
-                                {activeOrders.length} order{activeOrders.length !== 1 ? "s" : ""} · See who ordered & handover →
+                                <Edit2 className="size-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setDeleteId(p.id)}
+                                className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors"
+                                title="Delete sweet"
+                              >
+                                <Trash2 className="size-3.5" />
                               </button>
                             </div>
-                          ) : (
-                            <span className="text-xs text-slate-400">No active orders</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border ${
-                            p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"
-                          }`}>
-                            <span className={`size-1.5 rounded-full ${p.active ? "bg-emerald-500" : "bg-slate-400"}`} />
-                            {p.active ? "Active" : "Inactive"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => setEditProduct(p)}
-                              className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                              title="Edit sweet"
-                            >
-                              <Edit2 className="size-3.5" />
-                            </button>
-                            <button
-                              onClick={() => setDeleteId(p.id)}
-                              className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors"
-                              title="Delete sweet"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
 
       {(showModal || editProduct) && (
         <ProductModal
@@ -888,9 +932,8 @@ function OrderModal({
               value={form.customer}
               onChange={(e) => setForm({ ...form, customer: e.target.value })}
               placeholder="e.g. Sharma Sweets, Grand Banquets"
-              className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${
-                errors.customer ? "border-rose-400 bg-rose-50/30" : "border-slate-300"
-              }`}
+              className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.customer ? "border-rose-400 bg-rose-50/30" : "border-slate-300"
+                }`}
             />
             {errors.customer && <p className="mt-1 text-xs text-rose-600">{errors.customer}</p>}
           </div>
@@ -919,9 +962,8 @@ function OrderModal({
                 value={form.qty}
                 onChange={(e) => setForm({ ...form, qty: e.target.value })}
                 placeholder="e.g. 10"
-                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${
-                  errors.qty ? "border-rose-400 bg-rose-50/30" : "border-slate-300"
-                }`}
+                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.qty ? "border-rose-400 bg-rose-50/30" : "border-slate-300"
+                  }`}
               />
               {errors.qty && <p className="mt-1 text-xs text-rose-600">{errors.qty}</p>}
             </div>
@@ -933,9 +975,8 @@ function OrderModal({
                 type="date"
                 value={form.deliveryDate}
                 onChange={(e) => setForm({ ...form, deliveryDate: e.target.value })}
-                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${
-                  errors.deliveryDate ? "border-rose-400 bg-rose-50/30" : "border-slate-300"
-                }`}
+                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.deliveryDate ? "border-rose-400 bg-rose-50/30" : "border-slate-300"
+                  }`}
               />
               {errors.deliveryDate && <p className="mt-1 text-xs text-rose-600">{errors.deliveryDate}</p>}
             </div>
@@ -1405,17 +1446,15 @@ function OrdersPage({
               <button
                 key={tab.id}
                 onClick={() => setQuickTab(tab.id as typeof quickTab)}
-                className={`flex items-center gap-1.5 shrink-0 rounded-full px-3 sm:px-3.5 py-1.5 text-xs font-bold transition-all ${
-                  isActive
-                    ? "bg-amber-600 text-white shadow-sm shadow-amber-600/30"
-                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300"
-                }`}
+                className={`flex items-center gap-1.5 shrink-0 rounded-full px-3 sm:px-3.5 py-1.5 text-xs font-bold transition-all ${isActive
+                  ? "bg-amber-600 text-white shadow-sm shadow-amber-600/30"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+                  }`}
               >
                 <span>{tab.label}</span>
                 <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
-                    isActive ? "bg-amber-700 text-white" : "bg-slate-100 text-slate-600"
-                  }`}
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${isActive ? "bg-amber-700 text-white" : "bg-slate-100 text-slate-600"
+                    }`}
                 >
                   {tab.count}
                 </span>
@@ -1538,9 +1577,8 @@ function OrdersPage({
                   <button
                     key={mode}
                     onClick={() => setGroupBy(mode)}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-bold capitalize transition-all ${
-                      groupBy === mode ? "bg-white text-amber-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
-                    }`}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold capitalize transition-all ${groupBy === mode ? "bg-white text-amber-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                      }`}
                   >
                     {mode === "date" ? "By Date" : mode === "product" ? "By Sweet" : mode === "status" ? "By Status" : "Individual"}
                   </button>
@@ -1761,9 +1799,8 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
                     {/* Clickable sweet row */}
                     <button
                       onClick={() => setExpandedProductId(isExpanded ? null : product.id)}
-                      className={`flex w-full items-center justify-between gap-2.5 p-3.5 sm:px-6 sm:py-4 text-left transition-colors hover:bg-slate-50/80 ${
-                        isExpanded ? "bg-amber-50/40" : ""
-                      }`}
+                      className={`flex w-full items-center justify-between gap-2.5 p-3.5 sm:px-6 sm:py-4 text-left transition-colors hover:bg-slate-50/80 ${isExpanded ? "bg-amber-50/40" : ""
+                        }`}
                     >
                       <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
                         <div className="flex size-10 sm:size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-300/40 text-amber-900 font-bold text-xs sm:text-sm shadow-2xs">
@@ -1917,6 +1954,26 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
           </div>
         )}
 
+        {productBreakdown.length === 0 && (
+          <div className="mt-7 sm:mt-8 rounded-2xl border border-dashed border-slate-200 bg-white p-8 sm:p-10 text-center">
+            <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600 mb-3">
+              <Package className="size-6" />
+            </div>
+            <h4 className="text-sm sm:text-base font-bold text-slate-900">No Active Production Demand</h4>
+            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+              Add sweets to your catalog and register customer orders to see live kitchen breakdown and delivery schedules here.
+            </p>
+            <div className="mt-5 flex items-center justify-center gap-2.5">
+              <Button size="sm" onClick={() => setActive("Products")} className="bg-amber-600 text-white hover:bg-amber-700 text-xs">
+                Manage Products
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setActive("Orders")} className="border-slate-300 text-xs text-slate-700">
+                View Orders
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Order Status Summary */}
         <div className="mt-8">
           <h3 className="text-base sm:text-xl font-bold text-slate-900">Order Pipeline Status</h3>
@@ -2018,82 +2075,113 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
 export default function Home() {
   const [active, setActive] = useState("Dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [products, setProducts] = useState<Product[]>(PRODUCTS_SEED);
-  const [orders, setOrders] = useState<Order[]>(ORDERS_SEED);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
-  const [nextProductId, setNextProductId] = useState(4);
   const [initialProductFilter, setInitialProductFilter] = useState<number | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
-  // Load from Supabase on mount (with localStorage fallback)
+  const addToast = (type: "success" | "error" | "info", message: string) => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts((prev) => [...prev, { id, type, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  };
+
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Load from Supabase on mount
   useEffect(() => {
-    const client = getSupabase();
-    if (client) {
-      setIsSyncing(true);
-      // Fetch Products
-      client
-        .from("products")
-        .select("*")
-        .order("id", { ascending: true })
-        .then(({ data, error }) => {
-          if (!error && data && data.length > 0) {
-            setProducts(
-              data.map((p: any) => ({
-                id: Number(p.id),
-                name: p.name,
-                unit: p.unit,
-                price: Number(p.price),
-                active: Boolean(p.active),
-                imageUrl: p.image_url || undefined,
-              }))
-            );
-            const maxId = Math.max(...data.map((p: any) => Number(p.id)), 0);
-            setNextProductId(maxId + 1);
-          } else {
-            try {
-              const local = localStorage.getItem("dhuniya_products");
-              if (local) setProducts(JSON.parse(local));
-            } catch {}
-          }
-        });
+    async function loadData() {
+      setIsLoading(true);
+      const client = getSupabase();
+      if (!client) {
+        // Fallback to local offline cache
+        try {
+          const lp = localStorage.getItem("dhuniya_products");
+          if (lp) setProducts(JSON.parse(lp));
+          const lo = localStorage.getItem("dhuniya_orders");
+          if (lo) setOrders(JSON.parse(lo));
+        } catch { }
+        setIsLoading(false);
+        return;
+      }
 
-      // Fetch Orders
-      client
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .then(({ data, error }) => {
-          if (!error && data && data.length > 0) {
-            setOrders(
-              data.map((o: any) => ({
-                id: o.id,
-                date: o.date,
-                deliveryDate: o.delivery_date,
-                customer: o.customer,
-                productId: Number(o.product_id),
-                qty: Number(o.qty),
-                rate: o.rate ? Number(o.rate) : undefined,
-                status: o.status,
-                notes: o.notes || undefined,
-              }))
-            );
-          } else {
-            try {
-              const local = localStorage.getItem("dhuniya_orders");
-              if (local) setOrders(JSON.parse(local));
-            } catch {}
-          }
-          setIsSyncing(false);
-        });
-    } else {
-      // LocalStorage fallback
       try {
-        const localP = localStorage.getItem("dhuniya_products");
-        if (localP) setProducts(JSON.parse(localP));
-        const localO = localStorage.getItem("dhuniya_orders");
-        if (localO) setOrders(JSON.parse(localO));
-      } catch {}
+        // Fetch products from Supabase
+        const { data: prodData, error: prodErr } = await client
+          .from("products")
+          .select("*")
+          .order("id", { ascending: true });
+
+        if (prodErr) throw prodErr;
+
+        if (prodData && prodData.length > 0) {
+          const loadedProducts: Product[] = prodData.map((p: any) => ({
+            id: Number(p.id),
+            name: p.name,
+            unit: p.unit,
+            price: Number(p.price),
+            active: Boolean(p.active),
+            imageUrl: p.image_url || undefined,
+          }));
+          setProducts(loadedProducts);
+          try { localStorage.setItem("dhuniya_products", JSON.stringify(loadedProducts)); } catch { }
+        } else {
+          // If Supabase table is empty, check localStorage
+          try {
+            const lp = localStorage.getItem("dhuniya_products");
+            if (lp) setProducts(JSON.parse(lp));
+          } catch { }
+        }
+
+        // Fetch orders from Supabase
+        const { data: ordData, error: ordErr } = await client
+          .from("orders")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (ordErr) throw ordErr;
+
+        if (ordData && ordData.length > 0) {
+          const loadedOrders: Order[] = ordData.map((o: any) => ({
+            id: o.id,
+            date: o.date,
+            deliveryDate: o.delivery_date,
+            customer: o.customer,
+            productId: Number(o.product_id),
+            qty: Number(o.qty),
+            rate: o.rate ? Number(o.rate) : undefined,
+            status: o.status,
+            notes: o.notes || undefined,
+          }));
+          setOrders(loadedOrders);
+          try { localStorage.setItem("dhuniya_orders", JSON.stringify(loadedOrders)); } catch { }
+        } else {
+          try {
+            const lo = localStorage.getItem("dhuniya_orders");
+            if (lo) setOrders(JSON.parse(lo));
+          } catch { }
+        }
+      } catch (err: any) {
+        console.error("Error loading Supabase data:", err);
+        addToast("error", `Supabase connection note: ${err.message || "Using local storage"}`);
+        try {
+          const lp = localStorage.getItem("dhuniya_products");
+          if (lp) setProducts(JSON.parse(lp));
+          const lo = localStorage.getItem("dhuniya_orders");
+          if (lo) setOrders(JSON.parse(lo));
+        } catch { }
+      } finally {
+        setIsLoading(false);
+      }
     }
+
+    loadData();
   }, []);
 
   // Navigate to Orders filtered by a specific sweet
@@ -2102,183 +2190,268 @@ export default function Home() {
     setActive("Orders");
   };
 
-  // Product CRUD
-  const addProduct = (data: ProductFormData) => {
-    const newId = nextProductId;
+  // Product CRUD with Optimistic UI + Supabase sync + Rollback
+  const addProduct = async (data: ProductFormData) => {
+    const tempId = Date.now();
     const newProduct: Product = {
-      id: newId,
-      name: data.name,
+      id: tempId,
+      name: data.name.trim(),
       unit: data.unit,
       price: Number(data.price),
       active: data.active,
-      imageUrl: data.imageUrl || undefined,
+      imageUrl: data.imageUrl?.trim() || undefined,
     };
+
     setProducts((prev) => {
       const updated = [...prev, newProduct];
-      try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch {}
+      try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { }
       return updated;
     });
-    setNextProductId((n) => n + 1);
+    addToast("success", `Sweet "${data.name}" added`);
 
     const client = getSupabase();
     if (client) {
-      client.from("products").insert({
-        name: data.name,
-        unit: data.unit,
-        price: Number(data.price),
-        active: data.active,
-        image_url: data.imageUrl || null,
-      }).then();
+      try {
+        const { data: inserted, error } = await client
+          .from("products")
+          .insert({
+            name: data.name.trim(),
+            unit: data.unit,
+            price: Number(data.price),
+            active: data.active,
+            image_url: data.imageUrl?.trim() || null,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        if (inserted) {
+          setProducts((prev) =>
+            prev.map((p) => (p.id === tempId ? { ...p, id: Number(inserted.id) } : p))
+          );
+        }
+      } catch (err: any) {
+        console.error("Supabase insert product error:", err);
+        addToast("error", `Failed to save product in Supabase: ${err.message}`);
+        setProducts((prev) => prev.filter((p) => p.id !== tempId));
+      }
     }
   };
 
-  const editProduct = (id: number, data: ProductFormData) => {
+  const editProduct = async (id: number, data: ProductFormData) => {
+    const prevProducts = [...products];
+    const updatedProduct: Product = {
+      id,
+      name: data.name.trim(),
+      unit: data.unit,
+      price: Number(data.price),
+      active: data.active,
+      imageUrl: data.imageUrl?.trim() || undefined,
+    };
+
     setProducts((prev) => {
-      const updated = prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              name: data.name,
-              unit: data.unit,
-              price: Number(data.price),
-              active: data.active,
-              imageUrl: data.imageUrl || undefined,
-            }
-          : p
-      );
-      try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch {}
+      const updated = prev.map((p) => (p.id === id ? updatedProduct : p));
+      try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { }
       return updated;
     });
+    addToast("success", `Sweet "${data.name}" updated`);
 
     const client = getSupabase();
     if (client) {
-      client
-        .from("products")
-        .update({
-          name: data.name,
-          unit: data.unit,
-          price: Number(data.price),
-          active: data.active,
-          image_url: data.imageUrl || null,
-        })
-        .eq("id", id)
-        .then();
+      try {
+        const { error } = await client
+          .from("products")
+          .update({
+            name: data.name.trim(),
+            unit: data.unit,
+            price: Number(data.price),
+            active: data.active,
+            image_url: data.imageUrl?.trim() || null,
+          })
+          .eq("id", id);
+
+        if (error) throw error;
+      } catch (err: any) {
+        console.error("Supabase update product error:", err);
+        addToast("error", `Supabase update failed: ${err.message}`);
+        setProducts(prevProducts);
+      }
     }
   };
 
-  const deleteProduct = (id: number) => {
+  const deleteProduct = async (id: number) => {
+    const prevProducts = [...products];
+    const target = products.find((p) => p.id === id);
+
     setProducts((prev) => {
       const updated = prev.filter((p) => p.id !== id);
-      try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch {}
+      try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { }
       return updated;
     });
+    addToast("info", `Deleted "${target?.name ?? "Sweet"}"`);
 
     const client = getSupabase();
     if (client) {
-      client.from("products").delete().eq("id", id).then();
+      try {
+        const { error } = await client.from("products").delete().eq("id", id);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error("Supabase delete product error:", err);
+        addToast("error", `Supabase delete failed: ${err.message}`);
+        setProducts(prevProducts);
+      }
     }
   };
 
-  // Order CRUD
-  const addOrder = (data: OrderFormData) => {
+  // Order CRUD with Optimistic UI + Supabase sync + Rollback
+  const addOrder = async (data: OrderFormData) => {
+    const newOrderId = genOrderId(orders);
     const newOrder: Order = {
-      id: genOrderId(),
+      id: newOrderId,
       date: getTodayStr(),
       deliveryDate: data.deliveryDate,
-      customer: data.customer,
+      customer: data.customer.trim(),
       productId: Number(data.productId),
       qty: Number(data.qty),
       rate: data.rate ? Number(data.rate) : undefined,
       status: "Pending",
-      notes: data.notes || undefined,
+      notes: data.notes?.trim() || undefined,
     };
+
     setOrders((prev) => {
       const updated = [newOrder, ...prev];
-      try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch {}
+      try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { }
       return updated;
     });
+    addToast("success", `Order ${newOrderId} created for ${newOrder.customer}`);
 
     const client = getSupabase();
     if (client) {
-      client.from("orders").insert({
-        id: newOrder.id,
-        date: newOrder.date,
-        delivery_date: newOrder.deliveryDate,
-        customer: newOrder.customer,
-        product_id: newOrder.productId,
-        qty: newOrder.qty,
-        rate: newOrder.rate ?? null,
-        status: newOrder.status,
-        notes: newOrder.notes ?? null,
-      }).then();
+      try {
+        const { error } = await client.from("orders").insert({
+          id: newOrder.id,
+          date: newOrder.date,
+          delivery_date: newOrder.deliveryDate,
+          customer: newOrder.customer,
+          product_id: newOrder.productId,
+          qty: newOrder.qty,
+          rate: newOrder.rate ?? null,
+          status: newOrder.status,
+          notes: newOrder.notes ?? null,
+        });
+
+        if (error) throw error;
+      } catch (err: any) {
+        console.error("Supabase insert order error:", err);
+        addToast("error", `Supabase error: ${err.message}`);
+        setOrders((prev) => prev.filter((o) => o.id !== newOrderId));
+      }
     }
   };
 
-  const editOrder = (id: string, data: OrderFormData) => {
+  const editOrder = async (id: string, data: OrderFormData) => {
+    const prevOrders = [...orders];
+    const current = orders.find((o) => o.id === id);
+    const updatedOrder: Order = {
+      id,
+      date: current?.date ?? getTodayStr(),
+      customer: data.customer.trim(),
+      productId: Number(data.productId),
+      qty: Number(data.qty),
+      rate: data.rate ? Number(data.rate) : undefined,
+      deliveryDate: data.deliveryDate,
+      notes: data.notes?.trim() || undefined,
+      status: current?.status ?? "Pending",
+    };
+
     setOrders((prev) => {
-      const updated = prev.map((o) =>
-        o.id === id
-          ? {
-              ...o,
-              customer: data.customer,
-              productId: Number(data.productId),
-              qty: Number(data.qty),
-              rate: data.rate ? Number(data.rate) : undefined,
-              deliveryDate: data.deliveryDate,
-              notes: data.notes || undefined,
-            }
-          : o
-      );
-      try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch {}
+      const updated = prev.map((o) => (o.id === id ? updatedOrder : o));
+      try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { }
       return updated;
     });
+    addToast("success", `Order ${id} updated`);
 
     const client = getSupabase();
     if (client) {
-      client
-        .from("orders")
-        .update({
-          customer: data.customer,
-          product_id: Number(data.productId),
-          qty: Number(data.qty),
-          rate: data.rate ? Number(data.rate) : null,
-          delivery_date: data.deliveryDate,
-          notes: data.notes || null,
-        })
-        .eq("id", id)
-        .then();
+      try {
+        const { error } = await client
+          .from("orders")
+          .update({
+            customer: data.customer.trim(),
+            product_id: Number(data.productId),
+            qty: Number(data.qty),
+            rate: data.rate ? Number(data.rate) : null,
+            delivery_date: data.deliveryDate,
+            notes: data.notes?.trim() || null,
+          })
+          .eq("id", id);
+
+        if (error) throw error;
+      } catch (err: any) {
+        console.error("Supabase update order error:", err);
+        addToast("error", `Supabase update failed: ${err.message}`);
+        setOrders(prevOrders);
+      }
     }
   };
 
-  const deleteOrder = (id: string) => {
+  const deleteOrder = async (id: string) => {
+    const prevOrders = [...orders];
+
     setOrders((prev) => {
       const updated = prev.filter((o) => o.id !== id);
-      try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch {}
+      try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { }
       return updated;
     });
+    addToast("info", `Deleted order ${id}`);
 
     const client = getSupabase();
     if (client) {
-      client.from("orders").delete().eq("id", id).then();
+      try {
+        const { error } = await client.from("orders").delete().eq("id", id);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error("Supabase delete order error:", err);
+        addToast("error", `Supabase delete failed: ${err.message}`);
+        setOrders(prevOrders);
+      }
     }
   };
 
-  const updateStatus = (id: string, status: string) => {
+  const updateStatus = async (id: string, status: string) => {
+    const prevOrders = [...orders];
+
     setOrders((prev) => {
       const updated = prev.map((o) => (o.id === id ? { ...o, status } : o));
-      try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch {}
+      try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { }
       return updated;
     });
+    addToast("success", `Order ${id} status set to "${status}"`);
 
     const client = getSupabase();
     if (client) {
-      client.from("orders").update({ status }).eq("id", id).then();
+      try {
+        const { error } = await client.from("orders").update({ status }).eq("id", id);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error("Supabase status update error:", err);
+        addToast("error", `Status update failed: ${err.message}`);
+        setOrders(prevOrders);
+      }
     }
   };
 
   const generateInvoice = (order: Order) => setInvoiceOrder(order);
 
-  const invoiceProduct = invoiceOrder ? (products.find((p) => p.id === invoiceOrder.productId) ?? products[0]) : null;
+  const invoiceProduct = invoiceOrder
+    ? (products.find((p) => p.id === invoiceOrder.productId) ?? {
+        id: invoiceOrder.productId,
+        name: "Sweet Item",
+        unit: "kg",
+        price: invoiceOrder.rate ?? 0,
+        active: true,
+      })
+    : null;
   const invoiceRate = invoiceOrder ? (invoiceOrder.rate ?? invoiceProduct?.price ?? 0) : 0;
   const activeOrderCount = orders.filter((o) => !["Completed", "Cancelled"].includes(o.status)).length;
 
@@ -2292,6 +2465,12 @@ export default function Home() {
         orderCount={activeOrderCount}
       />
       <main className="min-h-screen lg:ml-[260px] pb-24 lg:pb-16">
+        {isLoading && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center text-xs font-semibold text-amber-800 flex items-center justify-center gap-2">
+            <span className="size-2 rounded-full bg-amber-600 animate-ping" />
+            Connecting and syncing with Supabase...
+          </div>
+        )}
         {active === "Dashboard" && (
           <Dashboard
             orders={orders}
@@ -2332,18 +2511,16 @@ export default function Home() {
       <nav className="fixed bottom-0 inset-x-0 z-30 flex h-16 items-center justify-around border-t border-slate-200/90 bg-white/95 backdrop-blur-md px-2 lg:hidden shadow-[0_-2px_10px_rgba(0,0,0,0.03)]">
         <button
           onClick={() => setActive("Dashboard")}
-          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${
-            active === "Dashboard" ? "text-amber-600 font-bold" : "text-slate-400 hover:text-slate-700"
-          }`}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${active === "Dashboard" ? "text-amber-600 font-bold" : "text-slate-400 hover:text-slate-700"
+            }`}
         >
           <LayoutDashboard className="size-5" />
           <span className="text-[10px] mt-1 font-semibold">Dashboard</span>
         </button>
         <button
           onClick={() => setActive("Orders")}
-          className={`relative flex flex-col items-center justify-center flex-1 py-1 transition-colors ${
-            active === "Orders" ? "text-amber-600 font-bold" : "text-slate-400 hover:text-slate-700"
-          }`}
+          className={`relative flex flex-col items-center justify-center flex-1 py-1 transition-colors ${active === "Orders" ? "text-amber-600 font-bold" : "text-slate-400 hover:text-slate-700"
+            }`}
         >
           <div className="relative">
             <ClipboardList className="size-5" />
@@ -2357,9 +2534,8 @@ export default function Home() {
         </button>
         <button
           onClick={() => setActive("Products")}
-          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${
-            active === "Products" ? "text-amber-600 font-bold" : "text-slate-400 hover:text-slate-700"
-          }`}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${active === "Products" ? "text-amber-600 font-bold" : "text-slate-400 hover:text-slate-700"
+            }`}
         >
           <Package className="size-5" />
           <span className="text-[10px] mt-1 font-semibold">Products</span>
@@ -2373,7 +2549,7 @@ export default function Home() {
         </button>
       </nav>
 
-      {invoiceOrder && invoiceProduct && (
+      {invoiceOrder && (
         <Invoice
           order={invoiceOrder}
           product={invoiceProduct}
@@ -2381,6 +2557,9 @@ export default function Home() {
           onClose={() => setInvoiceOrder(null)}
         />
       )}
+
+      {/* Floating Toast Notification Container */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }
