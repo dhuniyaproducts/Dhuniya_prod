@@ -550,10 +550,18 @@ function ProductModal({
             </div>
             <button
               type="button"
+              role="switch"
+              aria-checked={form.active}
               onClick={() => setForm({ ...form, active: !form.active })}
-              className={`relative h-6 w-11 rounded-full transition-colors ${form.active ? "bg-amber-600" : "bg-slate-300"}`}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${
+                form.active ? "bg-amber-600" : "bg-slate-300"
+              }`}
             >
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${form.active ? "translate-x-5" : "translate-x-0.5"}`} />
+              <span
+                className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                  form.active ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
             </button>
           </div>
         </div>
