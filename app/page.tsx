@@ -2113,9 +2113,36 @@ type TabType = (typeof VALID_TABS)[number];
 
 const normalizeTab = (raw: string | null | undefined): TabType => {
   if (!raw) return "Dashboard";
-  const clean = raw.replace(/^#/, "").trim().toLowerCase();
-  if (clean === "orders") return "Orders";
-  if (clean === "products") return "Products";
+  const clean = raw.replace(/^[#?]/, "").trim().toLowerCase();
+  if (clean === "orders" || clean.includes("orders")) return "Orders";
+  if (clean === "products" || clean.includes("products")) return "Products";
+  return "Dashboard";
+};
+
+const getInitialTab = (): TabType => {
+  if (typeof window === "undefined") return "Dashboard";
+  try {
+    // 1. Check URL query search param (?tab=orders)
+    const searchParams = new URLSearchParams(window.location.search);
+    const tabParam = searchParams.get("tab");
+    if (tabParam) {
+      const normalized = normalizeTab(tabParam);
+      if (normalized !== "Dashboard") return normalized;
+    }
+
+    // 2. Check URL hash (#orders)
+    if (window.location.hash) {
+      const normalized = normalizeTab(window.location.hash);
+      if (normalized !== "Dashboard") return normalized;
+    }
+
+    // 3. Check persistent localStorage
+    const saved = localStorage.getItem("dhuniya_active_tab");
+    if (saved) {
+      const normalized = normalizeTab(saved);
+      if (normalized !== "Dashboard") return normalized;
+    }
+  } catch { }
   return "Dashboard";
 };
 
@@ -2134,37 +2161,45 @@ export default function Home() {
     setActiveState(nextTab);
     try {
       localStorage.setItem("dhuniya_active_tab", nextTab);
-      const hash = `#${nextTab.toLowerCase()}`;
-      if (window.location.hash !== hash) {
-        window.history.replaceState(null, "", hash);
+      const url = new URL(window.location.href);
+      if (nextTab === "Dashboard") {
+        url.searchParams.delete("tab");
+        url.hash = "";
+      } else {
+        url.searchParams.set("tab", nextTab.toLowerCase());
+        url.hash = nextTab.toLowerCase();
       }
+      window.history.replaceState(null, "", url.toString());
     } catch { }
   };
 
   useEffect(() => {
     try {
-      const hashTab = normalizeTab(window.location.hash);
-      const savedTab = normalizeTab(localStorage.getItem("dhuniya_active_tab"));
-      const targetTab = window.location.hash ? hashTab : savedTab;
-
+      const targetTab = getInitialTab();
       if (targetTab !== "Dashboard") {
         setActiveState(targetTab);
       }
-      const hash = `#${targetTab.toLowerCase()}`;
-      if (window.location.hash !== hash) {
-        window.history.replaceState(null, "", hash);
+      const url = new URL(window.location.href);
+      if (targetTab !== "Dashboard") {
+        url.searchParams.set("tab", targetTab.toLowerCase());
+        url.hash = targetTab.toLowerCase();
+        window.history.replaceState(null, "", url.toString());
       }
     } catch { }
 
-    const handleHashChange = () => {
+    const handleLocationChange = () => {
       try {
-        const currentHashTab = normalizeTab(window.location.hash);
-        setActiveState(currentHashTab);
+        const currentTab = getInitialTab();
+        setActiveState(currentTab);
       } catch { }
     };
 
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    window.addEventListener("hashchange", handleLocationChange);
+    window.addEventListener("popstate", handleLocationChange);
+    return () => {
+      window.removeEventListener("hashchange", handleLocationChange);
+      window.removeEventListener("popstate", handleLocationChange);
+    };
   }, []);
 
   const addToast = (type: "success" | "error" | "info", message: string) => {
