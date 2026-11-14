@@ -36,12 +36,39 @@ create table if not exists public.orders (
 alter table public.products enable row level security;
 alter table public.orders enable row level security;
 
+<<<<<<< Updated upstream
 -- Allow public read & write for app operations (or restrict to authenticated users)
 create policy "Allow all access to products" on public.products
   for all using (true) with check (true);
 
 create policy "Allow all access to orders" on public.orders
   for all using (true) with check (true);
+=======
+-- Drop existing policies if any
+drop policy if exists "Allow all access to products" on public.products;
+drop policy if exists "Allow all access to orders" on public.orders;
+drop policy if exists "Public read products" on public.products;
+drop policy if exists "Authenticated full access products" on public.products;
+drop policy if exists "Authenticated full access orders" on public.orders;
+
+-- PUBLIC: Anyone can read active products (for the public homepage)
+create policy "Public read products" on public.products
+  for select using (true);
+
+-- AUTHENTICATED: Logged-in users can do full CRUD on products
+create policy "Authenticated insert products" on public.products
+  for insert with check (auth.role() = 'authenticated');
+
+create policy "Authenticated update products" on public.products
+  for update using (auth.role() = 'authenticated');
+
+create policy "Authenticated delete products" on public.products
+  for delete using (auth.role() = 'authenticated');
+
+-- AUTHENTICATED: Logged-in users can do full CRUD on orders
+create policy "Authenticated full access orders" on public.orders
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+>>>>>>> Stashed changes
 
 -- 4. INITIAL SEED PRODUCTS (Optional)
 insert into public.products (name, unit, price, active) values
@@ -49,4 +76,7 @@ insert into public.products (name, unit, price, active) values
   ('Milk Toffee', 'kg', 1450, true),
   ('Dodol', 'kg', 1100, true)
 on conflict do nothing;
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes

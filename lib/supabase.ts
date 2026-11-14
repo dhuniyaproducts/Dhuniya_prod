@@ -10,7 +10,11 @@ export function getSupabase(): SupabaseClient | null {
   if (!supabaseUrl || !supabaseAnonKey) {
     if (typeof window !== "undefined") {
       console.warn(
+<<<<<<< Updated upstream
         "Supabase environment variables (NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY) are not set. Falling back to local offline storage."
+=======
+        "Supabase environment variables are not set. Falling back to local offline storage."
+>>>>>>> Stashed changes
       );
     }
     return null;
