@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-
 export const metadata: Metadata = {
-  title: "Dhuniya Products",
-  description: "Dhuniya Products - Eastern Traditional Sweets Production Desk & Order Management",
+  title: "Dhuniya Products — Eastern Traditional Sweets",
+  description: "Dhuniya Products - Authentic Eastern Traditional Sweets from Maruthamunai. Order premium halwas, toffees and traditional sweets.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}><body className="min-h-full">{children}</body></html>;
+  return (
+    <html lang="en" className="h-full antialiased font-sans">
+      <body className="min-h-full font-sans">{children}</body>
+    </html>
+  );
 }

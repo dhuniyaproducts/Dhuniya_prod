@@ -25,9 +25,22 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
+<<<<<<< Updated upstream
     ],
   },
 
+=======
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+      },
+    ],
+  },
+
+  experimental: {
+    cpus: 1,
+  },
+>>>>>>> Stashed changes
   turbopack: {
     rules: {
       "*.css": {

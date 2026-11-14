@@ -1,34 +1,29 @@
 "use client";
 
+<<<<<<< Updated upstream
 import { useState, useMemo, useEffect } from "react";
+=======
+import { useState, useEffect } from "react";
+>>>>>>> Stashed changes
 import { getSupabase } from "@/lib/supabase";
 import {
-  ArrowRight,
-  Bell,
-  Calendar,
-  CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  ClipboardList,
-  Download,
-  Edit2,
-  Factory,
-  FileText,
-  LayoutDashboard,
-  Menu,
-  Package,
-  PackagePlus,
-  Plus,
-  Printer,
-  Search,
   Sparkles,
-  Trash2,
-  User,
-  X,
+  MapPin,
+  Phone,
+  FileText,
+  ArrowRight,
+  Star,
+  Shield,
+  Leaf,
+  ChevronDown,
+  Lock,
+  Award,
+  Heart,
+  Clock,
+  Sparkle,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
-// --- Types ---
 type Product = {
   id: number;
   name: string;
@@ -38,6 +33,7 @@ type Product = {
   imageUrl?: string;
 };
 
+<<<<<<< Updated upstream
 type Order = {
   id: string;
   date: string;
@@ -114,19 +110,11 @@ function ToastContainer({
 
 // --- Helpers ---
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+=======
+>>>>>>> Stashed changes
 const money = (v: number) => `Rs. ${v.toLocaleString("en-LK")}`;
-const dateLabel = (v: string) => {
-  if (!v) return "";
-  const parts = v.split("-");
-  if (parts.length === 3) {
-    const day = parseInt(parts[2], 10);
-    const m = parseInt(parts[1], 10);
-    const month = MONTHS[m - 1] ?? parts[1];
-    return `${day} ${month} ${parts[0]}`;
-  }
-  return v;
-};
 
+<<<<<<< Updated upstream
 const getTodayStr = () => {
   if (typeof window !== "undefined") {
     try {
@@ -206,8 +194,48 @@ function StatusDropdown({ value, onChange }: { value: string; onChange: (v: stri
 
 function PageHeader({ title, onMenu, action }: { title: string; onMenu?: () => void; action?: React.ReactNode }) {
   const [headerDate, setHeaderDate] = useState("Fri, 30 Oct 2026");
+=======
+// Fallback seed products for immediate gorgeous showcase if offline or loading
+const SHOWCASE_SWEETS: Product[] = [
+  {
+    id: 1,
+    name: "Musket Halwa",
+    unit: "kg",
+    price: 1200,
+    active: true,
+    imageUrl: "https://images.unsplash.com/photo-1599785209707-a456fc1337bb?w=800&auto=format&fit=crop&q=80",
+  },
+  {
+    id: 2,
+    name: "Golden Milk Toffee",
+    unit: "kg",
+    price: 1450,
+    active: true,
+    imageUrl: "https://images.unsplash.com/photo-1582293041079-7814c2f12063?w=800&auto=format&fit=crop&q=80",
+  },
+  {
+    id: 3,
+    name: "Authentic Kalu Dodol",
+    unit: "kg",
+    price: 1100,
+    active: true,
+    imageUrl: "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800&auto=format&fit=crop&q=80",
+  },
+  {
+    id: 4,
+    name: "Royal Cashew Peda",
+    unit: "kg",
+    price: 1650,
+    active: true,
+    imageUrl: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
+  },
+];
+>>>>>>> Stashed changes
 
+function HeroSection() {
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
+<<<<<<< Updated upstream
     try {
       const now = new Date();
       setHeaderDate(
@@ -219,41 +247,20 @@ function PageHeader({ title, onMenu, action }: { title: string; onMenu?: () => v
         }).format(now)
       );
     } catch { }
+=======
+    const t = setTimeout(() => setVisible(true), 100);
+    return () => clearTimeout(t);
+>>>>>>> Stashed changes
   }, []);
 
   return (
-    <header className="flex min-h-[62px] sm:min-h-[72px] items-center justify-between border-b border-slate-200/80 bg-white/95 backdrop-blur-md px-4 sm:px-8 lg:px-10 sticky top-0 z-20 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-        <button
-          className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 lg:hidden transition-colors active:scale-95"
-          onClick={onMenu}
-          aria-label="Open navigation"
-        >
-          <Menu className="size-5" />
-        </button>
-        <div className="min-w-0">
-          <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-400 truncate">{headerDate}</p>
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 truncate leading-tight">{title}</h1>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
-          <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-medium">Dhuniya Live</span>
-        </div>
-        <button
-          className="relative flex size-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors active:scale-95"
-          aria-label="Notifications"
-        >
-          <Bell className="size-[17px]" />
-          <span className="absolute right-2 top-2 size-2 rounded-full bg-amber-500 ring-2 ring-white" />
-        </button>
-        {action}
-      </div>
-    </header>
-  );
-}
+    <section className="relative min-h-[92vh] flex items-center justify-center overflow-hidden bg-[#0a0600] pt-20 pb-16">
+      {/* Background radiant glows */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#180d01] via-[#0f0700] to-[#0a0600]" />
+      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-gradient-to-br from-amber-500/20 via-orange-600/15 to-transparent rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-96 h-96 bg-amber-600/10 rounded-full blur-[100px] pointer-events-none" />
 
+<<<<<<< Updated upstream
 function ConfirmDialog({ title, message, onConfirm, onCancel }: { title: string; message: string; onConfirm: () => void; onCancel: () => void }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-4">
@@ -693,33 +700,40 @@ function ProductsPage({
             <Plus className="size-4" /> <span className="hidden xs:inline">New Sweet</span><span className="xs:hidden">Add</span>
           </Button>
         }
+=======
+      {/* Decorative subtle grid */}
+      <div
+        className="absolute inset-0 opacity-[0.04] pointer-events-none"
+        style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, #f59e0b 1px, transparent 0)`,
+          backgroundSize: "36px 36px",
+        }}
+>>>>>>> Stashed changes
       />
-      <div className="mx-auto max-w-[1250px] px-3.5 py-5 sm:px-6 sm:py-8 lg:px-10">
-        <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-amber-600">Sweet Catalog</span>
-          <h2 className="mt-1 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Products & Production Demand</h2>
-          <p className="mt-1 text-xs sm:text-sm text-slate-500">Manage sweet catalog, standard rates, and live customer orders in production.</p>
+
+      <div className="relative z-10 text-center px-4 max-w-5xl mx-auto">
+        {/* Registration pill */}
+        <div
+          className={`inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-amber-300 mb-8 backdrop-blur-md transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            }`}
+        >
+          <Sparkles className="size-3.5 text-amber-400" />
+          <span>Reg: KDS/1597 · Maruthamunai</span>
         </div>
 
-        {products.length === 0 ? (
-          <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white py-16 sm:py-20 text-center p-4">
-            <PackagePlus className="size-12 text-amber-600" />
-            <p className="mt-4 text-base sm:text-lg font-bold text-slate-800">No sweet products in catalog</p>
-            <p className="mt-1 text-xs sm:text-sm text-slate-500">Add your first sweet to start taking orders.</p>
-            <button onClick={() => setShowModal(true)} className="mt-5 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 shadow-sm">
-              Add Sweet Product
-            </button>
-          </div>
-        ) : (
-          <div className="mt-6">
-            {/* Mobile Cards List (< sm) - Separate Individual Cards */}
-            <div className="block sm:hidden space-y-3">
-              {products.map((p) => {
-                const activeOrders = orders.filter(
-                  (o) => o.productId === p.id && !["Completed", "Cancelled"].includes(o.status)
-                );
-                const totalOrderedKg = activeOrders.reduce((sum, o) => sum + o.qty, 0);
+        {/* Brand Headline */}
+        <h1
+          className={`text-5xl sm:text-7xl md:text-8xl font-black tracking-tight text-white leading-[1.02] mb-6 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            }`}
+          style={{ transitionDelay: "100ms" }}
+        >
+          <span>Dhuniya</span>{" "}
+          <span className="bg-gradient-to-r from-amber-300 via-amber-500 to-orange-400 bg-clip-text text-transparent">
+            Products
+          </span>
+        </h1>
 
+<<<<<<< Updated upstream
                 return (
                   <div key={p.id} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm hover:border-amber-300 transition-all space-y-3">
                     <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
@@ -1104,359 +1118,95 @@ function OrderCard({
           <p className="text-sm font-bold text-slate-900 truncate">{product?.name ?? "—"}</p>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
             {money(rate)} per {product?.unit ?? "kg"}
+=======
+        {/* Subtitle tag */}
+        <div
+          className={`inline-block mb-5 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            }`}
+          style={{ transitionDelay: "200ms" }}
+        >
+          <p className="text-lg sm:text-2xl md:text-3xl font-extrabold uppercase tracking-[0.25em] text-amber-200">
+            Eastern Traditional Sweet
+>>>>>>> Stashed changes
           </p>
+          <div className="h-0.5 w-28 bg-gradient-to-r from-amber-400 to-orange-500 mx-auto mt-3 rounded-full" />
         </div>
-        <div className="text-right shrink-0">
-          <div className="flex items-baseline justify-end gap-1">
-            <span className="text-lg font-black text-amber-600">{order.qty}</span>
-            <span className="text-xs font-bold text-slate-500">{product?.unit ?? "kg"}</span>
-          </div>
-          <p className="text-xs font-black text-slate-900">{money(total)}</p>
+
+        <p
+          className={`text-slate-300 text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-10 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            }`}
+          style={{ transitionDelay: "300ms" }}
+        >
+          Experience handcrafted heritage sweets made with authentic eastern Sri Lankan recipes,
+          pure ingredients, and time-honoured artistry.
+        </p>
+
+        {/* Action Buttons */}
+        <div
+          className={`flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            }`}
+          style={{ transitionDelay: "400ms" }}
+        >
+          <a
+            href="#sweets"
+            className="group flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-105 transition-all duration-300"
+          >
+            <span>Explore Sweet Catalog</span>
+            <ArrowRight className="size-4 group-hover:translate-x-1 transition-transform" />
+          </a>
+          <a
+            href="tel:0756656135"
+            className="flex items-center gap-2 rounded-full border border-amber-500/40 bg-white/5 px-8 py-3.5 text-sm font-bold text-amber-300 hover:bg-white/10 hover:border-amber-400 transition-all duration-300 backdrop-blur-sm"
+          >
+            <Phone className="size-4" />
+            <span>Order by Phone: 0756656135</span>
+          </a>
+        </div>
+
+        {/* Feature Badges */}
+        <div
+          className={`grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-3xl mx-auto transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+            }`}
+          style={{ transitionDelay: "500ms" }}
+        >
+          {[
+            { label: "100% Pure Recipe", icon: Award },
+            { label: "Handcrafted Daily", icon: Heart },
+            { label: "Eastern Tradition", icon: Sparkle },
+            { label: "Fresh Handover", icon: Clock },
+          ].map(({ label, icon: Icon }) => (
+            <div
+              key={label}
+              className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 py-3 px-3 backdrop-blur-sm"
+            >
+              <Icon className="size-4 text-amber-400 shrink-0" />
+              <span className="text-xs font-semibold text-slate-300">{label}</span>
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* Notes if present */}
-      {order.notes && (
-        <div className="rounded-xl bg-slate-50 border border-slate-200/80 px-3 py-2 text-xs text-slate-700 flex items-start gap-1.5">
-          <span className="font-bold text-amber-700 shrink-0">Note:</span>
-          <span className="italic">{order.notes}</span>
-        </div>
-      )}
-
-      {/* Bottom: Schedule & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
-        <div className="flex items-center gap-1.5 text-xs text-slate-600">
-          <Calendar className="size-3.5 text-amber-600 shrink-0" />
-          <span className="font-semibold text-slate-800">{dateLabel(order.deliveryDate)}</span>
-          {badge && (
-            <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-bold ${badge.style}`}>
-              {badge.label}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onGenerate(order)}
-            className="h-8 border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100 text-xs font-bold px-3 gap-1 shadow-2xs"
-          >
-            <FileText className="size-3.5" data-icon="inline-start" /> Bill
-          </Button>
-          <button
-            onClick={() => onEdit(order)}
-            className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-            title="Edit order"
-          >
-            <Edit2 className="size-3" /> Edit
-          </button>
-          <button
-            onClick={() => onDelete(order.id)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors"
-            title="Delete order"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-        </div>
-      </div>
-    </div>
+    </section>
   );
 }
 
-// Sub-component for Desktop Table
-function OrdersTable({
-  orders,
-  getProduct,
-  onStatusChange,
-  onGenerate,
-  onEdit,
-  onDelete,
-}: {
-  orders: Order[];
-  getProduct: (id: number) => Product | undefined;
-  onStatusChange: (id: string, s: string) => void;
-  onGenerate: (o: Order) => void;
-  onEdit: (o: Order) => void;
-  onDelete: (id: string) => void;
-}) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[960px] text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            <tr>
-              <th className="px-6 py-4">Customer (Who Ordered)</th>
-              <th className="px-6 py-4">Sweet Product</th>
-              <th className="px-6 py-4">Quantity</th>
-              <th className="px-6 py-4">Handover Schedule</th>
-              <th className="px-6 py-4">Amount</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {orders.map((order) => {
-              const prod = getProduct(order.productId);
-              const rate = order.rate ?? prod?.price ?? 0;
-              const total = order.qty * rate;
-              const badge = getHandoverBadge(order.deliveryDate);
-
-              return (
-                <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 font-bold text-xs">
-                        {order.customer.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-900">{order.customer}</p>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                          <span className="font-mono text-slate-500">{order.id}</span>
-                          {order.notes && (
-                            <>
-                              <span>·</span>
-                              <span className="italic text-slate-600 max-w-[200px] truncate" title={order.notes}>
-                                &ldquo;{order.notes}&rdquo;
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="font-bold text-slate-900">{prod?.name ?? "—"}</p>
-                    <p className="text-xs text-slate-400">{money(rate)} / {prod?.unit ?? "kg"}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-base font-bold text-amber-600">{order.qty}</span>
-                    <span className="ml-1 text-xs text-slate-500">{prod?.unit ?? "kg"}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="size-3.5 text-amber-600" />
-                        <span className="font-bold text-sm text-slate-900">{dateLabel(order.deliveryDate)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {badge && (
-                          <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${badge.style}`}>
-                            {badge.label}
-                          </span>
-                        )}
-                        <span className="text-[11px] text-slate-400">Placed: {dateLabel(order.date)}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 font-bold text-slate-900">{money(total)}</td>
-                  <td className="px-6 py-4">
-                    <StatusDropdown value={order.status} onChange={(v) => onStatusChange(order.id, v)} />
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onGenerate(order)}
-                        className="border-amber-200 bg-amber-50/70 text-amber-800 hover:bg-amber-100 font-semibold"
-                      >
-                        <FileText className="size-3.5" data-icon="inline-start" /> Bill
-                      </Button>
-                      <button
-                        onClick={() => onEdit(order)}
-                        className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                        title="Edit order"
-                      >
-                        <Edit2 className="size-3.5" />
-                      </button>
-                      <button
-                        onClick={() => onDelete(order.id)}
-                        className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors"
-                        title="Delete order"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// --- Orders Page ---
-function OrdersPage({
-  orders,
-  products,
-  onAdd,
-  onEdit,
-  onDelete,
-  onStatusChange,
-  onGenerate,
-  initialProductFilter = null,
-  onClearProductFilter,
-  onOpenSidebar,
-}: {
-  orders: Order[];
-  products: Product[];
-  onAdd: (data: OrderFormData) => void;
-  onEdit: (id: string, data: OrderFormData) => void;
-  onDelete: (id: string) => void;
-  onStatusChange: (id: string, status: string) => void;
-  onGenerate: (order: Order) => void;
-  initialProductFilter?: number | null;
-  onClearProductFilter?: () => void;
-  onOpenSidebar?: () => void;
-}) {
-  const [showModal, setShowModal] = useState(false);
-  const [editOrder, setEditOrder] = useState<Order | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [filterProductId, setFilterProductId] = useState<string>(
-    initialProductFilter ? String(initialProductFilter) : "All"
-  );
-  const [filterStatus, setFilterStatus] = useState("All");
-  const [filterDate, setFilterDate] = useState("");
-  const [quickTab, setQuickTab] = useState<"all" | "today" | "ready" | "kitchen" | "completed">("all");
-  const [groupBy, setGroupBy] = useState<"date" | "product" | "status" | "none">("date");
-
-  const todayStr = getTodayStr();
+function ProductCard({ product, index }: { product: Product; index: number }) {
+  const [visible, setVisible] = useState(false);
+  const [imgErr, setImgErr] = useState(false);
 
   useEffect(() => {
-    if (initialProductFilter !== null && initialProductFilter !== undefined) {
-      setFilterProductId(String(initialProductFilter));
-    }
-  }, [initialProductFilter]);
+    const t = setTimeout(() => setVisible(true), index * 80);
+    return () => clearTimeout(t);
+  }, [index]);
 
-  const activeFilteredProduct = useMemo(
-    () => (filterProductId !== "All" ? products.find((p) => p.id === Number(filterProductId)) : null),
-    [filterProductId, products]
-  );
-
-  const filtered = useMemo(() => {
-    return orders.filter((o) => {
-      const matchProduct = filterProductId === "All" || o.productId === Number(filterProductId);
-      const matchQuery =
-        o.customer.toLowerCase().includes(query.toLowerCase()) ||
-        o.id.toLowerCase().includes(query.toLowerCase()) ||
-        (o.notes && o.notes.toLowerCase().includes(query.toLowerCase())) ||
-        (products.find((p) => p.id === o.productId)?.name ?? "").toLowerCase().includes(query.toLowerCase());
-      const matchStatus = filterStatus === "All" || o.status === filterStatus;
-      const matchDate = !filterDate || o.date === filterDate || o.deliveryDate === filterDate;
-      return matchProduct && matchQuery && matchStatus && matchDate;
-    });
-  }, [orders, products, filterProductId, query, filterStatus, filterDate]);
-
-  // Quick tabs counts
-  const quickTabs = useMemo(() => [
-    { id: "all", label: "All Orders", count: orders.length },
-    { id: "today", label: "Handover Today", count: orders.filter((o) => o.deliveryDate === todayStr && o.status !== "Cancelled").length },
-    { id: "ready", label: "Ready to Bill", count: orders.filter((o) => o.status === "Ready to Bill").length },
-    { id: "kitchen", label: "In Kitchen", count: orders.filter((o) => o.status === "In Production").length },
-    { id: "completed", label: "Completed", count: orders.filter((o) => o.status === "Completed").length },
-  ], [orders, todayStr]);
-
-  // Apply quick tab filter
-  const displayedOrders = useMemo(() => {
-    return filtered.filter((o) => {
-      if (quickTab === "today") return o.deliveryDate === todayStr && o.status !== "Cancelled";
-      if (quickTab === "ready") return o.status === "Ready to Bill";
-      if (quickTab === "kitchen") return o.status === "In Production";
-      if (quickTab === "completed") return o.status === "Completed";
-      return true;
-    });
-  }, [filtered, quickTab, todayStr]);
-
-  const totalFilteredKg = useMemo(() => {
-    return displayedOrders.reduce((sum, o) => sum + o.qty, 0);
-  }, [displayedOrders]);
-
-  const getProduct = (id: number) => products.find((p) => p.id === id);
-
-  // Grouping logic for separate management
-  const groupedOrders = useMemo(() => {
-    if (groupBy === "none") {
-      return [{ key: "all", title: "All Orders", orders: displayedOrders }];
-    }
-
-    if (groupBy === "date") {
-      const todayOrders: Order[] = [];
-      const tomorrowOrders: Order[] = [];
-      const upcomingOrders: Order[] = [];
-      const pastOrders: Order[] = [];
-
-      displayedOrders.forEach((o) => {
-        const badge = getHandoverBadge(o.deliveryDate);
-        if (badge?.label === "Today" || o.deliveryDate === todayStr) {
-          todayOrders.push(o);
-        } else if (badge?.label === "Tomorrow") {
-          tomorrowOrders.push(o);
-        } else if (badge?.label?.startsWith("In") || o.deliveryDate > todayStr) {
-          upcomingOrders.push(o);
-        } else {
-          pastOrders.push(o);
-        }
-      });
-
-      const groups: { key: string; title: string; badge?: string; orders: Order[] }[] = [];
-      if (todayOrders.length > 0) {
-        groups.push({ key: "today", title: "Handover Today", badge: "Today", orders: todayOrders });
-      }
-      if (tomorrowOrders.length > 0) {
-        groups.push({ key: "tomorrow", title: "Handover Tomorrow", badge: "Tomorrow", orders: tomorrowOrders });
-      }
-      if (upcomingOrders.length > 0) {
-        groups.push({ key: "upcoming", title: "Upcoming Handover Schedule", orders: upcomingOrders });
-      }
-      if (pastOrders.length > 0) {
-        groups.push({ key: "past", title: "Completed & Past Orders", orders: pastOrders });
-      }
-      return groups;
-    }
-
-    if (groupBy === "product") {
-      const map = new Map<number, Order[]>();
-      displayedOrders.forEach((o) => {
-        const list = map.get(o.productId) ?? [];
-        list.push(o);
-        map.set(o.productId, list);
-      });
-      return Array.from(map.entries()).map(([productId, ords]) => {
-        const prod = products.find((p) => p.id === productId);
-        return {
-          key: `prod-${productId}`,
-          title: prod?.name ?? `Product #${productId}`,
-          orders: ords,
-        };
-      });
-    }
-
-    if (groupBy === "status") {
-      const map = new Map<string, Order[]>();
-      STATUS_OPTIONS.forEach((s) => map.set(s, []));
-      displayedOrders.forEach((o) => {
-        const list = map.get(o.status) ?? [];
-        list.push(o);
-        map.set(o.status, list);
-      });
-      return Array.from(map.entries())
-        .filter(([_, ords]) => ords.length > 0)
-        .map(([status, ords]) => ({
-          key: `status-${status}`,
-          title: status,
-          orders: ords,
-        }));
-    }
-
-    return [{ key: "all", title: "All Orders", orders: displayedOrders }];
-  }, [displayedOrders, groupBy, todayStr, products]);
+  const initials = product.name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
+<<<<<<< Updated upstream
     <>
       <PageHeader
         title="Orders"
@@ -1986,10 +1736,31 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
                   </div>
                 );
               })}
+=======
+    <div
+      className={`group relative flex flex-col rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-transparent backdrop-blur-md hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+        }`}
+    >
+      {/* Product Image */}
+      <div className="relative h-60 overflow-hidden bg-gradient-to-br from-amber-950/80 to-[#120800]">
+        {product.imageUrl && !imgErr ? (
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 ease-out"
+            onError={() => setImgErr(true)}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
+            <div className="size-20 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+              <span className="text-3xl font-black text-amber-300">{initials}</span>
+>>>>>>> Stashed changes
             </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-amber-400/80">Dhuniya Special</p>
           </div>
         )}
 
+<<<<<<< Updated upstream
         {productBreakdown.length === 0 && (
           <div className="mt-7 sm:mt-8 rounded-2xl border border-dashed border-slate-200 bg-white p-8 sm:p-10 text-center">
             <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600 mb-3">
@@ -2028,85 +1799,23 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
               );
             })}
           </div>
+=======
+        {/* Ambient shadow gradient */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
+
+        {/* Price Tag Pill */}
+        <div className="absolute bottom-3 left-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-3.5 py-1 text-xs font-black text-white shadow-lg shadow-black/40">
+          {money(product.price)} <span className="font-normal text-[11px] text-amber-100">/ {product.unit}</span>
+>>>>>>> Stashed changes
         </div>
 
-        {/* Active Customers */}
-        {customers.length > 0 && (
-          <div className="mt-8">
-            <button
-              onClick={() => setExpandCustomers(!expandCustomers)}
-              className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-xs hover:bg-slate-50 transition-colors"
-            >
-              <div className="text-left min-w-0 pr-2">
-                <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">Active Customer Orders ({customers.length})</h3>
-                <p className="text-xs text-slate-500 truncate">View customer list with active sweet requirements</p>
-              </div>
-              <ChevronRight className={`size-5 text-slate-400 shrink-0 transition-transform ${expandCustomers ? "rotate-90" : ""}`} />
-            </button>
-            {expandCustomers && (
-              <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm divide-y divide-slate-100">
-                {customers.map(([name, { orders: cnt, kg }]) => (
-                  <div key={name} className="flex items-center justify-between p-3 sm:px-6 sm:py-3.5 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                      <div className="flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-800">
-                        {name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-slate-900 text-sm truncate">{name}</p>
-                        <p className="text-xs text-slate-500">{cnt} order{cnt !== 1 ? "s" : ""}</p>
-                      </div>
-                    </div>
-                    <p className="font-bold text-amber-600 text-sm sm:text-base shrink-0">{kg.toFixed(2)} kg</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Quick Actions */}
-        <div className="mt-8 sm:mt-10">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base sm:text-lg font-bold text-slate-900">Quick Navigation</h3>
-            <button onClick={() => setActive("Orders")} className="text-xs font-bold text-amber-600 hover:text-amber-700">
-              Go to Orders →
-            </button>
-          </div>
-          <div className="mt-3 grid gap-3 sm:gap-4 sm:grid-cols-2">
-            <button
-              onClick={() => setActive("Orders")}
-              className="group rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 text-left hover:border-amber-500 hover:shadow-sm transition-all"
-            >
-              <div className="flex size-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                <ClipboardList className="size-5" />
-              </div>
-              <p className="mt-3 font-bold text-slate-900">Manage Customer Orders</p>
-              <p className="mt-1 text-xs text-slate-500">Track delivery deadlines, customer orders, and print bills.</p>
-              <div className="mt-3 flex items-center gap-1 text-xs font-bold text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                Open Orders Page <ChevronRight className="size-3" />
-              </div>
-            </button>
-
-            <button
-              onClick={() => setActive("Products")}
-              className="group rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 text-left hover:border-amber-500 hover:shadow-sm transition-all"
-            >
-              <div className="flex size-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                <Package className="size-5" />
-              </div>
-              <p className="mt-3 font-bold text-slate-900">Manage Sweet Catalog</p>
-              <p className="mt-1 text-xs text-slate-500">Update sweets, pricing per kg, and catalog availability.</p>
-              <div className="mt-3 flex items-center gap-1 text-xs font-bold text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                Open Sweet Products <ChevronRight className="size-3" />
-              </div>
-            </button>
-          </div>
+        {/* Active Badge */}
+        <div className="absolute top-3 right-3 rounded-full bg-black/60 border border-white/15 px-2.5 py-0.5 text-[10px] font-bold text-amber-300 backdrop-blur-md">
+          Available Fresh
         </div>
       </div>
-    </>
-  );
-}
 
+<<<<<<< Updated upstream
 // --- Root Component ---
 const VALID_TABS = ["Dashboard", "Orders", "Products"] as const;
 type TabType = (typeof VALID_TABS)[number];
@@ -2656,19 +2365,255 @@ export default function Home() {
           onClick={() => setActive("Products")}
           className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${active === "Products" ? "text-amber-600 font-bold" : "text-slate-400 hover:text-slate-700"
             }`}
+=======
+      {/* Card Body */}
+      <div className="flex flex-col flex-1 p-6">
+        <h3 className="text-lg sm:text-xl font-bold text-white group-hover:text-amber-300 transition-colors leading-tight">
+          {product.name}
+        </h3>
+        <p className="mt-2 text-xs sm:text-sm text-slate-400 leading-relaxed flex-1">
+          Authentic eastern recipe made fresh with premium ingredients, prepared daily in our Maruthamunai kitchen.
+        </p>
+
+        {/* Quality indicator */}
+        <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1">
+            {[1, 2, 3, 4, 5].map((s) => (
+              <Star key={s} className="size-3.5 fill-amber-400 text-amber-400" />
+            ))}
+          </div>
+          <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wider">Traditional Recipe</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContactSection() {
+  return (
+    <section id="contact" className="py-20 sm:py-28 px-4 bg-gradient-to-b from-[#0a0600] to-[#120800] relative">
+      <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+
+      <div className="max-w-5xl mx-auto text-center">
+        <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-400">Authentic Taste</span>
+        <h2 className="mt-3 text-3xl sm:text-4xl md:text-5xl font-black text-white mb-4">
+          Visit Us or Place Orders
+        </h2>
+        <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto mb-14">
+          We cater for weddings, functions, and everyday celebrations. Contact us directly for bulk sweets and custom orders.
+        </p>
+
+        <div className="grid gap-6 sm:grid-cols-3 max-w-3xl mx-auto text-left">
+          {/* Mobile */}
+          <a
+            href="tel:0756656135"
+            className="group rounded-3xl border border-white/10 bg-white/5 p-6 hover:border-amber-400/50 hover:bg-white/10 transition-all duration-300 flex flex-col justify-between"
+          >
+            <div>
+              <div className="size-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 group-hover:scale-110 transition-transform">
+                <Phone className="size-5" />
+              </div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Direct Mobile</p>
+              <p className="text-xl font-black text-white mt-1 group-hover:text-amber-300 transition-colors">
+                0756656135
+              </p>
+            </div>
+            <p className="text-xs text-amber-400/90 font-semibold mt-4">Tap to Call Us →</p>
+          </a>
+
+          {/* Address */}
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 flex flex-col justify-between">
+            <div>
+              <div className="size-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4">
+                <MapPin className="size-5" />
+              </div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Kitchen Address</p>
+              <p className="text-lg font-bold text-white mt-1 leading-snug">
+                138, France City
+              </p>
+              <p className="text-sm text-slate-300">Maruthamunai, Eastern Province</p>
+            </div>
+            <p className="text-xs text-slate-500 mt-4">Fresh daily production</p>
+          </div>
+
+          {/* Registration */}
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 flex flex-col justify-between">
+            <div>
+              <div className="size-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4">
+                <FileText className="size-5" />
+              </div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Official Registration</p>
+              <p className="text-xl font-mono font-bold text-white mt-1">
+                KDS/1597
+              </p>
+              <p className="text-xs text-slate-400 mt-1">Government Registered Sweet Maker</p>
+            </div>
+            <p className="text-xs text-slate-500 mt-4">Licensed & Quality Approved</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="border-t border-white/10 bg-black px-4 py-12">
+      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
+        <div className="flex items-center gap-3">
+          <div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/20">
+            <Sparkles className="size-5" />
+          </div>
+          <div>
+            <p className="font-black text-white text-base">Dhuniya Products</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-400">
+              Eastern Traditional Sweet
+            </p>
+          </div>
+        </div>
+
+        <div className="text-center sm:text-right">
+          <p className="text-xs text-slate-400">
+            Registration: <strong className="text-slate-200">KDS/1597</strong> · Mobile: <strong className="text-slate-200">0756656135</strong>
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5">138, France City, Maruthamunai, Sri Lanka</p>
+        </div>
+
+        <Link
+          href="/login"
+          className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-2 text-xs font-bold text-slate-300 hover:border-amber-400 hover:text-amber-300 hover:bg-white/10 transition-all duration-200"
+>>>>>>> Stashed changes
         >
-          <Package className="size-5" />
-          <span className="text-[10px] mt-1 font-semibold">Products</span>
-        </button>
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-700 transition-colors"
-        >
-          <Menu className="size-5" />
-          <span className="text-[10px] mt-1 font-semibold">Menu</span>
-        </button>
+          <Lock className="size-3.5 text-amber-400" />
+          <span>Admin Login</span>
+        </Link>
+      </div>
+    </footer>
+  );
+}
+
+export default function PublicPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        const client = getSupabase();
+        if (!client) {
+          // If offline or no supabase, use showcase sweets
+          setProducts(SHOWCASE_SWEETS);
+          setLoading(false);
+          return;
+        }
+
+        const { data, error } = await client
+          .from("products")
+          .select("*")
+          .eq("active", true)
+          .order("id", { ascending: true });
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          setProducts(
+            data.map((p: any) => ({
+              id: Number(p.id),
+              name: p.name,
+              unit: p.unit,
+              price: Number(p.price),
+              active: Boolean(p.active),
+              imageUrl: p.image_url || undefined,
+            }))
+          );
+        } else {
+          setProducts(SHOWCASE_SWEETS);
+        }
+      } catch (err) {
+        console.error("Failed to load products:", err);
+        setProducts(SHOWCASE_SWEETS);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadProducts();
+  }, []);
+
+  return (
+    <div className="bg-[#0a0600] text-white min-h-screen selection:bg-amber-500 selection:text-black">
+      {/* Top Navbar */}
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-8 py-4 bg-black/75 backdrop-blur-xl border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/20">
+            <Sparkles className="size-4" />
+          </div>
+          <div>
+            <span className="font-black text-white text-sm sm:text-base tracking-tight">Dhuniya Products</span>
+            <span className="hidden sm:block text-[9px] font-bold uppercase tracking-[0.2em] text-amber-400">Eastern Traditional Sweet</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <a
+            href="#sweets"
+            className="hidden sm:inline-block text-xs font-semibold text-slate-300 hover:text-amber-300 transition-colors"
+          >
+            Sweet Catalog
+          </a>
+          <a
+            href="#contact"
+            className="hidden sm:inline-block text-xs font-semibold text-slate-300 hover:text-amber-300 transition-colors"
+          >
+            Contact
+          </a>
+          <Link
+            href="/login"
+            className="flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-4 py-1.5 text-xs font-bold text-amber-300 hover:bg-amber-500 hover:text-black transition-all duration-200"
+          >
+            <Lock className="size-3" />
+            <span>Admin Login</span>
+          </Link>
+        </div>
       </nav>
 
+      {/* Hero Section */}
+      <HeroSection />
+
+      {/* Sweets Showcase */}
+      <section id="sweets" className="py-20 sm:py-28 px-4 relative bg-[#0a0600]">
+        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-400">
+              Freshly Prepared Catalog
+            </span>
+            <h2 className="mt-3 text-3xl sm:text-5xl font-black text-white tracking-tight">
+              Our Traditional Sweets
+            </h2>
+            <p className="mt-4 text-slate-400 text-sm sm:text-base max-w-xl mx-auto">
+              Prepared to order with pure ghee, whole milk, and eastern culinary traditions.
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <div className="size-12 rounded-full border-4 border-amber-500/20 border-t-amber-500 animate-spin" />
+              <p className="text-sm text-slate-400 font-medium">Loading sweet catalog…</p>
+            </div>
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {products.map((product, i) => (
+                <ProductCard key={product.id} product={product} index={i} />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Contact Section */}
+      <ContactSection />
+
+<<<<<<< Updated upstream
       {invoiceOrder && (
         <Invoice
           order={invoiceOrder}
@@ -2680,6 +2625,10 @@ export default function Home() {
 
       {/* Floating Toast Notification Container */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+=======
+      {/* Footer */}
+      <Footer />
+>>>>>>> Stashed changes
     </div>
   );
 }
