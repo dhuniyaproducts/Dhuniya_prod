@@ -8,13 +8,15 @@
   "main": ".open-next/worker.js",
 
   // Use a recent compatibility date that includes nodejs_compat GA support and modern workerd runtime fixes.
-  "compatibility_date": "2025-04-01",
+  "compatibility_date": "2025-11-01",
   "compatibility_flags": ["nodejs_compat"],
 
   // Static assets directory produced by OpenNext build
+  // run_worker_first: false ensures CSS/JS/images are served directly from edge cache
   "assets": {
     "directory": ".open-next/assets",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "run_worker_first": false
   }
 }
 
