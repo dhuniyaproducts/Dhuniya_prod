@@ -39,6 +39,7 @@ export type Product = {
   price: number;
   active: boolean;
   imageUrl?: string;
+  description?: string;
 };
 
 export type Order = {
@@ -292,11 +293,11 @@ function Sidebar({ active, setActive, open, setOpen, orderCount, onLogout }: {
       >
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 text-white shadow-lg shadow-amber-500/20">
-              <Sparkles className="size-5" />
+            <div className="flex size-11 items-center justify-center rounded-xl overflow-hidden bg-white/10 p-0.5 border border-white/15 shrink-0">
+              <img src="/logo.jpg" alt="Dhuniya Products" className="size-full object-cover rounded-lg" />
             </div>
             <div>
-              <p className="text-[18px] font-bold tracking-tight text-white leading-tight">Dhuniya Products</p>
+              <p className="text-[17px] font-bold tracking-tight text-white leading-tight">Dhuniya Products</p>
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-400">Eastern Traditional Sweets</p>
             </div>
           </div>
@@ -403,8 +404,8 @@ function Invoice({ order, product, rate, onClose }: {
         <article id="printable-invoice" className="p-6 sm:p-8 print:p-0">
           <div className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-4 print:pb-3 sm:flex-row">
             <div>
-              <div className="flex items-center gap-2 text-amber-600">
-                <Sparkles className="size-5 sm:size-6" />
+              <div className="flex items-center gap-2.5">
+                <img src="/logo.jpg" alt="Dhuniya Products" className="size-9 rounded-xl object-contain border border-slate-200" />
                 <span className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Dhuniya Products</span>
               </div>
               <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-amber-700">Eastern Traditional Sweets</p>
@@ -475,7 +476,7 @@ function Invoice({ order, product, rate, onClose }: {
 }
 
 // --- Product Modal with Cloudinary Upload ---
-type ProductFormData = { name: string; unit: string; price: string; active: boolean; imageUrl?: string };
+type ProductFormData = { name: string; unit: string; price: string; active: boolean; imageUrl?: string; description?: string };
 
 function ProductModal({ initial, onSave, onClose }: {
   initial?: Product;
@@ -488,6 +489,7 @@ function ProductModal({ initial, onSave, onClose }: {
     price: initial?.price?.toString() ?? "",
     active: initial?.active ?? true,
     imageUrl: initial?.imageUrl ?? "",
+    description: initial?.description ?? "",
   });
   const [errors, setErrors] = useState<Partial<ProductFormData>>({});
 
@@ -548,6 +550,18 @@ function ProductModal({ initial, onSave, onClose }: {
               className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.price ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
             />
             {errors.price && <p className="mt-1 text-xs text-rose-600">{errors.price}</p>}
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-bold text-slate-700">Description (Shown on Homepage)</label>
+            <textarea
+              rows={3}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="e.g. Traditional slow-cooked musket halwa prepared with pure ghee, cashews, and aromatic spices."
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 resize-none placeholder:text-slate-400"
+            />
+            <p className="mt-1 text-[11px] text-slate-400">Describe the sweet recipe, ingredients, or specialty for public visitors.</p>
           </div>
 
           {/* Cloudinary Image Upload */}
@@ -647,9 +661,12 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                             {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
                           </div>
                         )}
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="font-bold text-slate-900 text-base truncate">{p.name}</p>
-                          <p className="text-xs font-semibold text-amber-700">{money(p.price)} / {p.unit}</p>
+                          {p.description && (
+                            <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{p.description}</p>
+                          )}
+                          <p className="text-xs font-semibold text-amber-700 mt-0.5">{money(p.price)} / {p.unit}</p>
                         </div>
                       </div>
                       <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
@@ -713,7 +730,12 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                                   {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
                                 </div>
                               )}
-                              <span className="font-bold text-slate-900">{p.name}</span>
+                              <div className="min-w-0 max-w-xs">
+                                <span className="font-bold text-slate-900 block truncate">{p.name}</span>
+                                {p.description && (
+                                  <span className="text-xs text-slate-400 block truncate mt-0.5">{p.description}</span>
+                                )}
+                              </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 font-medium text-slate-600">{p.unit}</td>
@@ -1599,11 +1621,32 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         const { data: prodData, error: prodErr } = await client.from("products").select("*").order("id", { ascending: true });
         if (prodErr) throw prodErr;
         if (prodData && prodData.length > 0) {
-          const loadedProducts: Product[] = prodData.map((p: any) => ({ id: Number(p.id), name: p.name, unit: p.unit, price: Number(p.price), active: Boolean(p.active), imageUrl: p.image_url || undefined }));
-          setProducts(loadedProducts);
-          try { localStorage.setItem("dhuniya_products", JSON.stringify(loadedProducts)); } catch { }
+          const loadedProducts: Product[] = prodData.map((p: any) => ({
+            id: Number(p.id),
+            name: p.name,
+            unit: p.unit,
+            price: Number(p.price),
+            active: Boolean(p.active),
+            imageUrl: p.image_url || undefined,
+            description: p.description || undefined,
+          }));
+
+          // Deduplicate products by lowercase name so duplicates in database never double up
+          const mapByName = new Map<string, Product>();
+          for (const p of loadedProducts) {
+            const key = p.name.trim().toLowerCase();
+            const existing = mapByName.get(key);
+            if (!existing) {
+              mapByName.set(key, p);
+            } else if ((!existing.imageUrl && p.imageUrl) || (!existing.description && p.description)) {
+              mapByName.set(key, { ...existing, ...p });
+            }
+          }
+          const deduplicatedProducts = Array.from(mapByName.values());
+          setProducts(deduplicatedProducts);
+          try { localStorage.setItem("dhuniya_products", JSON.stringify(deduplicatedProducts)); } catch { }
         } else {
-          try { const lp = localStorage.getItem("dhuniya_products"); if (lp) setProducts(JSON.parse(lp)); } catch { }
+          setProducts([]);
         }
         const { data: ordData, error: ordErr } = await client.from("orders").select("*").order("created_at", { ascending: false });
         if (ordErr) throw ordErr;
@@ -1635,13 +1678,28 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
   const addProduct = async (data: ProductFormData) => {
     const tempId = Date.now();
-    const newProduct: Product = { id: tempId, name: data.name.trim(), unit: data.unit, price: Number(data.price), active: data.active, imageUrl: data.imageUrl?.trim() || undefined };
+    const newProduct: Product = {
+      id: tempId,
+      name: data.name.trim(),
+      unit: data.unit,
+      price: Number(data.price),
+      active: data.active,
+      imageUrl: data.imageUrl?.trim() || undefined,
+      description: data.description?.trim() || undefined,
+    };
     setProducts((prev) => { const updated = [...prev, newProduct]; try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { } return updated; });
     addToast("success", `Sweet "${data.name}" added`);
     const client = getSupabase();
     if (client) {
       try {
-        const { data: inserted, error } = await client.from("products").insert({ name: data.name.trim(), unit: data.unit, price: Number(data.price), active: data.active, image_url: data.imageUrl?.trim() || null }).select().single();
+        const { data: inserted, error } = await client.from("products").insert({
+          name: data.name.trim(),
+          unit: data.unit,
+          price: Number(data.price),
+          active: data.active,
+          image_url: data.imageUrl?.trim() || null,
+          description: data.description?.trim() || null,
+        }).select().single();
         if (error) throw error;
         if (inserted) { setProducts((prev) => prev.map((p) => (p.id === tempId ? { ...p, id: Number(inserted.id) } : p))); }
       } catch (err: any) { addToast("error", `Failed to save product: ${err.message}`); setProducts((prev) => prev.filter((p) => p.id !== tempId)); }
@@ -1650,13 +1708,28 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
   const editProduct = async (id: number, data: ProductFormData) => {
     const prevProducts = [...products];
-    const updatedProduct: Product = { id, name: data.name.trim(), unit: data.unit, price: Number(data.price), active: data.active, imageUrl: data.imageUrl?.trim() || undefined };
+    const updatedProduct: Product = {
+      id,
+      name: data.name.trim(),
+      unit: data.unit,
+      price: Number(data.price),
+      active: data.active,
+      imageUrl: data.imageUrl?.trim() || undefined,
+      description: data.description?.trim() || undefined,
+    };
     setProducts((prev) => { const updated = prev.map((p) => (p.id === id ? updatedProduct : p)); try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { } return updated; });
     addToast("success", `Sweet "${data.name}" updated`);
     const client = getSupabase();
     if (client) {
       try {
-        const { error } = await client.from("products").update({ name: data.name.trim(), unit: data.unit, price: Number(data.price), active: data.active, image_url: data.imageUrl?.trim() || null }).eq("id", id);
+        const { error } = await client.from("products").update({
+          name: data.name.trim(),
+          unit: data.unit,
+          price: Number(data.price),
+          active: data.active,
+          image_url: data.imageUrl?.trim() || null,
+          description: data.description?.trim() || null,
+        }).eq("id", id);
         if (error) throw error;
       } catch (err: any) { addToast("error", `Supabase update failed: ${err.message}`); setProducts(prevProducts); }
     }

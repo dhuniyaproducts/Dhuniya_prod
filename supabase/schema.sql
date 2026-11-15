@@ -14,8 +14,12 @@ create table if not exists public.products (
   price numeric not null,
   active boolean not null default true,
   image_url text,
+  description text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- Migration if table already exists
+alter table public.products add column if not exists description text;
 
 -- 2. ORDERS TABLE
 create table if not exists public.orders (
@@ -70,3 +74,11 @@ insert into public.products (name, unit, price, active) values
   ('Milk Toffee', 'kg', 1450, true),
   ('Dodol', 'kg', 1100, true)
 on conflict do nothing;
+
+-- 5. DUPLICATE CLEANUP HELPER (Run this if you ever have duplicate products)
+-- delete from public.products
+-- where id not in (
+--   select min(id)
+--   from public.products
+--   group by lower(trim(name))
+-- );

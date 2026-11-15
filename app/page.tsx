@@ -27,6 +27,7 @@ type Product = {
   price: number;
   active: boolean;
   imageUrl?: string;
+  description?: string;
 };
 
 const money = (v: number) => `Rs. ${v.toLocaleString("en-LK")}`;
@@ -39,6 +40,7 @@ const SHOWCASE_SWEETS: Product[] = [
     price: 1200,
     active: true,
     imageUrl: "https://images.unsplash.com/photo-1599785209707-a456fc1337bb?w=800&auto=format&fit=crop&q=80",
+    description: "Rich, slow-cooked musket halwa prepared with pure ghee, whole milk, and fragrant spices in authentic eastern tradition.",
   },
   {
     id: 2,
@@ -47,6 +49,7 @@ const SHOWCASE_SWEETS: Product[] = [
     price: 1450,
     active: true,
     imageUrl: "https://images.unsplash.com/photo-1582293041079-7814c2f12063?w=800&auto=format&fit=crop&q=80",
+    description: "Melt-in-your-mouth milk toffee crafted from pure condensed milk, golden caramel notes, and premium crunchy cashews.",
   },
   {
     id: 3,
@@ -55,6 +58,7 @@ const SHOWCASE_SWEETS: Product[] = [
     price: 1100,
     active: true,
     imageUrl: "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800&auto=format&fit=crop&q=80",
+    description: "Traditional dark kalu dodol stirred by hand for hours with thick coconut milk, kithul treacle, and roasted cashews.",
   },
   {
     id: 4,
@@ -63,6 +67,7 @@ const SHOWCASE_SWEETS: Product[] = [
     price: 1650,
     active: true,
     imageUrl: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
+    description: "Delicate royal peda infused with aromatic cardamom and garnished with hand-selected jumbo cashews.",
   },
 ];
 
@@ -93,7 +98,7 @@ function HeroSection() {
             }`}
         >
           <Sparkles className="size-3.5 text-amber-400" />
-          <span>Reg: KDS/1597 · Maruthamunai</span>
+          <span>Authentic Eastern Heritage · Maruthamunai</span>
         </div>
 
         <h1
@@ -227,7 +232,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
           {product.name}
         </h3>
         <p className="mt-2 text-xs sm:text-sm text-slate-400 leading-relaxed flex-1">
-          Authentic eastern recipe made fresh with premium ingredients, prepared daily in our Maruthamunai kitchen.
+          {product.description?.trim() || "Authentic eastern recipe made fresh with premium ingredients, prepared daily in our Maruthamunai kitchen."}
         </p>
 
         <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-between text-xs">
@@ -291,15 +296,15 @@ function ContactSection() {
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 flex flex-col justify-between">
             <div>
               <div className="size-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4">
-                <FileText className="size-5" />
+                <Award className="size-5" />
               </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Official Registration</p>
-              <p className="text-xl font-mono font-bold text-white mt-1">
-                KDS/1597
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Pure Craftsmanship</p>
+              <p className="text-lg font-bold text-white mt-1">
+                100% Traditional Recipe
               </p>
-              <p className="text-xs text-slate-400 mt-1">Government Registered Sweet Maker</p>
+              <p className="text-xs text-slate-400 mt-1">Prepared daily with pure ghee, whole milk & nuts</p>
             </div>
-            <p className="text-xs text-slate-500 mt-4">Licensed & Quality Approved</p>
+            <p className="text-xs text-slate-500 mt-4">Fresh Batch Every Day</p>
           </div>
         </div>
       </div>
@@ -312,8 +317,8 @@ function Footer() {
     <footer className="border-t border-white/10 bg-black px-4 py-12">
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
         <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/20">
-            <Sparkles className="size-5" />
+          <div className="flex size-11 items-center justify-center rounded-2xl overflow-hidden bg-white/10 p-0.5 border border-white/15 shrink-0">
+            <img src="/logo.jpg" alt="Dhuniya Products Logo" className="size-full object-cover rounded-xl" />
           </div>
           <div>
             <p className="font-black text-white text-base">Dhuniya Products</p>
@@ -325,7 +330,7 @@ function Footer() {
 
         <div className="text-center sm:text-right">
           <p className="text-xs text-slate-400">
-            Registration: <strong className="text-slate-200">KDS/1597</strong> · Mobile: <strong className="text-slate-200">0756656135</strong>
+            Direct Order Mobile: <strong className="text-slate-200">0756656135</strong>
           </p>
           <p className="text-xs text-slate-500 mt-0.5">138, France City, Maruthamunai, Sri Lanka</p>
         </div>
@@ -364,16 +369,28 @@ export default function PublicPage() {
 
         if (error) throw error;
         if (data && data.length > 0) {
-          setProducts(
-            data.map((p: any) => ({
-              id: Number(p.id),
-              name: p.name,
-              unit: p.unit,
-              price: Number(p.price),
-              active: Boolean(p.active),
-              imageUrl: p.image_url || undefined,
-            }))
-          );
+          const raw = data.map((p: any) => ({
+            id: Number(p.id),
+            name: p.name,
+            unit: p.unit,
+            price: Number(p.price),
+            active: Boolean(p.active),
+            imageUrl: p.image_url || undefined,
+            description: p.description || undefined,
+          }));
+
+          // Deduplicate products by lowercase name so duplicate entries never show up
+          const mapByName = new Map<string, Product>();
+          for (const item of raw) {
+            const key = item.name.trim().toLowerCase();
+            const existing = mapByName.get(key);
+            if (!existing) {
+              mapByName.set(key, item);
+            } else if ((!existing.imageUrl && item.imageUrl) || (!existing.description && item.description)) {
+              mapByName.set(key, { ...existing, ...item });
+            }
+          }
+          setProducts(Array.from(mapByName.values()));
         } else {
           setProducts(SHOWCASE_SWEETS);
         }
@@ -391,8 +408,8 @@ export default function PublicPage() {
     <div className="bg-[#0a0600] text-white min-h-screen selection:bg-amber-500 selection:text-black">
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-8 py-4 bg-black/75 backdrop-blur-xl border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/20">
-            <Sparkles className="size-4" />
+          <div className="flex size-10 items-center justify-center rounded-xl overflow-hidden bg-white/10 p-0.5 border border-white/15 shadow-md shadow-amber-500/20 shrink-0">
+            <img src="/logo.jpg" alt="Dhuniya Products Logo" className="size-full object-cover rounded-lg" />
           </div>
           <div>
             <span className="font-black text-white text-sm sm:text-base tracking-tight">Dhuniya Products</span>
