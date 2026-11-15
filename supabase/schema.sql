@@ -32,8 +32,14 @@ create table if not exists public.orders (
   rate numeric,
   status text not null default 'Pending',
   notes text,
+  phone text,
+  address text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- Migrations if table already exists
+alter table public.orders add column if not exists phone text;
+alter table public.orders add column if not exists address text;
 
 -- 3. CUSTOMERS TABLE (Customer directory & auto-saves customer names for dropdown reuse)
 create table if not exists public.customers (

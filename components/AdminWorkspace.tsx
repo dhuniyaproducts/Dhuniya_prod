@@ -72,6 +72,8 @@ export type Order = {
   rate?: number;
   status: string;
   notes?: string;
+  phone?: string;
+  address?: string;
 };
 
 // --- Constants ---
@@ -832,18 +834,34 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
   );
 }
 
-type OrderFormData = { customer: string; productId: string; qty: string; deliveryDate: string; rate: string; notes: string; };
+type OrderFormData = {
+  customer: string;
+  productId: string;
+  qty: string;
+  deliveryDate: string;
+  rate: string;
+  notes: string;
+  phone?: string;
+  address?: string;
+};
 
 function OrderModal({ initial, products, customers = [], initialCustomer, onSave, onClose }: {
   initial?: Order; products: Product[]; customers?: (Customer | string)[]; initialCustomer?: string | null; onSave: (data: OrderFormData) => void; onClose: () => void;
 }) {
   const activeProducts = products.filter((p) => p.active);
   const normalizedCustomers = useMemo(() => {
-    return customers.map((c) => (typeof c === "string" ? { name: c, phone: undefined } : c));
+    return customers.map((c) => (typeof c === "string" ? { name: c, phone: undefined, address: undefined } : c));
   }, [customers]);
 
+  const targetInitialCustomer = initial?.customer ?? (initialCustomer ?? "");
+  const matchedInitial = targetInitialCustomer
+    ? normalizedCustomers.find((c) => c.name.toLowerCase() === targetInitialCustomer.toLowerCase())
+    : null;
+
   const [form, setForm] = useState<OrderFormData>({
-    customer: initial?.customer ?? (initialCustomer ?? ""),
+    customer: targetInitialCustomer,
+    phone: initial?.phone ?? (matchedInitial?.phone ?? ""),
+    address: initial?.address ?? (matchedInitial?.address ?? ""),
     productId: initial?.productId?.toString() ?? (activeProducts[0]?.id?.toString() ?? ""),
     qty: initial?.qty?.toString() ?? "",
     deliveryDate: initial?.deliveryDate ?? getTodayStr(),
@@ -851,6 +869,17 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
     notes: initial?.notes ?? "",
   });
   const [errors, setErrors] = useState<Partial<OrderFormData>>({});
+
+  const selectCustomer = (name: string) => {
+    const matched = normalizedCustomers.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
+    setForm((prev) => ({
+      ...prev,
+      customer: name,
+      phone: matched?.phone || prev.phone || "",
+      address: matched?.address || prev.address || "",
+    }));
+    if (errors.customer) setErrors((prev) => ({ ...prev, customer: undefined }));
+  };
 
   const validate = () => {
     const e: Partial<OrderFormData> = {};
@@ -894,11 +923,10 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
             {normalizedCustomers.length > 0 && (
               <div className="mb-2">
                 <select
-                  value={normalizedCustomers.some((c) => c.name === form.customer) ? form.customer : ""}
+                  value={normalizedCustomers.some((c) => c.name.toLowerCase() === form.customer.toLowerCase()) ? (normalizedCustomers.find((c) => c.name.toLowerCase() === form.customer.toLowerCase())?.name ?? form.customer) : ""}
                   onChange={(e) => {
                     if (e.target.value) {
-                      setForm((prev) => ({ ...prev, customer: e.target.value }));
-                      if (errors.customer) setErrors((prev) => ({ ...prev, customer: undefined }));
+                      selectCustomer(e.target.value);
                     }
                   }}
                   className="w-full rounded-xl border border-amber-300/80 bg-amber-50/70 px-3.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
@@ -917,7 +945,7 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
             <input
               list="customer-suggestions"
               value={form.customer}
-              onChange={(e) => setForm({ ...form, customer: e.target.value })}
+              onChange={(e) => selectCustomer(e.target.value)}
               placeholder={normalizedCustomers.length > 0 ? "Or type a new customer name..." : "e.g. Sharma Sweets, Grand Banquets"}
               autoComplete="off"
               className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.customer ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
@@ -937,12 +965,9 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
                   <button
                     key={c.name}
                     type="button"
-                    onClick={() => {
-                      setForm((prev) => ({ ...prev, customer: c.name }));
-                      if (errors.customer) setErrors((prev) => ({ ...prev, customer: undefined }));
-                    }}
+                    onClick={() => selectCustomer(c.name)}
                     className={`text-[11px] font-medium px-2 py-0.5 rounded-lg border transition-all ${
-                      form.customer === c.name
+                      form.customer.toLowerCase() === c.name.toLowerCase()
                         ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
                         : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300"
                     }`}
@@ -952,6 +977,40 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
                 ))}
               </div>
             )}
+
+            {/* Customer Phone (Optional) */}
+            <div className="mt-3">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Customer Mobile Number <span className="font-normal text-slate-400">(Optional - for direct calls)</span>
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+                <input
+                  type="tel"
+                  value={form.phone ?? ""}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  placeholder="e.g. 0756656135 (clickable in orders for dial pad)"
+                  className="w-full rounded-xl border border-slate-300 pl-9 pr-3.5 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Delivery Address (Optional) */}
+            <div className="mt-3">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Delivery Address / Town <span className="font-normal text-slate-400">(Optional)</span>
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+                <input
+                  value={form.address ?? ""}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  placeholder="e.g. 138 France City, Maruthamunai"
+                  className="w-full rounded-xl border border-slate-300 pl-9 pr-3.5 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all"
+                />
+              </div>
+              <p className="mt-1 text-[10px] text-amber-700 font-medium">✓ Phone & address will be remembered for future orders.</p>
+            </div>
           </div>
           <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
             <div>
@@ -1033,12 +1092,15 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
   );
 }
 
-function OrderCard({ order, product, onStatusChange, onGenerate, onEdit, onDelete }: {
-  order: Order; product?: Product; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void;
+function OrderCard({ order, product, customerLookup, onStatusChange, onGenerate, onEdit, onDelete }: {
+  order: Order; product?: Product; customerLookup?: Map<string, Customer>; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void;
 }) {
   const rate = order.rate ?? product?.price ?? 0;
   const total = order.qty * rate;
   const badge = getHandoverBadge(order.deliveryDate);
+  const info = customerLookup?.get(order.customer.trim().toLowerCase());
+  const phone = order.phone || info?.phone;
+  const address = order.address || info?.address;
 
   return (
     <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm hover:border-amber-300 transition-all space-y-3">
@@ -1056,6 +1118,31 @@ function OrderCard({ order, product, onStatusChange, onGenerate, onEdit, onDelet
           <StatusDropdown value={order.status} onChange={(v) => onStatusChange(order.id, v)} />
         </div>
       </div>
+
+      {(phone || address) && (
+        <div className="flex flex-col gap-1.5 bg-slate-50/90 rounded-xl p-2.5 text-xs border border-slate-200/80">
+          {phone && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500">Contact:</span>
+              <a
+                href={`tel:${phone}`}
+                className="inline-flex items-center gap-1.5 font-bold text-amber-800 bg-amber-100/90 hover:bg-amber-200 border border-amber-300/80 px-2.5 py-1 rounded-lg transition-colors active:scale-95 shadow-2xs"
+                title="Tap to open phone dial pad"
+              >
+                <Phone className="size-3 text-amber-700" />
+                <span>{phone}</span>
+                <span className="text-[10px] text-amber-700 font-semibold">📞 Call</span>
+              </a>
+            </div>
+          )}
+          {address && (
+            <div className="flex items-start gap-1.5 text-slate-600 pt-0.5 border-t border-slate-200/60">
+              <MapPin className="size-3 text-slate-400 shrink-0 mt-0.5" />
+              <span className="text-[11px] text-slate-700 leading-tight">{address}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-3 bg-amber-50/50 rounded-xl p-3 border border-amber-100/70">
         <div className="min-w-0">
@@ -1102,8 +1189,8 @@ function OrderCard({ order, product, onStatusChange, onGenerate, onEdit, onDelet
   );
 }
 
-function OrdersTable({ orders, getProduct, onStatusChange, onGenerate, onEdit, onDelete }: {
-  orders: Order[]; getProduct: (id: number) => Product | undefined; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void;
+function OrdersTable({ orders, getProduct, customerLookup, onStatusChange, onGenerate, onEdit, onDelete }: {
+  orders: Order[]; getProduct: (id: number) => Product | undefined; customerLookup?: Map<string, Customer>; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -1126,6 +1213,10 @@ function OrdersTable({ orders, getProduct, onStatusChange, onGenerate, onEdit, o
               const rate = order.rate ?? prod?.price ?? 0;
               const total = order.qty * rate;
               const badge = getHandoverBadge(order.deliveryDate);
+              const info = customerLookup?.get(order.customer.trim().toLowerCase());
+              const phone = order.phone || info?.phone;
+              const address = order.address || info?.address;
+
               return (
                 <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="px-6 py-4">
@@ -1133,11 +1224,29 @@ function OrdersTable({ orders, getProduct, onStatusChange, onGenerate, onEdit, o
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 font-bold text-xs">
                         {order.customer.charAt(0).toUpperCase()}
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-900">{order.customer}</p>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                          <span className="font-mono text-slate-500">{order.id}</span>
-                          {order.notes && (<><span>·</span><span className="italic text-slate-600 max-w-[200px] truncate">&ldquo;{order.notes}&rdquo;</span></>)}
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 leading-tight">{order.customer}</p>
+                        <div className="flex flex-col gap-0.5 mt-1 text-xs">
+                          {phone && (
+                            <a
+                              href={`tel:${phone}`}
+                              className="inline-flex items-center gap-1 font-semibold text-amber-700 hover:text-amber-800 hover:underline w-fit"
+                              title="Click to dial"
+                            >
+                              <Phone className="size-3 text-amber-600" />
+                              <span>{phone}</span>
+                            </a>
+                          )}
+                          {address && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 truncate max-w-[200px]" title={address}>
+                              <MapPin className="size-2.5 text-slate-400 shrink-0" />
+                              <span className="truncate">{address}</span>
+                            </span>
+                          )}
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
+                            <span className="font-mono text-slate-500">{order.id}</span>
+                            {order.notes && (<><span>·</span><span className="italic text-slate-600 max-w-[180px] truncate">&ldquo;{order.notes}&rdquo;</span></>)}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1195,6 +1304,7 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
   const [showModal, setShowModal] = useState(false);
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [selectedCustomerForNewOrder, setSelectedCustomerForNewOrder] = useState<string | null>(initialCustomer);
   const [query, setQuery] = useState("");
   const [filterProductId, setFilterProductId] = useState<string>(initialProductFilter ? String(initialProductFilter) : "All");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -1211,15 +1321,26 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
     for (const name of fromOrders) {
       if (!existing.has(name.toLowerCase())) {
         existing.add(name.toLowerCase());
-        list.push({ name });
+        list.push({ id: name, name });
       }
     }
     return list.sort((a, b) => a.name.localeCompare(b.name));
   }, [customers, orders]);
 
+  const customerLookup = useMemo(() => {
+    const map = new Map<string, Customer>();
+    for (const c of customers) {
+      if (typeof c === "object" && c.name) {
+        map.set(c.name.trim().toLowerCase(), c);
+      }
+    }
+    return map;
+  }, [customers]);
+
   useEffect(() => {
     if (initialCustomer) {
       setEditOrder(null);
+      setSelectedCustomerForNewOrder(initialCustomer);
       setShowModal(true);
       onClearInitialCustomer?.();
     }
@@ -1409,11 +1530,11 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
                   <div className="block sm:hidden space-y-3.5">
                     {group.orders.map((order) => {
                       const prod = getProduct(order.productId);
-                      return <OrderCard key={order.id} order={order} product={prod} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} />;
+                      return <OrderCard key={order.id} order={order} product={prod} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} />;
                     })}
                   </div>
                   <div className="hidden sm:block">
-                    <OrdersTable orders={group.orders} getProduct={getProduct} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} />
+                    <OrdersTable orders={group.orders} getProduct={getProduct} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} />
                   </div>
                 </section>
               );
@@ -1423,9 +1544,27 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
       </div>
 
       {(showModal || editOrder) && (
-        <OrderModal initial={editOrder ?? undefined} products={products} customers={allCustomers} initialCustomer={initialCustomer}
-          onSave={(data) => { if (editOrder) { onEdit(editOrder.id, data); setEditOrder(null); } else { onAdd(data); setShowModal(false); } }}
-          onClose={() => { setShowModal(false); setEditOrder(null); }}
+        <OrderModal
+          key={editOrder ? `edit-${editOrder.id}` : (selectedCustomerForNewOrder ? `new-${selectedCustomerForNewOrder}` : "new-order")}
+          initial={editOrder ?? undefined}
+          products={products}
+          customers={allCustomers}
+          initialCustomer={selectedCustomerForNewOrder}
+          onSave={(data) => {
+            if (editOrder) {
+              onEdit(editOrder.id, data);
+              setEditOrder(null);
+            } else {
+              onAdd(data);
+              setShowModal(false);
+              setSelectedCustomerForNewOrder(null);
+            }
+          }}
+          onClose={() => {
+            setShowModal(false);
+            setEditOrder(null);
+            setSelectedCustomerForNewOrder(null);
+          }}
         />
       )}
       {deleteId !== null && (
@@ -2258,7 +2397,19 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         if (ordErr) throw ordErr;
         let loadedOrders: Order[] = [];
         if (ordData && ordData.length > 0) {
-          loadedOrders = ordData.map((o: any) => ({ id: o.id, date: o.date, deliveryDate: o.delivery_date, customer: o.customer, productId: Number(o.product_id), qty: Number(o.qty), rate: o.rate ? Number(o.rate) : undefined, status: o.status, notes: o.notes || undefined }));
+          loadedOrders = ordData.map((o: any) => ({
+            id: o.id,
+            date: o.date,
+            deliveryDate: o.delivery_date,
+            customer: o.customer,
+            productId: Number(o.product_id),
+            qty: Number(o.qty),
+            rate: o.rate ? Number(o.rate) : undefined,
+            status: o.status,
+            notes: o.notes || undefined,
+            phone: o.phone || undefined,
+            address: o.address || undefined,
+          }));
           setOrders(loadedOrders);
           try { localStorage.setItem("dhuniya_orders", JSON.stringify(loadedOrders)); } catch { }
         } else {
@@ -2450,25 +2601,65 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
   const addOrder = async (data: OrderFormData) => {
     const newOrderId = genOrderId(orders);
-    const newOrder: Order = { id: newOrderId, date: getTodayStr(), deliveryDate: data.deliveryDate, customer: data.customer.trim(), productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined, status: "Pending", notes: data.notes?.trim() || undefined };
+    const newOrder: Order = {
+      id: newOrderId,
+      date: getTodayStr(),
+      deliveryDate: data.deliveryDate,
+      customer: data.customer.trim(),
+      productId: Number(data.productId),
+      qty: Number(data.qty),
+      rate: data.rate ? Number(data.rate) : undefined,
+      status: "Pending",
+      notes: data.notes?.trim() || undefined,
+      phone: data.phone?.trim() || undefined,
+      address: data.address?.trim() || undefined,
+    };
     setOrders((prev) => { const updated = [newOrder, ...prev]; try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
     
-    // Auto-save customer name for dropdown reuse
+    // Auto-save customer name, phone, address for dropdown & directory reuse
     const custName = data.customer.trim();
+    const custPhone = data.phone?.trim() || undefined;
+    const custAddress = data.address?.trim() || undefined;
+
     if (custName) {
       setCustomers((prev) => {
-        const cust = prev.find((c) => c.name.toLowerCase() === custName.toLowerCase());
-        if (!cust) {
-          const newC: Customer = { id: Date.now(), name: custName };
-          const updated = [...prev, newC].sort((a, b) => a.name.localeCompare(b.name));
-          try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
-          return updated;
+        const existing = prev.find((c) => c.name.toLowerCase() === custName.toLowerCase());
+        let updated: Customer[];
+        if (existing) {
+          updated = prev.map((c) =>
+            c.name.toLowerCase() === custName.toLowerCase()
+              ? {
+                  ...c,
+                  phone: custPhone || c.phone,
+                  address: custAddress || c.address,
+                }
+              : c
+          );
+        } else {
+          const newC: Customer = {
+            id: Date.now(),
+            name: custName,
+            phone: custPhone,
+            address: custAddress,
+          };
+          updated = [...prev, newC].sort((a, b) => a.name.localeCompare(b.name));
         }
-        return prev;
+        try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
+        return updated;
       });
+
       const client = getSupabase();
       if (client) {
-        client.from("customers").insert({ name: custName }).then(() => {}, () => {});
+        client.from("customers").upsert(
+          {
+            name: custName,
+            phone: custPhone || null,
+            address: custAddress || null,
+          },
+          { onConflict: "name" }
+        ).then(() => {}, () => {
+          client.from("customers").insert({ name: custName, phone: custPhone || null }).then(() => {}, () => {});
+        });
       }
     }
 
@@ -2476,7 +2667,35 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const client = getSupabase();
     if (client) {
       try {
-        const { error } = await client.from("orders").insert({ id: newOrder.id, date: newOrder.date, delivery_date: newOrder.deliveryDate, customer: newOrder.customer, product_id: newOrder.productId, qty: newOrder.qty, rate: newOrder.rate ?? null, status: newOrder.status, notes: newOrder.notes ?? null });
+        let { error } = await client.from("orders").insert({
+          id: newOrder.id,
+          date: newOrder.date,
+          delivery_date: newOrder.deliveryDate,
+          customer: newOrder.customer,
+          product_id: newOrder.productId,
+          qty: newOrder.qty,
+          rate: newOrder.rate ?? null,
+          status: newOrder.status,
+          notes: newOrder.notes ?? null,
+          phone: newOrder.phone ?? null,
+          address: newOrder.address ?? null,
+        });
+
+        if (error && (error.message?.includes("phone") || error.message?.includes("address") || error.code === "PGRST204")) {
+          const fb = await client.from("orders").insert({
+            id: newOrder.id,
+            date: newOrder.date,
+            delivery_date: newOrder.deliveryDate,
+            customer: newOrder.customer,
+            product_id: newOrder.productId,
+            qty: newOrder.qty,
+            rate: newOrder.rate ?? null,
+            status: newOrder.status,
+            notes: newOrder.notes ?? null,
+          });
+          error = fb.error;
+        }
+
         if (error) throw error;
       } catch (err: any) { addToast("error", `Supabase error: ${err.message}`); setOrders((prev) => prev.filter((o) => o.id !== newOrderId)); }
     }
@@ -2485,25 +2704,65 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
   const editOrder = async (id: string, data: OrderFormData) => {
     const prevOrders = [...orders];
     const current = orders.find((o) => o.id === id);
-    const updatedOrder: Order = { id, date: current?.date ?? getTodayStr(), customer: data.customer.trim(), productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined, deliveryDate: data.deliveryDate, notes: data.notes?.trim() || undefined, status: current?.status ?? "Pending" };
+    const updatedOrder: Order = {
+      id,
+      date: current?.date ?? getTodayStr(),
+      customer: data.customer.trim(),
+      productId: Number(data.productId),
+      qty: Number(data.qty),
+      rate: data.rate ? Number(data.rate) : undefined,
+      deliveryDate: data.deliveryDate,
+      notes: data.notes?.trim() || undefined,
+      phone: data.phone?.trim() || current?.phone || undefined,
+      address: data.address?.trim() || current?.address || undefined,
+      status: current?.status ?? "Pending",
+    };
     setOrders((prev) => { const updated = prev.map((o) => (o.id === id ? updatedOrder : o)); try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
     
-    // Auto-save customer name for dropdown reuse
+    // Auto-save customer name, phone, address for dropdown reuse
     const custName = data.customer.trim();
+    const custPhone = data.phone?.trim() || undefined;
+    const custAddress = data.address?.trim() || undefined;
+
     if (custName) {
       setCustomers((prev) => {
-        const cust = prev.find((c) => c.name.toLowerCase() === custName.toLowerCase());
-        if (!cust) {
-          const newC: Customer = { id: Date.now(), name: custName };
-          const updated = [...prev, newC].sort((a, b) => a.name.localeCompare(b.name));
-          try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
-          return updated;
+        const existing = prev.find((c) => c.name.toLowerCase() === custName.toLowerCase());
+        let updated: Customer[];
+        if (existing) {
+          updated = prev.map((c) =>
+            c.name.toLowerCase() === custName.toLowerCase()
+              ? {
+                  ...c,
+                  phone: custPhone || c.phone,
+                  address: custAddress || c.address,
+                }
+              : c
+          );
+        } else {
+          const newC: Customer = {
+            id: Date.now(),
+            name: custName,
+            phone: custPhone,
+            address: custAddress,
+          };
+          updated = [...prev, newC].sort((a, b) => a.name.localeCompare(b.name));
         }
-        return prev;
+        try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
+        return updated;
       });
+
       const client = getSupabase();
       if (client) {
-        client.from("customers").insert({ name: custName }).then(() => {}, () => {});
+        client.from("customers").upsert(
+          {
+            name: custName,
+            phone: custPhone || null,
+            address: custAddress || null,
+          },
+          { onConflict: "name" }
+        ).then(() => {}, () => {
+          client.from("customers").insert({ name: custName, phone: custPhone || null }).then(() => {}, () => {});
+        });
       }
     }
 
@@ -2511,7 +2770,29 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const client = getSupabase();
     if (client) {
       try {
-        const { error } = await client.from("orders").update({ customer: data.customer.trim(), product_id: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : null, delivery_date: data.deliveryDate, notes: data.notes?.trim() || null }).eq("id", id);
+        let { error } = await client.from("orders").update({
+          customer: data.customer.trim(),
+          product_id: Number(data.productId),
+          qty: Number(data.qty),
+          rate: data.rate ? Number(data.rate) : null,
+          delivery_date: data.deliveryDate,
+          notes: data.notes?.trim() || null,
+          phone: updatedOrder.phone ?? null,
+          address: updatedOrder.address ?? null,
+        }).eq("id", id);
+
+        if (error && (error.message?.includes("phone") || error.message?.includes("address") || error.code === "PGRST204")) {
+          const fb = await client.from("orders").update({
+            customer: data.customer.trim(),
+            product_id: Number(data.productId),
+            qty: Number(data.qty),
+            rate: data.rate ? Number(data.rate) : null,
+            delivery_date: data.deliveryDate,
+            notes: data.notes?.trim() || null,
+          }).eq("id", id);
+          error = fb.error;
+        }
+
         if (error) throw error;
       } catch (err: any) { addToast("error", `Supabase update failed: ${err.message}`); setOrders(prevOrders); }
     }
