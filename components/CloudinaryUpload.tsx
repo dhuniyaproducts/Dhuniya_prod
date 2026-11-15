@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { Upload, X, ImageIcon, Loader2 } from "lucide-react";
+import { deleteCloudinaryImage } from "@/lib/cloudinary";
 
 type CloudinaryUploadProps = {
   value?: string;
@@ -87,9 +88,13 @@ export default function CloudinaryUpload({ value, onChange, onClear }: Cloudinar
           />
           <button
             type="button"
-            onClick={() => { onChange(""); onClear?.(); }}
+            onClick={() => {
+              if (value) deleteCloudinaryImage(value);
+              onChange("");
+              onClear?.();
+            }}
             className="absolute top-2 right-2 flex size-7 items-center justify-center rounded-full bg-rose-600 text-white hover:bg-rose-700 shadow-sm transition-colors"
-            title="Remove image"
+            title="Remove image from Cloudinary"
           >
             <X className="size-4" />
           </button>

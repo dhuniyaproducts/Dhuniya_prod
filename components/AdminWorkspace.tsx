@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
 import CloudinaryUpload from "@/components/CloudinaryUpload";
+import { deleteCloudinaryImage } from "@/lib/cloudinary";
 import {
   ArrowRight,
   Bell,
@@ -1692,7 +1693,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const client = getSupabase();
     if (client) {
       try {
-        const { data: inserted, error } = await client.from("products").insert({
+        let { data: inserted, error } = await client.from("products").insert({
           name: data.name.trim(),
           unit: data.unit,
           price: Number(data.price),
@@ -1700,6 +1701,20 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           image_url: data.imageUrl?.trim() || null,
           description: data.description?.trim() || null,
         }).select().single();
+
+        // Fallback: If Supabase table does not yet have 'description' column, save without it
+        if (error && (error.message?.includes("description") || error.code === "PGRST204")) {
+          const fallback = await client.from("products").insert({
+            name: data.name.trim(),
+            unit: data.unit,
+            price: Number(data.price),
+            active: data.active,
+            image_url: data.imageUrl?.trim() || null,
+          }).select().single();
+          inserted = fallback.data;
+          error = fallback.error;
+        }
+
         if (error) throw error;
         if (inserted) { setProducts((prev) => prev.map((p) => (p.id === tempId ? { ...p, id: Number(inserted.id) } : p))); }
       } catch (err: any) { addToast("error", `Failed to save product: ${err.message}`); setProducts((prev) => prev.filter((p) => p.id !== tempId)); }
@@ -1708,6 +1723,13 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
   const editProduct = async (id: number, data: ProductFormData) => {
     const prevProducts = [...products];
+    const current = products.find((p) => p.id === id);
+
+    // If existing image changed or was cleared, delete the old image from Cloudinary
+    if (current?.imageUrl && current.imageUrl !== data.imageUrl) {
+      deleteCloudinaryImage(current.imageUrl);
+    }
+
     const updatedProduct: Product = {
       id,
       name: data.name.trim(),
@@ -1722,7 +1744,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const client = getSupabase();
     if (client) {
       try {
-        const { error } = await client.from("products").update({
+        let { error } = await client.from("products").update({
           name: data.name.trim(),
           unit: data.unit,
           price: Number(data.price),
@@ -1730,6 +1752,19 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           image_url: data.imageUrl?.trim() || null,
           description: data.description?.trim() || null,
         }).eq("id", id);
+
+        // Fallback: If Supabase table does not yet have 'description' column, update without it
+        if (error && (error.message?.includes("description") || error.code === "PGRST204")) {
+          const fallback = await client.from("products").update({
+            name: data.name.trim(),
+            unit: data.unit,
+            price: Number(data.price),
+            active: data.active,
+            image_url: data.imageUrl?.trim() || null,
+          }).eq("id", id);
+          error = fallback.error;
+        }
+
         if (error) throw error;
       } catch (err: any) { addToast("error", `Supabase update failed: ${err.message}`); setProducts(prevProducts); }
     }
@@ -1738,6 +1773,12 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
   const deleteProduct = async (id: number) => {
     const prevProducts = [...products];
     const target = products.find((p) => p.id === id);
+
+    // Delete image from Cloudinary storage to save quota
+    if (target?.imageUrl) {
+      deleteCloudinaryImage(target.imageUrl);
+    }
+
     setProducts((prev) => { const updated = prev.filter((p) => p.id !== id); try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { } return updated; });
     addToast("info", `Deleted "${target?.name ?? "Sweet"}"`);
     const client = getSupabase();
