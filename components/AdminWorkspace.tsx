@@ -19,15 +19,18 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  MapPin,
   Menu,
   Package,
   PackagePlus,
+  Phone,
   Plus,
   Printer,
   Search,
   Sparkles,
   Trash2,
   User,
+  Users,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -41,6 +44,22 @@ export type Product = {
   active: boolean;
   imageUrl?: string;
   description?: string;
+};
+
+export type Customer = {
+  id?: number | string;
+  name: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
+  createdAt?: string;
+};
+
+export type CustomerFormData = {
+  name: string;
+  phone: string;
+  address: string;
+  notes: string;
 };
 
 export type Order = {
@@ -271,13 +290,14 @@ function ConfirmDialog({ title, message, onConfirm, onCancel }: { title: string;
   );
 }
 
-function Sidebar({ active, setActive, open, setOpen, orderCount, onLogout }: {
-  active: string; setActive: (v: string) => void; open: boolean; setOpen: (v: boolean) => void; orderCount: number; onLogout: () => void;
+function Sidebar({ active, setActive, open, setOpen, orderCount, customerCount = 0, onLogout }: {
+  active: string; setActive: (v: string) => void; open: boolean; setOpen: (v: boolean) => void; orderCount: number; customerCount?: number; onLogout: () => void;
 }) {
   const items = [
     { label: "Dashboard", Icon: LayoutDashboard, path: "/dashboard" },
     { label: "Orders", Icon: ClipboardList, path: "/orders" },
     { label: "Products", Icon: Package, path: "/products" },
+    { label: "Customers", Icon: Users, path: "/customers" },
   ] as const;
 
   return (
@@ -335,6 +355,16 @@ function Sidebar({ active, setActive, open, setOpen, orderCount, onLogout }: {
                       }`}
                   >
                     {orderCount}
+                  </span>
+                )}
+                {label === "Customers" && customerCount > 0 && (
+                  <span
+                    className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold ${isActive
+                      ? "bg-amber-700 text-white"
+                      : "bg-slate-800 text-slate-300 border border-slate-700"
+                      }`}
+                  >
+                    {customerCount}
                   </span>
                 )}
               </button>
@@ -804,12 +834,16 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
 
 type OrderFormData = { customer: string; productId: string; qty: string; deliveryDate: string; rate: string; notes: string; };
 
-function OrderModal({ initial, products, customers = [], onSave, onClose }: {
-  initial?: Order; products: Product[]; customers?: string[]; onSave: (data: OrderFormData) => void; onClose: () => void;
+function OrderModal({ initial, products, customers = [], initialCustomer, onSave, onClose }: {
+  initial?: Order; products: Product[]; customers?: (Customer | string)[]; initialCustomer?: string | null; onSave: (data: OrderFormData) => void; onClose: () => void;
 }) {
   const activeProducts = products.filter((p) => p.active);
+  const normalizedCustomers = useMemo(() => {
+    return customers.map((c) => (typeof c === "string" ? { name: c, phone: undefined } : c));
+  }, [customers]);
+
   const [form, setForm] = useState<OrderFormData>({
-    customer: initial?.customer ?? "",
+    customer: initial?.customer ?? (initialCustomer ?? ""),
     productId: initial?.productId?.toString() ?? (activeProducts[0]?.id?.toString() ?? ""),
     qty: initial?.qty?.toString() ?? "",
     deliveryDate: initial?.deliveryDate ?? getTodayStr(),
@@ -849,18 +883,18 @@ function OrderModal({ initial, products, customers = [], onSave, onClose }: {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-xs font-bold text-slate-700">Customer Name *</label>
-              {customers.length > 0 && (
+              {normalizedCustomers.length > 0 && (
                 <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                  {customers.length} saved customer{customers.length !== 1 ? "s" : ""}
+                  {normalizedCustomers.length} saved customer{normalizedCustomers.length !== 1 ? "s" : ""}
                 </span>
               )}
             </div>
 
             {/* Select from existing customers dropdown */}
-            {customers.length > 0 && (
+            {normalizedCustomers.length > 0 && (
               <div className="mb-2">
                 <select
-                  value={customers.includes(form.customer) ? form.customer : ""}
+                  value={normalizedCustomers.some((c) => c.name === form.customer) ? form.customer : ""}
                   onChange={(e) => {
                     if (e.target.value) {
                       setForm((prev) => ({ ...prev, customer: e.target.value }));
@@ -869,10 +903,10 @@ function OrderModal({ initial, products, customers = [], onSave, onClose }: {
                   }}
                   className="w-full rounded-xl border border-amber-300/80 bg-amber-50/70 px-3.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
                 >
-                  <option value="">▼ Select from saved customers ({customers.length})...</option>
-                  {customers.map((c) => (
-                    <option key={c} value={c}>
-                      👤 {c}
+                  <option value="">▼ Select from saved customers ({normalizedCustomers.length})...</option>
+                  {normalizedCustomers.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      👤 {c.name} {c.phone ? `(${c.phone})` : ""}
                     </option>
                   ))}
                 </select>
@@ -884,36 +918,36 @@ function OrderModal({ initial, products, customers = [], onSave, onClose }: {
               list="customer-suggestions"
               value={form.customer}
               onChange={(e) => setForm({ ...form, customer: e.target.value })}
-              placeholder={customers.length > 0 ? "Or type a new customer name..." : "e.g. Sharma Sweets, Grand Banquets"}
+              placeholder={normalizedCustomers.length > 0 ? "Or type a new customer name..." : "e.g. Sharma Sweets, Grand Banquets"}
               autoComplete="off"
               className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.customer ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
             />
             <datalist id="customer-suggestions">
-              {customers.map((c) => (
-                <option key={c} value={c} />
+              {normalizedCustomers.map((c) => (
+                <option key={c.name} value={c.name} />
               ))}
             </datalist>
             {errors.customer && <p className="mt-1 text-xs text-rose-600">{errors.customer}</p>}
 
             {/* Quick-pick customer pills */}
-            {customers.length > 0 && (
+            {normalizedCustomers.length > 0 && (
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-0.5">Quick pick:</span>
-                {customers.slice(0, 5).map((c) => (
+                {normalizedCustomers.slice(0, 5).map((c) => (
                   <button
-                    key={c}
+                    key={c.name}
                     type="button"
                     onClick={() => {
-                      setForm((prev) => ({ ...prev, customer: c }));
+                      setForm((prev) => ({ ...prev, customer: c.name }));
                       if (errors.customer) setErrors((prev) => ({ ...prev, customer: undefined }));
                     }}
                     className={`text-[11px] font-medium px-2 py-0.5 rounded-lg border transition-all ${
-                      form.customer === c
+                      form.customer === c.name
                         ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
                         : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300"
                     }`}
                   >
-                    {c}
+                    {c.name}
                   </button>
                 ))}
               </div>
@@ -1153,8 +1187,8 @@ function OrdersTable({ orders, getProduct, onStatusChange, onGenerate, onEdit, o
   );
 }
 
-function OrdersPage({ orders, products, customers = [], onAdd, onEdit, onDelete, onStatusChange, onGenerate, initialProductFilter = null, onClearProductFilter, onOpenSidebar }: {
-  orders: Order[]; products: Product[]; customers?: string[]; onAdd: (data: OrderFormData) => void; onEdit: (id: string, data: OrderFormData) => void;
+function OrdersPage({ orders, products, customers = [], initialCustomer = null, onClearInitialCustomer, onAdd, onEdit, onDelete, onStatusChange, onGenerate, initialProductFilter = null, onClearProductFilter, onOpenSidebar }: {
+  orders: Order[]; products: Product[]; customers?: (Customer | string)[]; initialCustomer?: string | null; onClearInitialCustomer?: () => void; onAdd: (data: OrderFormData) => void; onEdit: (id: string, data: OrderFormData) => void;
   onDelete: (id: string) => void; onStatusChange: (id: string, status: string) => void; onGenerate: (order: Order) => void;
   initialProductFilter?: number | null; onClearProductFilter?: () => void; onOpenSidebar?: () => void;
 }) {
@@ -1170,10 +1204,26 @@ function OrdersPage({ orders, products, customers = [], onAdd, onEdit, onDelete,
   const todayStr = getTodayStr();
 
   // Combine customers passed in with all distinct customer names currently in orders
-  const allCustomerNames = useMemo(() => {
+  const allCustomers = useMemo(() => {
+    const list = customers.map((c) => (typeof c === "string" ? { name: c } : c));
     const fromOrders = orders.map((o) => o.customer?.trim()).filter(Boolean);
-    return Array.from(new Set([...customers, ...fromOrders])).sort((a, b) => a.localeCompare(b));
+    const existing = new Set(list.map((c) => c.name.toLowerCase()));
+    for (const name of fromOrders) {
+      if (!existing.has(name.toLowerCase())) {
+        existing.add(name.toLowerCase());
+        list.push({ name });
+      }
+    }
+    return list.sort((a, b) => a.name.localeCompare(b.name));
   }, [customers, orders]);
+
+  useEffect(() => {
+    if (initialCustomer) {
+      setEditOrder(null);
+      setShowModal(true);
+      onClearInitialCustomer?.();
+    }
+  }, [initialCustomer, onClearInitialCustomer]);
 
   useEffect(() => {
     if (initialProductFilter !== null && initialProductFilter !== undefined) {
@@ -1373,7 +1423,7 @@ function OrdersPage({ orders, products, customers = [], onAdd, onEdit, onDelete,
       </div>
 
       {(showModal || editOrder) && (
-        <OrderModal initial={editOrder ?? undefined} products={products} customers={allCustomerNames}
+        <OrderModal initial={editOrder ?? undefined} products={products} customers={allCustomers} initialCustomer={initialCustomer}
           onSave={(data) => { if (editOrder) { onEdit(editOrder.id, data); setEditOrder(null); } else { onAdd(data); setShowModal(false); } }}
           onClose={() => { setShowModal(false); setEditOrder(null); }}
         />
@@ -1387,8 +1437,8 @@ function OrdersPage({ orders, products, customers = [], onAdd, onEdit, onDelete,
   );
 }
 
-function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSidebar }: {
-  orders: Order[]; products: Product[]; setActive: (v: string) => void; onViewProductOrders: (productId: number) => void; onOpenSidebar?: () => void;
+function Dashboard({ orders, products, customers: allCustomersList = [], setActive, onViewProductOrders, onOpenSidebar }: {
+  orders: Order[]; products: Product[]; customers?: Customer[]; setActive: (v: string) => void; onViewProductOrders: (productId: number) => void; onOpenSidebar?: () => void;
 }) {
   const [expandCustomers, setExpandCustomers] = useState(false);
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
@@ -1410,6 +1460,7 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
     customerMap.set(o.customer, { orders: existing.orders + 1, kg: existing.kg + o.qty });
   });
   const customers = Array.from(customerMap.entries());
+  const totalCustomerCount = Math.max(allCustomersList.length, customerMap.size);
 
   return (
     <>
@@ -1421,41 +1472,58 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
           <p className="mt-1 text-xs sm:text-sm text-slate-500">Monitor daily production output, customer orders, and upcoming handovers.</p>
         </div>
 
-        <div className="mt-5 sm:mt-6 grid gap-3 sm:gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-white to-amber-50/40 p-4 sm:p-5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-700">Total Production Demand</p>
-              <div className="size-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700"><Factory className="size-4" /></div>
+        <div className="mt-5 sm:mt-6 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="rounded-xl sm:rounded-2xl border border-amber-200/80 bg-gradient-to-br from-white to-amber-50/40 p-3 sm:p-5 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-700 truncate">Total Demand</p>
+              <div className="size-6 sm:size-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 shrink-0"><Factory className="size-3.5 sm:size-4" /></div>
             </div>
-            <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900">{totalKg.toFixed(2)}</span>
-              <span className="text-xs sm:text-sm font-bold text-amber-600">kg active</span>
+            <div className="mt-2 sm:mt-2.5 flex items-baseline gap-1">
+              <span className="text-xl sm:text-3xl font-black text-slate-900">{totalKg.toFixed(2)}</span>
+              <span className="text-[10px] sm:text-xs font-bold text-amber-600">kg active</span>
             </div>
-            <p className="mt-1.5 text-xs text-slate-500">Across {activeOrders.length} customer orders in pipeline</p>
+            <p className="mt-1 sm:mt-1.5 text-[10px] sm:text-xs text-slate-500 truncate">{activeOrders.length} orders in pipeline</p>
           </div>
 
-          <div className="rounded-2xl border border-blue-200/80 bg-gradient-to-br from-white to-blue-50/40 p-4 sm:p-5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-blue-700">Active Sweet Products</p>
-              <div className="size-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700"><Package className="size-4" /></div>
+          <div className="rounded-xl sm:rounded-2xl border border-blue-200/80 bg-gradient-to-br from-white to-blue-50/40 p-3 sm:p-5 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-blue-700 truncate">Sweet Products</p>
+              <div className="size-6 sm:size-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 shrink-0"><Package className="size-3.5 sm:size-4" /></div>
             </div>
-            <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900">{activeProductCount}</span>
-              <span className="text-xs sm:text-sm font-bold text-blue-600">catalog items</span>
+            <div className="mt-2 sm:mt-2.5 flex items-baseline gap-1">
+              <span className="text-xl sm:text-3xl font-black text-slate-900">{activeProductCount}</span>
+              <span className="text-[10px] sm:text-xs font-bold text-blue-600">catalog items</span>
             </div>
-            <p className="mt-1.5 text-xs text-slate-500">{productBreakdown.length} sweets currently ordered</p>
+            <p className="mt-1 sm:mt-1.5 text-[10px] sm:text-xs text-slate-500 truncate">{productBreakdown.length} currently ordered</p>
           </div>
 
-          <div className="rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white to-emerald-50/40 p-4 sm:p-5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-700">Kitchen Pipeline</p>
-              <div className="size-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700"><ClipboardList className="size-4" /></div>
+          <div className="rounded-xl sm:rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white to-emerald-50/40 p-3 sm:p-5 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-700 truncate">Kitchen Orders</p>
+              <div className="size-6 sm:size-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0"><ClipboardList className="size-3.5 sm:size-4" /></div>
             </div>
-            <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900">{activeOrders.length}</span>
-              <span className="text-xs sm:text-sm font-bold text-emerald-600">orders</span>
+            <div className="mt-2 sm:mt-2.5 flex items-baseline gap-1">
+              <span className="text-xl sm:text-3xl font-black text-slate-900">{activeOrders.length}</span>
+              <span className="text-[10px] sm:text-xs font-bold text-emerald-600">orders</span>
             </div>
-            <p className="mt-1.5 text-xs text-slate-500">{customers.length} unique customers waiting for delivery</p>
+            <p className="mt-1 sm:mt-1.5 text-[10px] sm:text-xs text-slate-500 truncate">{customers.length} waiting for delivery</p>
+          </div>
+
+          <div
+            onClick={() => setActive("Customers")}
+            className="group cursor-pointer rounded-xl sm:rounded-2xl border border-violet-200/80 bg-gradient-to-br from-white to-violet-50/50 p-3 sm:p-5 shadow-xs hover:border-violet-400 hover:shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-violet-700 truncate">Saved Customers</p>
+              <div className="size-6 sm:size-8 rounded-lg bg-violet-100 flex items-center justify-center text-violet-700 shrink-0 group-hover:scale-110 transition-transform"><Users className="size-3.5 sm:size-4" /></div>
+            </div>
+            <div className="mt-2 sm:mt-2.5 flex items-baseline gap-1">
+              <span className="text-xl sm:text-3xl font-black text-slate-900">{totalCustomerCount}</span>
+              <span className="text-[10px] sm:text-xs font-bold text-violet-600">registered</span>
+            </div>
+            <p className="mt-1 sm:mt-1.5 text-[10px] sm:text-xs font-semibold text-violet-700 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              <span>View & Manage →</span>
+            </p>
           </div>
         </div>
 
@@ -1644,26 +1712,490 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
   );
 }
 
+function CustomerModal({ initial, onSave, onClose }: {
+  initial?: Customer;
+  onSave: (data: CustomerFormData) => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState<CustomerFormData>({
+    name: initial?.name ?? "",
+    phone: initial?.phone ?? "",
+    address: initial?.address ?? "",
+    notes: initial?.notes ?? "",
+  });
+  const [errors, setErrors] = useState<Partial<CustomerFormData>>({});
+
+  const validate = () => {
+    const e: Partial<CustomerFormData> = {};
+    if (!form.name.trim()) e.name = "Customer name is required";
+    return e;
+  };
+
+  const submit = () => {
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    onSave(form);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center">
+      <div className="my-5 w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6 sm:py-5 bg-slate-50">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-600">{initial ? "Edit" : "New"} Customer</p>
+            <h3 className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{initial ? "Update Customer Details" : "Add New Customer"}</h3>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200"><X className="size-4" /></button>
+        </div>
+
+        <div className="space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">Customer Name *</label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Grand Banquets, Deen Sweets"
+              className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.name ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
+            />
+            {errors.name && <p className="mt-1 text-xs text-rose-600">{errors.name}</p>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">Phone Number</label>
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="e.g. 0756656135"
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">Address / Location</label>
+            <input
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              placeholder="e.g. 138 France City, Maruthamunai"
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">Customer Notes / Preferences</label>
+            <textarea
+              rows={2}
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="e.g. Regular wholesale buyer, prefers delivery in mornings"
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-4 py-3 sm:px-6 sm:py-4 bg-slate-50">
+          <button onClick={onClose} className="rounded-xl border border-slate-300 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors">
+            Cancel
+          </button>
+          <button onClick={submit} className="rounded-xl bg-amber-600 px-5 py-2 text-xs sm:text-sm font-semibold text-white hover:bg-amber-700 shadow-sm transition-colors">
+            {initial ? "Save Changes" : "Add Customer"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CustomersPage({
+  customers,
+  orders,
+  onAdd,
+  onEdit,
+  onDelete,
+  onCreateOrder,
+  onOpenSidebar,
+}: {
+  customers: Customer[];
+  orders: Order[];
+  onAdd: (data: CustomerFormData) => void;
+  onEdit: (id: number | string, data: CustomerFormData) => void;
+  onDelete: (id: number | string, name: string) => void;
+  onCreateOrder: (customerName: string) => void;
+  onOpenSidebar?: () => void;
+}) {
+  const [showModal, setShowModal] = useState(false);
+  const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [query, setQuery] = useState("");
+
+  // Customer order stats
+  const customerStats = useMemo(() => {
+    const map = new Map<string, { totalOrders: number; activeOrders: number; totalKg: number; lastDate: string }>();
+    for (const o of orders) {
+      const name = o.customer?.trim();
+      if (!name) continue;
+      const cur = map.get(name) ?? { totalOrders: 0, activeOrders: 0, totalKg: 0, lastDate: "" };
+      cur.totalOrders += 1;
+      if (!["Completed", "Cancelled"].includes(o.status)) {
+        cur.activeOrders += 1;
+      }
+      cur.totalKg += o.qty;
+      if (!cur.lastDate || o.date > cur.lastDate) {
+        cur.lastDate = o.date;
+      }
+      map.set(name, cur);
+    }
+    return map;
+  }, [orders]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return customers;
+    return customers.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.phone && c.phone.toLowerCase().includes(q)) ||
+        (c.address && c.address.toLowerCase().includes(q)) ||
+        (c.notes && c.notes.toLowerCase().includes(q))
+    );
+  }, [customers, query]);
+
+  const totalActiveCustomers = Array.from(customerStats.values()).filter((s) => s.activeOrders > 0).length;
+
+  return (
+    <>
+      <PageHeader
+        title="Customers"
+        onMenu={onOpenSidebar}
+        action={
+          <button
+            onClick={() => { setEditCustomer(null); setShowModal(true); }}
+            className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-700 transition-colors"
+          >
+            <Plus className="size-4" />
+            <span>Add Customer</span>
+          </button>
+        }
+      />
+
+      <div className="mx-auto max-w-[1250px] px-3.5 py-5 sm:px-6 sm:py-8 lg:px-10">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-600">
+              <Users className="size-4" /> Customer Directory
+            </div>
+            <h2 className="mt-1 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+              Customer Accounts & Contacts
+            </h2>
+            <p className="mt-1 text-xs sm:text-sm text-slate-500">
+              Manage saved customer profiles, phone numbers, delivery locations, and order history.
+            </p>
+          </div>
+
+          <button
+            onClick={() => { setEditCustomer(null); setShowModal(true); }}
+            className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-amber-700 hover:shadow-md transition-all self-start sm:self-auto"
+          >
+            <Plus className="size-4" />
+            <span>Add Customer</span>
+          </button>
+        </div>
+
+        {/* Stats Row */}
+        <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-4">
+          <div className="rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-xs">
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Total Registered</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1">{customers.length}</p>
+            <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Saved in database</p>
+          </div>
+          <div className="rounded-xl sm:rounded-2xl border border-emerald-200/90 bg-emerald-50/40 p-3 sm:p-4 shadow-xs">
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-700">Active Buyers</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1">{totalActiveCustomers}</p>
+            <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Waiting for sweet orders</p>
+          </div>
+          <div className="col-span-2 sm:col-span-1 rounded-xl sm:rounded-2xl border border-amber-200/90 bg-amber-50/40 p-3 sm:p-4 shadow-xs">
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-700">Order Reuse</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1">100%</p>
+            <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Auto-suggests in order form</p>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="mt-5 sm:mt-6">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search customers by name, phone, or location..."
+              className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 shadow-xs"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 hover:text-slate-600"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Customer Cards & Table */}
+        {filtered.length === 0 ? (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center sm:p-12">
+            <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+              <Users className="size-6" />
+            </div>
+            <h3 className="mt-4 text-base font-bold text-slate-900">
+              {query ? "No matching customers found" : "No customers yet"}
+            </h3>
+            <p className="mt-1 text-xs sm:text-sm text-slate-500 max-w-sm mx-auto">
+              {query ? "Try clearing your search query" : "Add your first customer to quickly pick them whenever placing sweet production orders."}
+            </p>
+            {!query && (
+              <button
+                onClick={() => { setEditCustomer(null); setShowModal(true); }}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700"
+              >
+                <Plus className="size-4" /> Add First Customer
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Mobile Cards (Visible on mobile screens) */}
+            <div className="mt-4 block sm:hidden space-y-3">
+              {filtered.map((c) => {
+                const stats = customerStats.get(c.name.trim());
+                const initials = c.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+                return (
+                  <div key={c.id ?? c.name} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-100 to-amber-100 text-amber-900 font-bold text-xs border border-amber-300/40">
+                          {initials}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 text-sm truncate">{c.name}</p>
+                          {c.address && (
+                            <p className="text-[11px] text-slate-500 flex items-center gap-1 truncate mt-0.5">
+                              <MapPin className="size-3 text-slate-400 shrink-0" />
+                              <span className="truncate">{c.address}</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Orders badge */}
+                      {stats && stats.totalOrders > 0 ? (
+                        <span className="shrink-0 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                          {stats.totalOrders} order{stats.totalOrders !== 1 ? "s" : ""}
+                        </span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                          New
+                        </span>
+                      )}
+                    </div>
+
+                    {c.phone && (
+                      <div className="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2 text-xs">
+                        <span className="text-slate-500 font-medium">Contact:</span>
+                        <a href={`tel:${c.phone}`} className="font-bold text-amber-700 hover:underline flex items-center gap-1">
+                          <Phone className="size-3" />
+                          <span>{c.phone}</span>
+                        </a>
+                      </div>
+                    )}
+
+                    {c.notes && (
+                      <p className="text-xs text-slate-500 italic bg-amber-50/40 border border-amber-100 rounded-lg p-2">
+                        &ldquo;{c.notes}&rdquo;
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                      <button
+                        onClick={() => onCreateOrder(c.name)}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 hover:text-amber-700"
+                      >
+                        <Plus className="size-3.5" />
+                        <span>Place Order</span>
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => { setEditCustomer(c); setShowModal(true); }}
+                          className="rounded-lg p-1.5 text-slate-400 hover:text-amber-700 hover:bg-slate-100"
+                          title="Edit Customer"
+                        >
+                          <Edit2 className="size-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(c)}
+                          className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          title="Delete Customer"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table (Visible on sm and larger) */}
+            <div className="mt-5 hidden sm:block overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
+              <table className="w-full text-left text-sm text-slate-600">
+                <thead className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-6 py-3.5">Customer</th>
+                    <th className="px-6 py-3.5">Contact Phone</th>
+                    <th className="px-6 py-3.5">Address / Location</th>
+                    <th className="px-6 py-3.5">Order History</th>
+                    <th className="px-6 py-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map((c) => {
+                    const stats = customerStats.get(c.name.trim());
+                    const initials = c.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+                    return (
+                      <tr key={c.id ?? c.name} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-100 to-amber-100 text-amber-900 font-bold text-xs border border-amber-300/40">
+                              {initials}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-bold text-slate-900 block truncate">{c.name}</span>
+                              {c.notes && (
+                                <span className="text-xs text-slate-400 block truncate mt-0.5 italic">{c.notes}</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {c.phone ? (
+                            <a href={`tel:${c.phone}`} className="inline-flex items-center gap-1.5 font-semibold text-slate-800 hover:text-amber-700 hover:underline">
+                              <Phone className="size-3.5 text-slate-400" />
+                              <span>{c.phone}</span>
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">— No phone</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {c.address ? (
+                            <span className="inline-flex items-center gap-1.5 text-slate-700">
+                              <MapPin className="size-3.5 text-slate-400 shrink-0" />
+                              <span className="truncate max-w-[200px]">{c.address}</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">— No location</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {stats && stats.totalOrders > 0 ? (
+                            <div>
+                              <span className="font-bold text-slate-900">{stats.totalOrders} order{stats.totalOrders !== 1 ? "s" : ""}</span>
+                              <span className="text-xs text-slate-500 block">({stats.totalKg.toFixed(1)} kg total)</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-medium text-slate-400">No orders yet</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              onClick={() => onCreateOrder(c.name)}
+                              className="rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors"
+                              title="Create order for this customer"
+                            >
+                              + Order
+                            </button>
+                            <button
+                              onClick={() => { setEditCustomer(c); setShowModal(true); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:text-amber-700 hover:bg-slate-100 transition-colors"
+                              title="Edit Customer"
+                            >
+                              <Edit2 className="size-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteTarget(c)}
+                              className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                              title="Delete Customer"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+
+      {showModal && (
+        <CustomerModal
+          initial={editCustomer ?? undefined}
+          onSave={(data) => {
+            if (editCustomer && editCustomer.id !== undefined) {
+              onEdit(editCustomer.id, data);
+            } else {
+              onAdd(data);
+            }
+            setShowModal(false);
+            setEditCustomer(null);
+          }}
+          onClose={() => { setShowModal(false); setEditCustomer(null); }}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete Customer?"
+          message={`Are you sure you want to delete "${deleteTarget.name}"? This removes them from your saved directory.`}
+          onConfirm={() => {
+            if (deleteTarget.id !== undefined) {
+              onDelete(deleteTarget.id, deleteTarget.name);
+            }
+            setDeleteTarget(null);
+          }}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+    </>
+  );
+}
+
 // ============================================================
 // ADMIN WORKSPACE COMPONENT
 // ============================================================
-export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTab?: "Dashboard" | "Orders" | "Products" }) {
+export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTab?: "Dashboard" | "Orders" | "Products" | "Customers" }) {
   const router = useRouter();
-  const [active, setActiveState] = useState<"Dashboard" | "Orders" | "Products">(initialTab);
+  const [active, setActiveState] = useState<"Dashboard" | "Orders" | "Products" | "Customers">(initialTab);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [customers, setCustomers] = useState<string[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [newOrderInitialCustomer, setNewOrderInitialCustomer] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
   const [initialProductFilter, setInitialProductFilter] = useState<number | null>(null);
 
   // Sync tab changes with URL
-  const setActive = (tab: "Dashboard" | "Orders" | "Products" | string) => {
-    const validTab = tab as "Dashboard" | "Orders" | "Products";
+  const setActive = (tab: "Dashboard" | "Orders" | "Products" | "Customers" | string) => {
+    const validTab = tab as "Dashboard" | "Orders" | "Products" | "Customers";
     setActiveState(validTab);
-    const targetPath = validTab === "Dashboard" ? "/dashboard" : validTab === "Orders" ? "/orders" : "/products";
+    const targetPath = validTab === "Dashboard" ? "/dashboard" : validTab === "Orders" ? "/orders" : validTab === "Products" ? "/products" : "/customers";
     if (typeof window !== "undefined" && window.location.pathname !== targetPath) {
       window.history.pushState(null, "", targetPath);
     }
@@ -1734,24 +2266,58 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         }
 
         // Load customers from Supabase table + existing orders + local storage
-        let remoteCust: string[] = [];
+        let remoteCust: Customer[] = [];
         try {
-          const { data: cData } = await client.from("customers").select("name").order("name");
+          const { data: cData } = await client.from("customers").select("id,name,phone,address,notes,created_at").order("name");
           if (cData && cData.length > 0) {
-            remoteCust = cData.map((c: any) => c.name?.trim()).filter(Boolean);
+            remoteCust = cData.map((c: any) => ({
+              id: c.id,
+              name: c.name?.trim(),
+              phone: c.phone || undefined,
+              address: c.address || undefined,
+              notes: c.notes || undefined,
+              createdAt: c.created_at || undefined,
+            })).filter((c: Customer) => Boolean(c.name));
           }
-        } catch { }
+        } catch {
+          try {
+            const { data: minData } = await client.from("customers").select("id,name,phone").order("name");
+            if (minData) {
+              remoteCust = minData.map((c: any) => ({
+                id: c.id,
+                name: c.name?.trim(),
+                phone: c.phone || undefined,
+              })).filter((c: Customer) => Boolean(c.name));
+            }
+          } catch { }
+        }
 
-        const orderCust = loadedOrders.map((o) => o.customer?.trim()).filter(Boolean);
-        let localCust: string[] = [];
+        const existingNames = new Set(remoteCust.map((c) => c.name.toLowerCase()));
+        const orderCust: Customer[] = [];
+        for (const o of loadedOrders) {
+          const name = o.customer?.trim();
+          if (name && !existingNames.has(name.toLowerCase())) {
+            existingNames.add(name.toLowerCase());
+            orderCust.push({ id: `order-${name}`, name });
+          }
+        }
+
+        let localCust: Customer[] = [];
         try {
-          const lc = localStorage.getItem("dhuniya_customers");
+          const lc = localStorage.getItem("dhuniya_customers_v2");
           if (lc) localCust = JSON.parse(lc);
         } catch { }
 
-        const combinedCustomers = Array.from(new Set([...remoteCust, ...orderCust, ...localCust])).filter(Boolean).sort((a, b) => a.localeCompare(b));
+        for (const c of localCust) {
+          if (c.name && !existingNames.has(c.name.trim().toLowerCase())) {
+            existingNames.add(c.name.trim().toLowerCase());
+            orderCust.push(c);
+          }
+        }
+
+        const combinedCustomers = [...remoteCust, ...orderCust].sort((a, b) => a.name.localeCompare(b.name));
         setCustomers(combinedCustomers);
-        try { localStorage.setItem("dhuniya_customers", JSON.stringify(combinedCustomers)); } catch { }
+        try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(combinedCustomers)); } catch { }
       } catch (err: any) {
         console.error("Error loading Supabase data:", err);
         addToast("error", `Supabase connection note: ${err.message || "Using local storage"}`);
@@ -1891,9 +2457,11 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const custName = data.customer.trim();
     if (custName) {
       setCustomers((prev) => {
-        if (!prev.includes(custName)) {
-          const updated = [...prev, custName].sort((a, b) => a.localeCompare(b));
-          try { localStorage.setItem("dhuniya_customers", JSON.stringify(updated)); } catch { }
+        const cust = prev.find((c) => c.name.toLowerCase() === custName.toLowerCase());
+        if (!cust) {
+          const newC: Customer = { id: Date.now(), name: custName };
+          const updated = [...prev, newC].sort((a, b) => a.name.localeCompare(b.name));
+          try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
           return updated;
         }
         return prev;
@@ -1924,9 +2492,11 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const custName = data.customer.trim();
     if (custName) {
       setCustomers((prev) => {
-        if (!prev.includes(custName)) {
-          const updated = [...prev, custName].sort((a, b) => a.localeCompare(b));
-          try { localStorage.setItem("dhuniya_customers", JSON.stringify(updated)); } catch { }
+        const cust = prev.find((c) => c.name.toLowerCase() === custName.toLowerCase());
+        if (!cust) {
+          const newC: Customer = { id: Date.now(), name: custName };
+          const updated = [...prev, newC].sort((a, b) => a.name.localeCompare(b.name));
+          try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
           return updated;
         }
         return prev;
@@ -1944,6 +2514,123 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         const { error } = await client.from("orders").update({ customer: data.customer.trim(), product_id: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : null, delivery_date: data.deliveryDate, notes: data.notes?.trim() || null }).eq("id", id);
         if (error) throw error;
       } catch (err: any) { addToast("error", `Supabase update failed: ${err.message}`); setOrders(prevOrders); }
+    }
+  };
+
+  const addCustomer = async (data: CustomerFormData) => {
+    const trimmed = data.name.trim();
+    if (!trimmed) return;
+    if (customers.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) {
+      addToast("error", `Customer "${trimmed}" already exists`);
+      return;
+    }
+
+    let insertedId: any = Date.now();
+    const client = getSupabase();
+    if (client) {
+      try {
+        let { data: ins, error } = await client.from("customers").insert({
+          name: trimmed,
+          phone: data.phone.trim() || null,
+          address: data.address.trim() || null,
+          notes: data.notes.trim() || null,
+        }).select();
+
+        if (error) {
+          const fb = await client.from("customers").insert({
+            name: trimmed,
+            phone: data.phone.trim() || null,
+          }).select();
+          if (fb.data?.[0]?.id) insertedId = fb.data[0].id;
+        } else if (ins?.[0]?.id) {
+          insertedId = ins[0].id;
+        }
+      } catch (err: any) {
+        console.warn("Supabase customer insert warning:", err);
+      }
+    }
+
+    const newCustomer: Customer = {
+      id: insertedId,
+      name: trimmed,
+      phone: data.phone.trim() || undefined,
+      address: data.address.trim() || undefined,
+      notes: data.notes.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    setCustomers((prev) => {
+      const updated = [...prev, newCustomer].sort((a, b) => a.name.localeCompare(b.name));
+      try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
+      return updated;
+    });
+    addToast("success", `Customer "${trimmed}" saved`);
+  };
+
+  const editCustomer = async (id: number | string, data: CustomerFormData) => {
+    const trimmed = data.name.trim();
+    if (!trimmed) return;
+
+    const client = getSupabase();
+    if (client) {
+      try {
+        let { error } = await client.from("customers").update({
+          name: trimmed,
+          phone: data.phone.trim() || null,
+          address: data.address.trim() || null,
+          notes: data.notes.trim() || null,
+        }).eq("id", id);
+
+        if (error) {
+          await client.from("customers").update({
+            name: trimmed,
+            phone: data.phone.trim() || null,
+          }).eq("id", id);
+        }
+      } catch (err: any) {
+        console.warn("Supabase customer update error:", err);
+      }
+    }
+
+    setCustomers((prev) => {
+      const updated = prev.map((c) =>
+        c.id === id || c.name.toLowerCase() === trimmed.toLowerCase()
+          ? {
+              ...c,
+              name: trimmed,
+              phone: data.phone.trim() || undefined,
+              address: data.address.trim() || undefined,
+              notes: data.notes.trim() || undefined,
+            }
+          : c
+      ).sort((a, b) => a.name.localeCompare(b.name));
+      try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
+      return updated;
+    });
+    addToast("success", `Customer "${trimmed}" updated`);
+  };
+
+  const deleteCustomer = async (id: number | string, name: string) => {
+    const prevCustomers = [...customers];
+    setCustomers((prev) => {
+      const updated = prev.filter((c) => c.id !== id && c.name !== name);
+      try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
+      return updated;
+    });
+
+    const client = getSupabase();
+    if (client) {
+      try {
+        const { error } = await client.from("customers").delete().or(`id.eq.${id},name.eq.${name}`);
+        if (error) throw error;
+        addToast("info", `Customer "${name}" deleted`);
+      } catch (err: any) {
+        console.error("Failed to delete customer from Supabase:", err);
+        setCustomers(prevCustomers);
+        addToast("error", `Failed to delete customer: ${err.message}`);
+      }
+    } else {
+      addToast("info", `Customer "${name}" deleted`);
     }
   };
 
@@ -1976,7 +2663,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 antialiased font-sans">
-      <Sidebar active={active} setActive={setActive} open={sidebarOpen} setOpen={setSidebarOpen} orderCount={activeOrderCount} onLogout={handleLogout} />
+      <Sidebar active={active} setActive={setActive} open={sidebarOpen} setOpen={setSidebarOpen} orderCount={activeOrderCount} customerCount={customers.length} onLogout={handleLogout} />
       <main className="min-h-screen lg:ml-[260px] pb-24 lg:pb-16">
         {isLoading && (
           <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center text-xs font-semibold text-amber-800 flex items-center justify-center gap-2">
@@ -1984,13 +2671,14 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
             Connecting and syncing with Supabase...
           </div>
         )}
-        {active === "Dashboard" && (<Dashboard orders={orders} products={products} setActive={setActive} onViewProductOrders={viewProductOrders} onOpenSidebar={() => setSidebarOpen(true)} />)}
-        {active === "Orders" && (<OrdersPage orders={orders} products={products} customers={customers} onAdd={addOrder} onEdit={editOrder} onDelete={deleteOrder} onStatusChange={updateStatus} onGenerate={generateInvoice} initialProductFilter={initialProductFilter} onClearProductFilter={() => setInitialProductFilter(null)} onOpenSidebar={() => setSidebarOpen(true)} />)}
+        {active === "Dashboard" && (<Dashboard orders={orders} products={products} customers={customers} setActive={setActive} onViewProductOrders={viewProductOrders} onOpenSidebar={() => setSidebarOpen(true)} />)}
+        {active === "Orders" && (<OrdersPage orders={orders} products={products} customers={customers} initialCustomer={newOrderInitialCustomer} onClearInitialCustomer={() => setNewOrderInitialCustomer(null)} onAdd={addOrder} onEdit={editOrder} onDelete={deleteOrder} onStatusChange={updateStatus} onGenerate={generateInvoice} initialProductFilter={initialProductFilter} onClearProductFilter={() => setInitialProductFilter(null)} onOpenSidebar={() => setSidebarOpen(true)} />)}
         {active === "Products" && (<ProductsPage products={products} orders={orders} onAdd={addProduct} onEdit={editProduct} onDelete={deleteProduct} onViewProductOrders={viewProductOrders} onOpenSidebar={() => setSidebarOpen(true)} />)}
+        {active === "Customers" && (<CustomersPage customers={customers} orders={orders} onAdd={addCustomer} onEdit={editCustomer} onDelete={deleteCustomer} onCreateOrder={(name) => { setNewOrderInitialCustomer(name); setActive("Orders"); }} onOpenSidebar={() => setSidebarOpen(true)} />)}
       </main>
 
       {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 inset-x-0 z-30 flex h-16 items-center justify-around border-t border-slate-200/90 bg-white/95 backdrop-blur-md px-2 lg:hidden shadow-[0_-2px_10px_rgba(0,0,0,0.03)]">
+      <nav className="fixed bottom-0 inset-x-0 z-30 flex h-16 items-center justify-around border-t border-slate-200/90 bg-white/95 backdrop-blur-md px-1 sm:px-2 lg:hidden shadow-[0_-2px_10px_rgba(0,0,0,0.03)]">
         <button onClick={() => setActive("Dashboard")} className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${active === "Dashboard" ? "text-amber-600 font-bold" : "text-slate-400 hover:text-slate-700"}`}>
           <LayoutDashboard className="size-5" />
           <span className="text-[10px] mt-1 font-semibold">Dashboard</span>
@@ -2005,6 +2693,10 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         <button onClick={() => setActive("Products")} className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${active === "Products" ? "text-amber-600 font-bold" : "text-slate-400 hover:text-slate-700"}`}>
           <Package className="size-5" />
           <span className="text-[10px] mt-1 font-semibold">Products</span>
+        </button>
+        <button onClick={() => setActive("Customers")} className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${active === "Customers" ? "text-amber-600 font-bold" : "text-slate-400 hover:text-slate-700"}`}>
+          <Users className="size-5" />
+          <span className="text-[10px] mt-1 font-semibold">Customers</span>
         </button>
         <button onClick={() => setSidebarOpen(true)} className="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-700 transition-colors">
           <Menu className="size-5" />
