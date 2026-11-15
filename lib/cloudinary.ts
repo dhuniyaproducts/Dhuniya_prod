@@ -42,3 +42,17 @@ export async function deleteCloudinaryImage(imageUrl?: string): Promise<boolean>
     return false;
   }
 }
+
+/**
+ * Optimizes an image URL for fast mobile & web loading.
+ * Automatically serves modern WebP/AVIF formats and resizes high-res images.
+ */
+export function optimizeImageUrl(url?: string, width = 600): string {
+  if (!url || typeof url !== "string") return "";
+  if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
+    if (!url.includes("f_auto")) {
+      return url.replace("/upload/", `/upload/f_auto,q_auto,w_${width},c_limit/`);
+    }
+  }
+  return url;
+}

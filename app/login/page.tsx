@@ -103,7 +103,15 @@ export default function LoginPage() {
         {/* Brand */}
         <div className="mb-8 text-center">
           <div className="inline-flex size-16 items-center justify-center rounded-2xl overflow-hidden bg-white/10 p-0.5 border border-white/15 shadow-xl shadow-amber-500/20 mb-4">
-            <img src="/logo.jpg" alt="Dhuniya Products Logo" className="size-full object-cover rounded-xl" />
+            <img
+              src="/logo.jpg"
+              alt="Dhuniya Products Logo"
+              className="size-full object-cover rounded-xl"
+              loading="eager"
+              decoding="async"
+              width={64}
+              height={64}
+            />
           </div>
           <h1 className="text-2xl font-black text-white">Dhuniya Products</h1>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-500 mt-1">

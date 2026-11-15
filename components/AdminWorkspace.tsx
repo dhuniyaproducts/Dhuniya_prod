@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
 import CloudinaryUpload from "@/components/CloudinaryUpload";
-import { deleteCloudinaryImage } from "@/lib/cloudinary";
+import { deleteCloudinaryImage, optimizeImageUrl } from "@/lib/cloudinary";
 import {
   ArrowRight,
   Bell,
@@ -656,7 +656,7 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                     <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-3 min-w-0">
                         {p.imageUrl ? (
-                          <img src={p.imageUrl} alt={p.name} className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40 shadow-2xs" />
+                          <img src={optimizeImageUrl(p.imageUrl, 100)} alt={p.name} loading="lazy" decoding="async" className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40 shadow-2xs" />
                         ) : (
                           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40 shadow-2xs">
                             {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
@@ -725,7 +725,7 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               {p.imageUrl ? (
-                                <img src={p.imageUrl} alt={p.name} className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40" />
+                                <img src={optimizeImageUrl(p.imageUrl, 100)} alt={p.name} loading="lazy" decoding="async" className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40" />
                               ) : (
                                 <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 font-bold text-xs">
                                   {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
@@ -1689,7 +1689,10 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         setIsLoading(false); return;
       }
       try {
-        const { data: prodData, error: prodErr } = await client.from("products").select("*").order("id", { ascending: true });
+        const { data: prodData, error: prodErr } = await client
+          .from("products")
+          .select("id,name,unit,price,active,image_url,description")
+          .order("id", { ascending: true });
         if (prodErr) throw prodErr;
         if (prodData && prodData.length > 0) {
           const loadedProducts: Product[] = prodData.map((p: any) => ({

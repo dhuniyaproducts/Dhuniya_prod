@@ -2,16 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { getSupabase } from "@/lib/supabase";
+import { optimizeImageUrl } from "@/lib/cloudinary";
 import {
   Sparkles,
   MapPin,
   Phone,
-  FileText,
   ArrowRight,
   Star,
-  Shield,
-  Leaf,
-  ChevronDown,
   Lock,
   Award,
   Heart,
@@ -72,12 +69,6 @@ const SHOWCASE_SWEETS: Product[] = [
 ];
 
 function HeroSection() {
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setVisible(true), 100);
-    return () => clearTimeout(t);
-  }, []);
-
   return (
     <section className="relative min-h-[75vh] sm:min-h-[90vh] flex items-center justify-center overflow-hidden bg-[#0a0600] pt-16 pb-10 sm:pt-28 sm:pb-20">
       <div className="absolute inset-0 bg-gradient-to-b from-[#180d01] via-[#0f0700] to-[#0a0600]" />
@@ -92,51 +83,32 @@ function HeroSection() {
         }}
       />
 
-      <div className="relative z-10 text-center px-4 max-w-5xl mx-auto">
-        <div
-          className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 sm:px-4 sm:py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider sm:tracking-[0.2em] text-amber-300 mb-4 sm:mb-8 backdrop-blur-md transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-        >
+      <div className="relative z-10 text-center px-4 max-w-5xl mx-auto hero-fade-in">
+        <div className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 sm:px-4 sm:py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider sm:tracking-[0.2em] text-amber-300 mb-4 sm:mb-8 backdrop-blur-md">
           <Sparkles className="size-3 sm:size-3.5 text-amber-400" />
           <span>Authentic Eastern Heritage · Maruthamunai</span>
         </div>
 
-        <h1
-          className={`text-3xl sm:text-6xl md:text-8xl font-black tracking-tight text-white leading-[1.08] sm:leading-[1.02] mb-3 sm:mb-6 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-            }`}
-          style={{ transitionDelay: "100ms" }}
-        >
+        <h1 className="text-3xl sm:text-6xl md:text-8xl font-black tracking-tight text-white leading-[1.08] sm:leading-[1.02] mb-3 sm:mb-6">
           <span>Dhuniya</span>{" "}
           <span className="bg-gradient-to-r from-amber-300 via-amber-500 to-orange-400 bg-clip-text text-transparent">
             Products
           </span>
         </h1>
 
-        <div
-          className={`inline-block mb-3 sm:mb-5 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-            }`}
-          style={{ transitionDelay: "200ms" }}
-        >
+        <div className="inline-block mb-3 sm:mb-5">
           <p className="text-xs sm:text-2xl md:text-3xl font-extrabold uppercase tracking-[0.16em] sm:tracking-[0.25em] text-amber-200">
             Eastern Traditional Sweet
           </p>
           <div className="h-0.5 w-16 sm:w-28 bg-gradient-to-r from-amber-400 to-orange-500 mx-auto mt-2 sm:mt-3 rounded-full" />
         </div>
 
-        <p
-          className={`text-slate-300 text-xs sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-10 px-2 sm:px-0 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-            }`}
-          style={{ transitionDelay: "300ms" }}
-        >
+        <p className="text-slate-300 text-xs sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-10 px-2 sm:px-0">
           Experience handcrafted heritage sweets made with authentic eastern Sri Lankan recipes,
           pure ingredients, and time-honoured artistry.
         </p>
 
-        <div
-          className={`flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-4 mb-8 sm:mb-16 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-            }`}
-          style={{ transitionDelay: "400ms" }}
-        >
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-4 mb-8 sm:mb-16">
           <a
             href="#sweets"
             className="group flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-2.5 sm:px-8 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-105 transition-all duration-300 w-full sm:w-auto"
@@ -153,11 +125,7 @@ function HeroSection() {
           </a>
         </div>
 
-        <div
-          className={`grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 max-w-3xl mx-auto transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-            }`}
-          style={{ transitionDelay: "500ms" }}
-        >
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 max-w-3xl mx-auto">
           {[
             { label: "100% Pure Recipe", icon: Award },
             { label: "Handcrafted Daily", icon: Heart },
@@ -179,13 +147,7 @@ function HeroSection() {
 }
 
 function ProductCard({ product, index }: { product: Product; index: number }) {
-  const [visible, setVisible] = useState(false);
   const [imgErr, setImgErr] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setVisible(true), index * 60);
-    return () => clearTimeout(t);
-  }, [index]);
 
   const initials = product.name
     .split(" ")
@@ -194,19 +156,21 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
     .slice(0, 2)
     .toUpperCase();
 
+  const optimizedSrc = product.imageUrl ? optimizeImageUrl(product.imageUrl, 600) : "";
+
   return (
     <div
-      className={`group relative flex flex-col rounded-2xl sm:rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-transparent backdrop-blur-md hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/15 transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-        }`}
+      className="group relative flex flex-col rounded-2xl sm:rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-transparent backdrop-blur-md hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/15 transition-all duration-300"
     >
       <div className="relative aspect-[4/3] sm:aspect-auto sm:h-56 md:h-60 overflow-hidden bg-gradient-to-br from-amber-950/80 to-[#120800]">
-        {product.imageUrl && !imgErr ? (
+        {optimizedSrc && !imgErr ? (
           <img
-            src={product.imageUrl}
+            src={optimizedSrc}
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 ease-out"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
             onError={() => setImgErr(true)}
-            loading="lazy"
+            loading={index < 4 ? "eager" : "lazy"}
+            decoding="async"
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 text-center">
@@ -321,7 +285,15 @@ function Footer() {
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
         <div className="flex items-center gap-3">
           <div className="flex size-11 items-center justify-center rounded-2xl overflow-hidden bg-white/10 p-0.5 border border-white/15 shrink-0">
-            <img src="/logo.jpg" alt="Dhuniya Products Logo" className="size-full object-cover rounded-xl" />
+            <img
+              src="/logo.jpg"
+              alt="Dhuniya Products Logo"
+              className="size-full object-cover rounded-xl"
+              loading="lazy"
+              decoding="async"
+              width={44}
+              height={44}
+            />
           </div>
           <div>
             <p className="font-black text-white text-base">Dhuniya Products</p>
@@ -351,22 +323,18 @@ function Footer() {
 }
 
 export default function PublicPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Show showcase sweets immediately — replaced by real data once loaded
+  const [products, setProducts] = useState<Product[]>(SHOWCASE_SWEETS);
 
   useEffect(() => {
     async function loadProducts() {
       try {
         const client = getSupabase();
-        if (!client) {
-          setProducts(SHOWCASE_SWEETS);
-          setLoading(false);
-          return;
-        }
+        if (!client) return;
 
         const { data, error } = await client
           .from("products")
-          .select("*")
+          .select("id,name,unit,price,active,image_url,description")
           .eq("active", true)
           .order("id", { ascending: true });
 
@@ -394,14 +362,9 @@ export default function PublicPage() {
             }
           }
           setProducts(Array.from(mapByName.values()));
-        } else {
-          setProducts(SHOWCASE_SWEETS);
         }
       } catch (err) {
         console.error("Failed to load products:", err);
-        setProducts(SHOWCASE_SWEETS);
-      } finally {
-        setLoading(false);
       }
     }
     loadProducts();
@@ -412,7 +375,15 @@ export default function PublicPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-3 sm:px-8 py-2.5 sm:py-4 bg-black/80 backdrop-blur-xl border-b border-white/10">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="flex size-8 sm:size-10 items-center justify-center rounded-lg sm:rounded-xl overflow-hidden bg-white/10 p-0.5 border border-white/15 shadow-md shadow-amber-500/20 shrink-0">
-            <img src="/logo.jpg" alt="Dhuniya Products Logo" className="size-full object-cover rounded-md sm:rounded-lg" />
+            <img
+              src="/logo.jpg"
+              alt="Dhuniya Products Logo"
+              className="size-full object-cover rounded-md sm:rounded-lg"
+              loading="eager"
+              decoding="async"
+              width={40}
+              height={40}
+            />
           </div>
           <div>
             <span className="font-black text-white text-xs sm:text-base tracking-tight block">Dhuniya Products</span>
@@ -461,7 +432,7 @@ export default function PublicPage() {
             </p>
           </div>
 
-          {loading ? (
+          {products.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <div className="size-12 rounded-full border-4 border-amber-500/20 border-t-amber-500 animate-spin" />
               <p className="text-sm text-slate-400 font-medium">Loading sweet catalog…</p>
