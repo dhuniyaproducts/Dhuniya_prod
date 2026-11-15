@@ -412,12 +412,12 @@ function Invoice({ order, product, rate, onClose }: {
           html, body { background: #ffffff !important; color: #0f172a !important; margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; overflow: visible !important; }
           aside, header, main, nav, .print-hide, .toast-container { display: none !important; }
           .invoice-modal-overlay { position: static !important; display: block !important; padding: 0 !important; margin: 0 !important; background: transparent !important; overflow: visible !important; height: auto !important; min-height: 0 !important; }
-          .invoice-card { border: none !important; box-shadow: none !important; margin: 0 !important; padding: 0 !important; max-width: 100% !important; border-radius: 0 !important; overflow: visible !important; height: auto !important; }
-          #printable-invoice { position: static !important; display: block !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; page-break-inside: avoid !important; break-inside: avoid !important; }
+          .invoice-card { border: none !important; box-shadow: none !important; margin: 0 !important; padding: 0 !important; max-width: 100% !important; border-radius: 0 !important; overflow: visible !important; height: auto !important; max-height: none !important; }
+          #printable-invoice { position: static !important; display: block !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; page-break-inside: avoid !important; break-inside: avoid !important; height: auto !important; max-height: none !important; overflow: visible !important; }
         }
       ` }} />
-      <div className="invoice-card my-4 sm:my-5 w-full max-w-[760px] rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
-        <div className="border-b border-slate-200 px-3.5 py-3 sm:px-6 sm:py-4 bg-slate-50 flex items-center justify-between print:hidden gap-2">
+      <div className="invoice-card my-auto w-full max-w-[760px] max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="shrink-0 border-b border-slate-200 px-3.5 py-3 sm:px-6 sm:py-4 bg-slate-50 flex items-center justify-between print:hidden gap-2">
           <div>
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-600">Official Bill</p>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">Invoice {order.id}</h2>
@@ -434,7 +434,7 @@ function Invoice({ order, product, rate, onClose }: {
             </button>
           </div>
         </div>
-        <article id="printable-invoice" className="p-4 sm:p-8 print:p-0">
+        <article id="printable-invoice" className="flex-1 overflow-y-auto p-4 sm:p-8 print:p-0 print:overflow-visible">
           <div className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-4 print:pb-3 sm:flex-row">
             <div>
               <div className="flex items-center gap-2.5">
@@ -573,15 +573,15 @@ function ProductModal({ initial, onSave, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6 sm:py-5 bg-slate-50">
+      <div className="my-auto w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-4 py-3.5 sm:px-6 sm:py-5 bg-slate-50">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-amber-600">{initial ? "Edit" : "New"} Sweet</p>
             <h3 className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{initial ? "Update Sweet Details" : "Add Sweet to Catalog"}</h3>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200"><X className="size-4" /></button>
         </div>
-        <div className="space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+        <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5 sm:px-6 sm:py-6">
           <div>
             <label className="mb-1.5 block text-xs font-bold text-slate-700">Sweet Name *</label>
             <input
@@ -655,7 +655,7 @@ function ProductModal({ initial, onSave, onClose }: {
             </button>
           </div>
         </div>
-        <div className="flex gap-3 border-t border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50">
+        <div className="shrink-0 flex gap-3 border-t border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50">
           <button onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-2.5 text-sm font-semibold text-slate-700 hover:bg-white transition-colors">Cancel</button>
           <button onClick={submit} className="flex-1 rounded-xl bg-amber-600 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 shadow-xs transition-colors">
             {initial ? "Update Sweet" : "Add Sweet"}
@@ -932,15 +932,15 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center">
-      <div className="my-5 w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6 sm:py-5 bg-slate-50">
+      <div className="my-auto w-full max-w-lg max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-4 py-3.5 sm:px-6 sm:py-5 bg-slate-50">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-amber-600">{initial ? "Edit" : "New"} Order</p>
             <h3 className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{initial ? "Update Customer Order" : "Place New Customer Order"}</h3>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200"><X className="size-4" /></button>
         </div>
-        <div className="space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+        <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5 sm:px-6 sm:py-6">
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-xs font-bold text-slate-700">Customer Name *</label>
@@ -1113,7 +1113,7 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
             </div>
           )}
         </div>
-        <div className="flex gap-3 border-t border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50">
+        <div className="shrink-0 flex gap-3 border-t border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50">
           <button onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-2.5 text-sm font-semibold text-slate-700 hover:bg-white transition-colors">Cancel</button>
           <button onClick={submit} className="flex-1 rounded-xl bg-amber-600 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 shadow-xs">
             {initial ? "Update Order" : "Place Order"}
@@ -1910,8 +1910,8 @@ function CustomerModal({ initial, onSave, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center">
-      <div className="my-5 w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6 sm:py-5 bg-slate-50">
+      <div className="my-auto w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-4 py-3.5 sm:px-6 sm:py-5 bg-slate-50">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-amber-600">{initial ? "Edit" : "New"} Customer</p>
             <h3 className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{initial ? "Update Customer Details" : "Add New Customer"}</h3>
@@ -1919,7 +1919,7 @@ function CustomerModal({ initial, onSave, onClose }: {
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200"><X className="size-4" /></button>
         </div>
 
-        <div className="space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+        <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5 sm:px-6 sm:py-6">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">Customer Name *</label>
             <input
@@ -1964,7 +1964,7 @@ function CustomerModal({ initial, onSave, onClose }: {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-4 py-3 sm:px-6 sm:py-4 bg-slate-50">
+        <div className="shrink-0 flex items-center justify-end gap-3 border-t border-slate-200 px-4 py-3 sm:px-6 sm:py-4 bg-slate-50">
           <button onClick={onClose} className="rounded-xl border border-slate-300 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors">
             Cancel
           </button>
