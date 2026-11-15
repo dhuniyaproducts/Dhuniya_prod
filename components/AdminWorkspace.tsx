@@ -804,8 +804,8 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
 
 type OrderFormData = { customer: string; productId: string; qty: string; deliveryDate: string; rate: string; notes: string; };
 
-function OrderModal({ initial, products, onSave, onClose }: {
-  initial?: Order; products: Product[]; onSave: (data: OrderFormData) => void; onClose: () => void;
+function OrderModal({ initial, products, customers = [], onSave, onClose }: {
+  initial?: Order; products: Product[]; customers?: string[]; onSave: (data: OrderFormData) => void; onClose: () => void;
 }) {
   const activeProducts = products.filter((p) => p.active);
   const [form, setForm] = useState<OrderFormData>({
@@ -847,14 +847,77 @@ function OrderModal({ initial, products, onSave, onClose }: {
         </div>
         <div className="space-y-4 px-4 py-5 sm:px-6 sm:py-6">
           <div>
-            <label className="mb-1.5 block text-xs font-bold text-slate-700">Customer Name *</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-700">Customer Name *</label>
+              {customers.length > 0 && (
+                <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                  {customers.length} saved customer{customers.length !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+
+            {/* Select from existing customers dropdown */}
+            {customers.length > 0 && (
+              <div className="mb-2">
+                <select
+                  value={customers.includes(form.customer) ? form.customer : ""}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setForm((prev) => ({ ...prev, customer: e.target.value }));
+                      if (errors.customer) setErrors((prev) => ({ ...prev, customer: undefined }));
+                    }
+                  }}
+                  className="w-full rounded-xl border border-amber-300/80 bg-amber-50/70 px-3.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
+                >
+                  <option value="">▼ Select from saved customers ({customers.length})...</option>
+                  {customers.map((c) => (
+                    <option key={c} value={c}>
+                      👤 {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Input with datalist autocomplete for typing new name or editing */}
             <input
+              list="customer-suggestions"
               value={form.customer}
               onChange={(e) => setForm({ ...form, customer: e.target.value })}
-              placeholder="e.g. Sharma Sweets, Grand Banquets"
+              placeholder={customers.length > 0 ? "Or type a new customer name..." : "e.g. Sharma Sweets, Grand Banquets"}
+              autoComplete="off"
               className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.customer ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
             />
+            <datalist id="customer-suggestions">
+              {customers.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
             {errors.customer && <p className="mt-1 text-xs text-rose-600">{errors.customer}</p>}
+
+            {/* Quick-pick customer pills */}
+            {customers.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-0.5">Quick pick:</span>
+                {customers.slice(0, 5).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      setForm((prev) => ({ ...prev, customer: c }));
+                      if (errors.customer) setErrors((prev) => ({ ...prev, customer: undefined }));
+                    }}
+                    className={`text-[11px] font-medium px-2 py-0.5 rounded-lg border transition-all ${
+                      form.customer === c
+                        ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                        : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
             <div>
@@ -1090,8 +1153,8 @@ function OrdersTable({ orders, getProduct, onStatusChange, onGenerate, onEdit, o
   );
 }
 
-function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange, onGenerate, initialProductFilter = null, onClearProductFilter, onOpenSidebar }: {
-  orders: Order[]; products: Product[]; onAdd: (data: OrderFormData) => void; onEdit: (id: string, data: OrderFormData) => void;
+function OrdersPage({ orders, products, customers = [], onAdd, onEdit, onDelete, onStatusChange, onGenerate, initialProductFilter = null, onClearProductFilter, onOpenSidebar }: {
+  orders: Order[]; products: Product[]; customers?: string[]; onAdd: (data: OrderFormData) => void; onEdit: (id: string, data: OrderFormData) => void;
   onDelete: (id: string) => void; onStatusChange: (id: string, status: string) => void; onGenerate: (order: Order) => void;
   initialProductFilter?: number | null; onClearProductFilter?: () => void; onOpenSidebar?: () => void;
 }) {
@@ -1105,6 +1168,12 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
   const [quickTab, setQuickTab] = useState<"all" | "today" | "ready" | "kitchen" | "completed">("all");
   const [groupBy, setGroupBy] = useState<"date" | "product" | "status" | "none">("date");
   const todayStr = getTodayStr();
+
+  // Combine customers passed in with all distinct customer names currently in orders
+  const allCustomerNames = useMemo(() => {
+    const fromOrders = orders.map((o) => o.customer?.trim()).filter(Boolean);
+    return Array.from(new Set([...customers, ...fromOrders])).sort((a, b) => a.localeCompare(b));
+  }, [customers, orders]);
 
   useEffect(() => {
     if (initialProductFilter !== null && initialProductFilter !== undefined) {
@@ -1304,7 +1373,7 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
       </div>
 
       {(showModal || editOrder) && (
-        <OrderModal initial={editOrder ?? undefined} products={products}
+        <OrderModal initial={editOrder ?? undefined} products={products} customers={allCustomerNames}
           onSave={(data) => { if (editOrder) { onEdit(editOrder.id, data); setEditOrder(null); } else { onAdd(data); setShowModal(false); } }}
           onClose={() => { setShowModal(false); setEditOrder(null); }}
         />
@@ -1584,6 +1653,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [customers, setCustomers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
@@ -1651,13 +1721,34 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         }
         const { data: ordData, error: ordErr } = await client.from("orders").select("*").order("created_at", { ascending: false });
         if (ordErr) throw ordErr;
+        let loadedOrders: Order[] = [];
         if (ordData && ordData.length > 0) {
-          const loadedOrders: Order[] = ordData.map((o: any) => ({ id: o.id, date: o.date, deliveryDate: o.delivery_date, customer: o.customer, productId: Number(o.product_id), qty: Number(o.qty), rate: o.rate ? Number(o.rate) : undefined, status: o.status, notes: o.notes || undefined }));
+          loadedOrders = ordData.map((o: any) => ({ id: o.id, date: o.date, deliveryDate: o.delivery_date, customer: o.customer, productId: Number(o.product_id), qty: Number(o.qty), rate: o.rate ? Number(o.rate) : undefined, status: o.status, notes: o.notes || undefined }));
           setOrders(loadedOrders);
           try { localStorage.setItem("dhuniya_orders", JSON.stringify(loadedOrders)); } catch { }
         } else {
-          try { const lo = localStorage.getItem("dhuniya_orders"); if (lo) setOrders(JSON.parse(lo)); } catch { }
+          try { const lo = localStorage.getItem("dhuniya_orders"); if (lo) { loadedOrders = JSON.parse(lo); setOrders(loadedOrders); } } catch { }
         }
+
+        // Load customers from Supabase table + existing orders + local storage
+        let remoteCust: string[] = [];
+        try {
+          const { data: cData } = await client.from("customers").select("name").order("name");
+          if (cData && cData.length > 0) {
+            remoteCust = cData.map((c: any) => c.name?.trim()).filter(Boolean);
+          }
+        } catch { }
+
+        const orderCust = loadedOrders.map((o) => o.customer?.trim()).filter(Boolean);
+        let localCust: string[] = [];
+        try {
+          const lc = localStorage.getItem("dhuniya_customers");
+          if (lc) localCust = JSON.parse(lc);
+        } catch { }
+
+        const combinedCustomers = Array.from(new Set([...remoteCust, ...orderCust, ...localCust])).filter(Boolean).sort((a, b) => a.localeCompare(b));
+        setCustomers(combinedCustomers);
+        try { localStorage.setItem("dhuniya_customers", JSON.stringify(combinedCustomers)); } catch { }
       } catch (err: any) {
         console.error("Error loading Supabase data:", err);
         addToast("error", `Supabase connection note: ${err.message || "Using local storage"}`);
@@ -1792,6 +1883,24 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const newOrderId = genOrderId(orders);
     const newOrder: Order = { id: newOrderId, date: getTodayStr(), deliveryDate: data.deliveryDate, customer: data.customer.trim(), productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined, status: "Pending", notes: data.notes?.trim() || undefined };
     setOrders((prev) => { const updated = [newOrder, ...prev]; try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
+    
+    // Auto-save customer name for dropdown reuse
+    const custName = data.customer.trim();
+    if (custName) {
+      setCustomers((prev) => {
+        if (!prev.includes(custName)) {
+          const updated = [...prev, custName].sort((a, b) => a.localeCompare(b));
+          try { localStorage.setItem("dhuniya_customers", JSON.stringify(updated)); } catch { }
+          return updated;
+        }
+        return prev;
+      });
+      const client = getSupabase();
+      if (client) {
+        client.from("customers").insert({ name: custName }).then(() => {}, () => {});
+      }
+    }
+
     addToast("success", `Order ${newOrderId} created for ${newOrder.customer}`);
     const client = getSupabase();
     if (client) {
@@ -1807,6 +1916,24 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const current = orders.find((o) => o.id === id);
     const updatedOrder: Order = { id, date: current?.date ?? getTodayStr(), customer: data.customer.trim(), productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined, deliveryDate: data.deliveryDate, notes: data.notes?.trim() || undefined, status: current?.status ?? "Pending" };
     setOrders((prev) => { const updated = prev.map((o) => (o.id === id ? updatedOrder : o)); try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
+    
+    // Auto-save customer name for dropdown reuse
+    const custName = data.customer.trim();
+    if (custName) {
+      setCustomers((prev) => {
+        if (!prev.includes(custName)) {
+          const updated = [...prev, custName].sort((a, b) => a.localeCompare(b));
+          try { localStorage.setItem("dhuniya_customers", JSON.stringify(updated)); } catch { }
+          return updated;
+        }
+        return prev;
+      });
+      const client = getSupabase();
+      if (client) {
+        client.from("customers").insert({ name: custName }).then(() => {}, () => {});
+      }
+    }
+
     addToast("success", `Order ${id} updated`);
     const client = getSupabase();
     if (client) {
@@ -1855,7 +1982,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           </div>
         )}
         {active === "Dashboard" && (<Dashboard orders={orders} products={products} setActive={setActive} onViewProductOrders={viewProductOrders} onOpenSidebar={() => setSidebarOpen(true)} />)}
-        {active === "Orders" && (<OrdersPage orders={orders} products={products} onAdd={addOrder} onEdit={editOrder} onDelete={deleteOrder} onStatusChange={updateStatus} onGenerate={generateInvoice} initialProductFilter={initialProductFilter} onClearProductFilter={() => setInitialProductFilter(null)} onOpenSidebar={() => setSidebarOpen(true)} />)}
+        {active === "Orders" && (<OrdersPage orders={orders} products={products} customers={customers} onAdd={addOrder} onEdit={editOrder} onDelete={deleteOrder} onStatusChange={updateStatus} onGenerate={generateInvoice} initialProductFilter={initialProductFilter} onClearProductFilter={() => setInitialProductFilter(null)} onOpenSidebar={() => setSidebarOpen(true)} />)}
         {active === "Products" && (<ProductsPage products={products} orders={orders} onAdd={addProduct} onEdit={editProduct} onDelete={deleteProduct} onViewProductOrders={viewProductOrders} onOpenSidebar={() => setSidebarOpen(true)} />)}
       </main>
 
