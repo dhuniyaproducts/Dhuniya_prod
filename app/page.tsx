@@ -79,7 +79,7 @@ function HeroSection() {
   }, []);
 
   return (
-    <section className="relative min-h-[92vh] flex items-center justify-center overflow-hidden bg-[#0a0600] pt-20 pb-16">
+    <section className="relative min-h-[75vh] sm:min-h-[90vh] flex items-center justify-center overflow-hidden bg-[#0a0600] pt-16 pb-10 sm:pt-28 sm:pb-20">
       <div className="absolute inset-0 bg-gradient-to-b from-[#180d01] via-[#0f0700] to-[#0a0600]" />
       <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-gradient-to-br from-amber-500/20 via-orange-600/15 to-transparent rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-96 h-96 bg-amber-600/10 rounded-full blur-[100px] pointer-events-none" />
@@ -94,15 +94,15 @@ function HeroSection() {
 
       <div className="relative z-10 text-center px-4 max-w-5xl mx-auto">
         <div
-          className={`inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-amber-300 mb-8 backdrop-blur-md transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+          className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 sm:px-4 sm:py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider sm:tracking-[0.2em] text-amber-300 mb-4 sm:mb-8 backdrop-blur-md transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
         >
-          <Sparkles className="size-3.5 text-amber-400" />
+          <Sparkles className="size-3 sm:size-3.5 text-amber-400" />
           <span>Authentic Eastern Heritage · Maruthamunai</span>
         </div>
 
         <h1
-          className={`text-5xl sm:text-7xl md:text-8xl font-black tracking-tight text-white leading-[1.02] mb-6 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+          className={`text-3xl sm:text-6xl md:text-8xl font-black tracking-tight text-white leading-[1.08] sm:leading-[1.02] mb-3 sm:mb-6 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
             }`}
           style={{ transitionDelay: "100ms" }}
         >
@@ -113,18 +113,18 @@ function HeroSection() {
         </h1>
 
         <div
-          className={`inline-block mb-5 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+          className={`inline-block mb-3 sm:mb-5 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
             }`}
           style={{ transitionDelay: "200ms" }}
         >
-          <p className="text-lg sm:text-2xl md:text-3xl font-extrabold uppercase tracking-[0.25em] text-amber-200">
+          <p className="text-xs sm:text-2xl md:text-3xl font-extrabold uppercase tracking-[0.16em] sm:tracking-[0.25em] text-amber-200">
             Eastern Traditional Sweet
           </p>
-          <div className="h-0.5 w-28 bg-gradient-to-r from-amber-400 to-orange-500 mx-auto mt-3 rounded-full" />
+          <div className="h-0.5 w-16 sm:w-28 bg-gradient-to-r from-amber-400 to-orange-500 mx-auto mt-2 sm:mt-3 rounded-full" />
         </div>
 
         <p
-          className={`text-slate-300 text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-10 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+          className={`text-slate-300 text-xs sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-10 px-2 sm:px-0 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
             }`}
           style={{ transitionDelay: "300ms" }}
         >
@@ -133,28 +133,28 @@ function HeroSection() {
         </p>
 
         <div
-          className={`flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+          className={`flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-4 mb-8 sm:mb-16 transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
             }`}
           style={{ transitionDelay: "400ms" }}
         >
           <a
             href="#sweets"
-            className="group flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-105 transition-all duration-300"
+            className="group flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-2.5 sm:px-8 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-105 transition-all duration-300 w-full sm:w-auto"
           >
             <span>Explore Sweet Catalog</span>
-            <ArrowRight className="size-4 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight className="size-3.5 sm:size-4 group-hover:translate-x-1 transition-transform" />
           </a>
           <a
             href="tel:0756656135"
-            className="flex items-center gap-2 rounded-full border border-amber-500/40 bg-white/5 px-8 py-3.5 text-sm font-bold text-amber-300 hover:bg-white/10 hover:border-amber-400 transition-all duration-300 backdrop-blur-sm"
+            className="flex items-center justify-center gap-2 rounded-full border border-amber-500/40 bg-white/5 px-6 py-2.5 sm:px-8 sm:py-3.5 text-xs sm:text-sm font-bold text-amber-300 hover:bg-white/10 hover:border-amber-400 transition-all duration-300 backdrop-blur-sm w-full sm:w-auto"
           >
-            <Phone className="size-4" />
+            <Phone className="size-3.5 sm:size-4" />
             <span>Order by Phone: 0756656135</span>
           </a>
         </div>
 
         <div
-          className={`grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-3xl mx-auto transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+          className={`grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 max-w-3xl mx-auto transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
             }`}
           style={{ transitionDelay: "500ms" }}
         >
@@ -166,10 +166,10 @@ function HeroSection() {
           ].map(({ label, icon: Icon }) => (
             <div
               key={label}
-              className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 py-3 px-3 backdrop-blur-sm"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl border border-white/10 bg-white/5 py-2 px-2 sm:py-3 sm:px-3 backdrop-blur-sm"
             >
-              <Icon className="size-4 text-amber-400 shrink-0" />
-              <span className="text-xs font-semibold text-slate-300">{label}</span>
+              <Icon className="size-3.5 sm:size-4 text-amber-400 shrink-0" />
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-300 truncate">{label}</span>
             </div>
           ))}
         </div>
@@ -253,61 +253,61 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
 
 function ContactSection() {
   return (
-    <section id="contact" className="py-20 sm:py-28 px-4 bg-gradient-to-b from-[#0a0600] to-[#120800] relative">
+    <section id="contact" className="py-12 sm:py-28 px-2.5 sm:px-4 bg-gradient-to-b from-[#0a0600] to-[#120800] relative">
       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
 
       <div className="max-w-5xl mx-auto text-center">
-        <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-400">Authentic Taste</span>
-        <h2 className="mt-3 text-3xl sm:text-4xl md:text-5xl font-black text-white mb-4">
+        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] sm:tracking-[0.3em] text-amber-400">Authentic Taste</span>
+        <h2 className="mt-1.5 sm:mt-3 text-2xl sm:text-4xl md:text-5xl font-black text-white mb-2 sm:mb-4">
           Visit Us or Place Orders
         </h2>
-        <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto mb-14">
+        <p className="text-slate-400 text-xs sm:text-base max-w-xl mx-auto mb-8 sm:mb-14 px-2 sm:px-0">
           We cater for weddings, functions, and everyday celebrations. Contact us directly for bulk sweets and custom orders.
         </p>
 
-        <div className="grid gap-6 sm:grid-cols-3 max-w-3xl mx-auto text-left">
+        <div className="grid grid-cols-3 gap-2 sm:gap-6 max-w-4xl mx-auto text-left">
           <a
             href="tel:0756656135"
-            className="group rounded-3xl border border-white/10 bg-white/5 p-6 hover:border-amber-400/50 hover:bg-white/10 transition-all duration-300 flex flex-col justify-between"
+            className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-2.5 sm:p-6 hover:border-amber-400/50 hover:bg-white/10 transition-all duration-300 flex flex-col justify-between"
           >
             <div>
-              <div className="size-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 group-hover:scale-110 transition-transform">
-                <Phone className="size-5" />
+              <div className="size-8 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2 sm:mb-4 group-hover:scale-110 transition-transform">
+                <Phone className="size-4 sm:size-5" />
               </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Direct Mobile</p>
-              <p className="text-xl font-black text-white mt-1 group-hover:text-amber-300 transition-colors">
+              <p className="text-[9px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Direct Mobile</p>
+              <p className="text-xs sm:text-xl font-bold sm:font-black text-white mt-0.5 sm:mt-1 group-hover:text-amber-300 transition-colors truncate">
                 0756656135
               </p>
             </div>
-            <p className="text-xs text-amber-400/90 font-semibold mt-4">Tap to Call Us →</p>
+            <p className="text-[8px] sm:text-xs text-amber-400/90 font-semibold mt-2 sm:mt-4 truncate">Tap to Call →</p>
           </a>
 
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 flex flex-col justify-between">
+          <div className="rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-2.5 sm:p-6 flex flex-col justify-between">
             <div>
-              <div className="size-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4">
-                <MapPin className="size-5" />
+              <div className="size-8 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2 sm:mb-4">
+                <MapPin className="size-4 sm:size-5" />
               </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Kitchen Address</p>
-              <p className="text-lg font-bold text-white mt-1 leading-snug">
+              <p className="text-[9px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Kitchen Address</p>
+              <p className="text-xs sm:text-lg font-bold text-white mt-0.5 sm:mt-1 leading-snug truncate">
                 138, France City
               </p>
-              <p className="text-sm text-slate-300">Maruthamunai, Eastern Province</p>
+              <p className="text-[9px] sm:text-sm text-slate-300 truncate">Maruthamunai</p>
             </div>
-            <p className="text-xs text-slate-500 mt-4">Fresh daily production</p>
+            <p className="text-[8px] sm:text-xs text-slate-500 mt-2 sm:mt-4 truncate">Daily fresh</p>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 flex flex-col justify-between">
+          <div className="rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-2.5 sm:p-6 flex flex-col justify-between">
             <div>
-              <div className="size-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4">
-                <Award className="size-5" />
+              <div className="size-8 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2 sm:mb-4">
+                <Award className="size-4 sm:size-5" />
               </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Pure Craftsmanship</p>
-              <p className="text-lg font-bold text-white mt-1">
-                100% Traditional Recipe
+              <p className="text-[9px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Craftsmanship</p>
+              <p className="text-xs sm:text-lg font-bold text-white mt-0.5 sm:mt-1 truncate">
+                100% Traditional
               </p>
-              <p className="text-xs text-slate-400 mt-1">Prepared daily with pure ghee, whole milk & nuts</p>
+              <p className="text-[9px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-none">Pure ghee & nuts</p>
             </div>
-            <p className="text-xs text-slate-500 mt-4">Fresh Batch Every Day</p>
+            <p className="text-[8px] sm:text-xs text-slate-500 mt-2 sm:mt-4 truncate">Fresh Batches</p>
           </div>
         </div>
       </div>
@@ -409,18 +409,18 @@ export default function PublicPage() {
 
   return (
     <div className="bg-[#0a0600] text-white min-h-screen selection:bg-amber-500 selection:text-black">
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-8 py-4 bg-black/75 backdrop-blur-xl border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl overflow-hidden bg-white/10 p-0.5 border border-white/15 shadow-md shadow-amber-500/20 shrink-0">
-            <img src="/logo.jpg" alt="Dhuniya Products Logo" className="size-full object-cover rounded-lg" />
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-3 sm:px-8 py-2.5 sm:py-4 bg-black/80 backdrop-blur-xl border-b border-white/10">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex size-8 sm:size-10 items-center justify-center rounded-lg sm:rounded-xl overflow-hidden bg-white/10 p-0.5 border border-white/15 shadow-md shadow-amber-500/20 shrink-0">
+            <img src="/logo.jpg" alt="Dhuniya Products Logo" className="size-full object-cover rounded-md sm:rounded-lg" />
           </div>
           <div>
-            <span className="font-black text-white text-sm sm:text-base tracking-tight">Dhuniya Products</span>
+            <span className="font-black text-white text-xs sm:text-base tracking-tight block">Dhuniya Products</span>
             <span className="hidden sm:block text-[9px] font-bold uppercase tracking-[0.2em] text-amber-400">Eastern Traditional Sweet</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <a
             href="#sweets"
             className="hidden sm:inline-block text-xs font-semibold text-slate-300 hover:text-amber-300 transition-colors"
@@ -435,7 +435,7 @@ export default function PublicPage() {
           </a>
           <Link
             href="/login"
-            className="flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-4 py-1.5 text-xs font-bold text-amber-300 hover:bg-amber-500 hover:text-black transition-all duration-200"
+            className="flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 sm:px-4 sm:py-1.5 text-[11px] sm:text-xs font-bold text-amber-300 hover:bg-amber-500 hover:text-black transition-all duration-200"
           >
             <Lock className="size-3" />
             <span>Admin Login</span>
