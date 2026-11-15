@@ -404,7 +404,7 @@ function Invoice({ order, product, rate, onClose }: {
   const productName = product?.name ?? "Sweet Item";
   const productUnit = product?.unit ?? "kg";
   return (
-    <div className="invoice-modal-overlay fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-3 sm:p-4 backdrop-blur-xs flex items-center justify-center">
+    <div className="invoice-modal-overlay fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-2.5 sm:p-4 backdrop-blur-xs flex items-center justify-center">
       <style dangerouslySetInnerHTML={{
         __html: `
         @media print {
@@ -416,17 +416,17 @@ function Invoice({ order, product, rate, onClose }: {
           #printable-invoice { position: static !important; display: block !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; page-break-inside: avoid !important; break-inside: avoid !important; }
         }
       ` }} />
-      <div className="invoice-card my-5 w-full max-w-[760px] rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
-        <div className="border-b border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50 flex items-center justify-between print:hidden gap-2">
+      <div className="invoice-card my-4 sm:my-5 w-full max-w-[760px] rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="border-b border-slate-200 px-3.5 py-3 sm:px-6 sm:py-4 bg-slate-50 flex items-center justify-between print:hidden gap-2">
           <div>
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-600">Official Bill</p>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">Invoice {order.id}</h2>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <Button variant="outline" size="sm" onClick={() => window.print()} className="border-slate-300 text-slate-700 text-xs h-8 px-2.5 sm:px-3">
+            <Button variant="outline" size="sm" onClick={() => window.print()} className="border-slate-300 text-slate-700 text-xs h-8 px-2 sm:px-3">
               <Printer className="size-3.5" /> <span className="hidden sm:inline">Print Bill</span>
             </Button>
-            <Button size="sm" onClick={() => window.print()} className="bg-amber-600 text-white hover:bg-amber-700 text-xs h-8 px-2.5 sm:px-3">
+            <Button size="sm" onClick={() => window.print()} className="bg-amber-600 text-white hover:bg-amber-700 text-xs h-8 px-2 sm:px-3">
               <Download className="size-3.5" /> <span className="hidden sm:inline">Download PDF</span>
             </Button>
             <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700" aria-label="Close invoice">
@@ -434,7 +434,7 @@ function Invoice({ order, product, rate, onClose }: {
             </button>
           </div>
         </div>
-        <article id="printable-invoice" className="p-6 sm:p-8 print:p-0">
+        <article id="printable-invoice" className="p-4 sm:p-8 print:p-0">
           <div className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-4 print:pb-3 sm:flex-row">
             <div>
               <div className="flex items-center gap-2.5">
@@ -454,12 +454,24 @@ function Invoice({ order, product, rate, onClose }: {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:gap-6 border-b border-slate-200 py-4 print:py-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:gap-6 border-b border-slate-200 py-3.5 print:py-3 sm:grid-cols-2">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Billed To</p>
               <p className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{order.customer}</p>
               <p className="text-xs text-slate-600">Order ID: {order.id}</p>
-              {order.notes && <p className="mt-1 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 inline-block">Note: {order.notes}</p>}
+              {order.phone && (
+                <p className="mt-0.5 text-xs text-slate-600 flex items-center gap-1.5">
+                  <Phone className="size-3 text-slate-400 shrink-0" />
+                  <a href={`tel:${order.phone}`} className="text-amber-700 hover:underline font-medium">{order.phone}</a>
+                </p>
+              )}
+              {order.address && (
+                <p className="mt-0.5 text-xs text-slate-500 flex items-start gap-1.5">
+                  <MapPin className="size-3 text-slate-400 mt-0.5 shrink-0" />
+                  <span>{order.address}</span>
+                </p>
+              )}
+              {order.notes && <p className="mt-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 inline-block">Note: {order.notes}</p>}
             </div>
             <div className="sm:text-right">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Handover Schedule</p>
@@ -469,8 +481,27 @@ function Invoice({ order, product, rate, onClose }: {
             </div>
           </div>
 
-          <div className="mt-4 print:mt-3 overflow-x-auto">
-            <table className="w-full min-w-[360px] text-left text-sm">
+          {/* Mobile Item Breakdown (Clean receipt card without horizontal overflow or scrollbar) */}
+          <div className="mt-4 sm:hidden print:hidden rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2.5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Sweet Product</p>
+                <h4 className="text-sm font-bold text-slate-900 mt-0.5">{productName}</h4>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Amount</p>
+                <p className="text-base font-extrabold text-slate-900 mt-0.5">{money(total)}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-600 border-t border-slate-200 pt-2 font-medium">
+              <span>Quantity: <strong className="text-slate-900">{order.qty} {productUnit}</strong></span>
+              <span>Rate: <strong className="text-slate-900">{money(rate)}</strong> / {productUnit}</span>
+            </div>
+          </div>
+
+          {/* Desktop & Print Table */}
+          <div className="hidden sm:block print:block mt-4 print:mt-3">
+            <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="pb-2.5">Sweet Product</th>
@@ -490,8 +521,9 @@ function Invoice({ order, product, rate, onClose }: {
             </table>
           </div>
 
+          {/* Grand Total */}
           <div className="mt-4 print:mt-3 flex justify-end">
-            <div className="w-full max-w-[240px] border-t-2 border-slate-900 pt-2.5">
+            <div className="w-full sm:max-w-[260px] border-t-2 border-slate-900 pt-2.5">
               <div className="flex items-center justify-between text-sm sm:text-base font-bold text-slate-900">
                 <span>Grand Total:</span>
                 <span className="text-xl sm:text-2xl text-amber-600">{money(total)}</span>
@@ -499,7 +531,7 @@ function Invoice({ order, product, rate, onClose }: {
             </div>
           </div>
 
-          <p className="mt-6 print:mt-4 border-t border-slate-200 pt-3 text-center text-xs text-slate-400">
+          <p className="mt-5 print:mt-4 border-t border-slate-200 pt-3 text-center text-xs text-slate-400">
             Thank you for choosing Dhuniya Products. We take pride in authentic eastern sweets.
           </p>
         </article>
