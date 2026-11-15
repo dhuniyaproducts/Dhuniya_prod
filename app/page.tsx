@@ -183,7 +183,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
   const [imgErr, setImgErr] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setVisible(true), index * 80);
+    const t = setTimeout(() => setVisible(true), index * 60);
     return () => clearTimeout(t);
   }, [index]);
 
@@ -196,52 +196,55 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
 
   return (
     <div
-      className={`group relative flex flex-col rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-transparent backdrop-blur-md hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+      className={`group relative flex flex-col rounded-2xl sm:rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-transparent backdrop-blur-md hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/15 transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
         }`}
     >
-      <div className="relative h-60 overflow-hidden bg-gradient-to-br from-amber-950/80 to-[#120800]">
+      <div className="relative aspect-[4/3] sm:aspect-auto sm:h-56 md:h-60 overflow-hidden bg-gradient-to-br from-amber-950/80 to-[#120800]">
         {product.imageUrl && !imgErr ? (
           <img
             src={product.imageUrl}
             alt={product.name}
             className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 ease-out"
             onError={() => setImgErr(true)}
+            loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="size-20 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-              <span className="text-3xl font-black text-amber-300">{initials}</span>
+          <div className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 text-center">
+            <div className="size-12 sm:size-20 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform">
+              <span className="text-lg sm:text-3xl font-black text-amber-300">{initials}</span>
             </div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-400/80">Dhuniya Special</p>
+            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-amber-400/80">Dhuniya</p>
           </div>
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent pointer-events-none" />
 
-        <div className="absolute bottom-3 left-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-3.5 py-1 text-xs font-black text-white shadow-lg shadow-black/40">
-          {money(product.price)} <span className="font-normal text-[11px] text-amber-100">/ {product.unit}</span>
+        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-2.5 sm:px-3.5 py-0.5 sm:py-1 text-[11px] sm:text-xs font-black text-white shadow-md shadow-black/50">
+          {money(product.price)} <span className="font-normal text-[9px] sm:text-[11px] text-amber-100">/ {product.unit}</span>
         </div>
 
-        <div className="absolute top-3 right-3 rounded-full bg-black/60 border border-white/15 px-2.5 py-0.5 text-[10px] font-bold text-amber-300 backdrop-blur-md">
-          Available Fresh
+        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 rounded-full bg-black/70 border border-white/15 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-amber-300 backdrop-blur-md">
+          Fresh
         </div>
       </div>
 
-      <div className="flex flex-col flex-1 p-6">
-        <h3 className="text-lg sm:text-xl font-bold text-white group-hover:text-amber-300 transition-colors leading-tight">
+      <div className="flex flex-col flex-1 p-3 sm:p-5 md:p-6">
+        <h3 className="text-sm sm:text-lg md:text-xl font-bold text-white group-hover:text-amber-300 transition-colors leading-snug line-clamp-1 sm:line-clamp-none">
           {product.name}
         </h3>
-        <p className="mt-2 text-xs sm:text-sm text-slate-400 leading-relaxed flex-1">
-          {product.description?.trim() || "Authentic eastern recipe made fresh with premium ingredients, prepared daily in our Maruthamunai kitchen."}
+        <p className="mt-1 sm:mt-2 text-[11px] sm:text-xs md:text-sm text-slate-300/80 leading-relaxed flex-1 line-clamp-2 sm:line-clamp-3">
+          {product.description?.trim() || "Authentic eastern recipe made fresh with premium ingredients in Maruthamunai."}
         </p>
 
-        <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1">
+        <div className="mt-2.5 sm:mt-4 pt-2.5 sm:pt-3.5 border-t border-white/10 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-0.5 sm:gap-1">
             {[1, 2, 3, 4, 5].map((s) => (
-              <Star key={s} className="size-3.5 fill-amber-400 text-amber-400" />
+              <Star key={s} className="size-2.5 sm:size-3.5 fill-amber-400 text-amber-400" />
             ))}
           </div>
-          <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wider">Traditional Recipe</span>
+          <span className="text-amber-400 font-semibold text-[9px] sm:text-[11px] uppercase tracking-wider truncate max-w-[80px] sm:max-w-none">
+            Heritage
+          </span>
         </div>
       </div>
     </div>
@@ -442,18 +445,18 @@ export default function PublicPage() {
 
       <HeroSection />
 
-      <section id="sweets" className="py-20 sm:py-28 px-4 relative bg-[#0a0600]">
+      <section id="sweets" className="py-14 sm:py-28 px-3 sm:px-6 relative bg-[#0a0600]">
         <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
 
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
+          <div className="text-center mb-10 sm:mb-16">
             <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-400">
               Freshly Prepared Catalog
             </span>
-            <h2 className="mt-3 text-3xl sm:text-5xl font-black text-white tracking-tight">
+            <h2 className="mt-2 sm:mt-3 text-2xl sm:text-5xl font-black text-white tracking-tight">
               Our Traditional Sweets
             </h2>
-            <p className="mt-4 text-slate-400 text-sm sm:text-base max-w-xl mx-auto">
+            <p className="mt-2 sm:mt-4 text-slate-400 text-xs sm:text-base max-w-xl mx-auto">
               Prepared to order with pure ghee, whole milk, and eastern culinary traditions.
             </p>
           </div>
@@ -464,7 +467,7 @@ export default function PublicPage() {
               <p className="text-sm text-slate-400 font-medium">Loading sweet catalog…</p>
             </div>
           ) : (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {products.map((product, i) => (
                 <ProductCard key={product.id} product={product} index={i} />
               ))}
