@@ -28,6 +28,7 @@ import {
   Printer,
   Search,
   Sparkles,
+  SlidersHorizontal,
   Trash2,
   User,
   Users,
@@ -81,6 +82,8 @@ export type Order = {
   notes?: string;
   phone?: string;
   address?: string;
+  amountPaid?: number;
+  paymentStatus?: "Unpaid" | "Partial" | "Paid";
 };
 
 export const getOrderItems = (o: Order): OrderItem[] => {
@@ -225,6 +228,30 @@ function Badge({ status }: { status: string }) {
     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${s.bg} ${s.text} ${s.border}`}>
       <span className={`size-1.5 rounded-full ${s.dot}`} />
       {status}
+    </span>
+  );
+}
+
+function PaymentBadge({ amountPaid = 0, total }: { amountPaid?: number; total: number }) {
+  if (total <= 0) return null;
+  if (amountPaid >= total) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+        <CheckCircle2 className="size-3" /> PAID
+      </span>
+    );
+  }
+  if (amountPaid > 0) {
+    const bal = total - amountPaid;
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+        Rs.{bal.toLocaleString("en-LK")} Due
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+      Unpaid
     </span>
   );
 }
@@ -427,6 +454,7 @@ function Sidebar({ active, setActive, open, setOpen, orderCount, customerCount =
 function Invoice({ order, products, onClose }: {
   order: Order; products: Product[]; onClose: () => void;
 }) {
+  const amountPaidInv = order.amountPaid ?? 0;
   const items = getOrderItems(order);
   const lineItems = items.map((item) => {
     const prod = products.find((p) => p.id === item.productId);
@@ -560,13 +588,34 @@ function Invoice({ order, products, onClose }: {
             </table>
           </div>
 
-          {/* Grand Total */}
+          {/* Grand Total + Payment Summary */}
           <div className="mt-4 print:mt-3 flex justify-end">
-            <div className="w-full sm:max-w-[260px] border-t-2 border-slate-900 pt-2.5">
+            <div className="w-full sm:max-w-[280px] border-t-2 border-slate-900 pt-2.5 space-y-1.5">
               <div className="flex items-center justify-between text-sm sm:text-base font-bold text-slate-900">
                 <span>Grand Total:</span>
                 <span className="text-xl sm:text-2xl text-amber-600">{money(total)}</span>
               </div>
+              {amountPaidInv >= total && total > 0 ? (
+                <div className="mt-2 rounded-xl bg-emerald-50 border border-emerald-300 px-3 py-2 text-center">
+                  <p className="text-sm font-black text-emerald-800 tracking-wider">✓ PAID IN FULL</p>
+                </div>
+              ) : amountPaidInv > 0 ? (
+                <>
+                  <div className="flex items-center justify-between text-xs text-slate-600">
+                    <span>Amount Paid:</span>
+                    <span className="font-bold text-emerald-700">{money(amountPaidInv)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs font-bold border-t border-slate-200 pt-1.5">
+                    <span className="text-rose-700">Balance Due:</span>
+                    <span className="text-rose-700 text-sm">{money(total - amountPaidInv)}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>Payment Due:</span>
+                  <span className="font-semibold">On Receipt</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -735,8 +784,7 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
       <div className="mx-auto max-w-[1250px] px-3.5 py-5 sm:px-6 sm:py-8 lg:px-10">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-amber-600">Sweet Catalog</span>
-          <h2 className="mt-1 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Products & Production Demand</h2>
-          <p className="mt-1 text-xs sm:text-sm text-slate-500">Manage sweet catalog, standard rates, and live customer orders in production.</p>
+          <h2 className="mt-0.5 text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">Products & Production</h2>
         </div>
 
         {products.length === 0 ? (
@@ -752,54 +800,47 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
           <div className="mt-6">
             <div className="block sm:hidden space-y-3">
               {products.map((p) => {
-                const activeOrders = orders.filter((o) => o.productId === p.id && !["Completed", "Cancelled"].includes(o.status));
-                const totalOrderedKg = activeOrders.reduce((sum, o) => sum + o.qty, 0);
+                const activeOrders = orders.filter((o) => getOrderItems(o).some(it => it.productId === p.id) && !["Completed", "Cancelled"].includes(o.status));
+                const totalOrderedKg = activeOrders.reduce((sum, o) => sum + getOrderItems(o).filter(it => it.productId === p.id).reduce((s, it) => s + it.qty, 0), 0);
                 return (
-                  <div key={p.id} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm hover:border-amber-300 transition-all space-y-3">
-                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                      <div className="flex items-center gap-3 min-w-0">
+                  <div key={p.id} className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm hover:border-amber-300 transition-all">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         {p.imageUrl ? (
-                          <img src={optimizeImageUrl(p.imageUrl, 100)} alt={p.name} loading="lazy" decoding="async" className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40 shadow-2xs" />
+                          <img src={optimizeImageUrl(p.imageUrl, 80)} alt={p.name} loading="lazy" decoding="async" className="size-9 shrink-0 rounded-lg object-cover border border-amber-300/40" />
                         ) : (
-                          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40 shadow-2xs">
+                          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40">
                             {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <p className="font-bold text-slate-900 text-base truncate">{p.name}</p>
-                          {p.description && (
-                            <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{p.description}</p>
-                          )}
-                          <p className="text-xs font-semibold text-amber-700 mt-0.5">{money(p.price)} / {p.unit}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-bold text-slate-900 text-sm truncate">{p.name}</p>
+                            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"}`}>
+                              <span className={`size-1.5 rounded-full ${p.active ? "bg-emerald-500" : "bg-slate-400"}`} />
+                              {p.active ? "Active" : "Off"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <p className="text-xs font-semibold text-amber-700">{money(p.price)}/{p.unit}</p>
+                            {activeOrders.length > 0 ? (
+                              <button onClick={() => onViewProductOrders(p.id)} className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">
+                                {totalOrderedKg.toFixed(1)} {p.unit} ordered →
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">No orders</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
-                        <span className={`size-1.5 rounded-full ${p.active ? "bg-emerald-500" : "bg-slate-400"}`} />
-                        {p.active ? "Active" : "Archived"}
-                      </span>
-                    </div>
-                    <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Production Demand</p>
-                        {activeOrders.length > 0 ? (
-                          <p className="text-sm font-extrabold text-slate-900 mt-0.5">{totalOrderedKg.toFixed(2)} {p.unit} <span className="text-xs font-normal text-slate-500">({activeOrders.length} orders)</span></p>
-                        ) : (
-                          <p className="text-xs text-slate-400 mt-0.5">No active orders</p>
-                        )}
-                      </div>
-                      {activeOrders.length > 0 && (
-                        <button onClick={() => onViewProductOrders(p.id)} className="text-xs font-bold text-amber-600 hover:text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
-                          View orders →
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => setEditProduct(p)} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-100 transition-colors" title="Edit">
+                          <Edit2 className="size-3.5" />
                         </button>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <button onClick={() => setEditProduct(p)} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
-                        <Edit2 className="size-3.5" /> Edit
-                      </button>
-                      <button onClick={() => setDeleteId(p.id)} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors">
-                        <Trash2 className="size-3.5" /> Delete
-                      </button>
+                        <button onClick={() => setDeleteId(p.id)} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors" title="Delete">
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -811,21 +852,21 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                 <table className="w-full min-w-[760px] text-left text-sm">
                   <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     <tr>
-                      <th className="px-6 py-4">Sweet Product</th>
-                      <th className="px-6 py-4">Unit</th>
-                      <th className="px-6 py-4">Standard Rate</th>
-                      <th className="px-6 py-4">Active Production Demand</th>
-                      <th className="px-6 py-4">Catalog Status</th>
-                      <th className="px-6 py-4 text-right">Actions</th>
+                      <th className="px-4 py-3">Sweet Product</th>
+                      <th className="px-4 py-3">Unit</th>
+                      <th className="px-4 py-3">Standard Rate</th>
+                      <th className="px-4 py-3">Production Demand</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {products.map((p) => {
-                      const activeOrders = orders.filter((o) => o.productId === p.id && !["Completed", "Cancelled"].includes(o.status));
-                      const totalOrderedKg = activeOrders.reduce((sum, o) => sum + o.qty, 0);
+                      const activeOrders = orders.filter((o) => getOrderItems(o).some(it => it.productId === p.id) && !["Completed", "Cancelled"].includes(o.status));
+                      const totalOrderedKg = activeOrders.reduce((sum, o) => sum + getOrderItems(o).filter(it => it.productId === p.id).reduce((s, it) => s + it.qty, 0), 0);
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="px-6 py-4">
+                        <td className="px-4 py-2.5">
                             <div className="flex items-center gap-3">
                               {p.imageUrl ? (
                                 <img src={optimizeImageUrl(p.imageUrl, 100)} alt={p.name} loading="lazy" decoding="async" className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40" />
@@ -843,8 +884,8 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                             </div>
                           </td>
                           <td className="px-6 py-4 font-medium text-slate-600">{p.unit}</td>
-                          <td className="px-6 py-4 font-bold text-slate-900">{money(p.price)}<span className="ml-1 text-xs font-normal text-slate-400">/ {p.unit}</span></td>
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-2.5 font-bold text-slate-900">{money(p.price)}<span className="ml-1 text-xs font-normal text-slate-400">/ {p.unit}</span></td>
+                          <td className="px-4 py-2.5">
                             {activeOrders.length > 0 ? (
                               <div>
                                 <p className="font-bold text-slate-900">{totalOrderedKg.toFixed(2)} {p.unit}</p>
@@ -856,13 +897,13 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                               <span className="text-xs text-slate-400">No active orders</span>
                             )}
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-2.5">
                             <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
                               <span className={`size-1.5 rounded-full ${p.active ? "bg-emerald-500" : "bg-slate-400"}`} />
                               {p.active ? "Active" : "Inactive"}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-4 py-2.5 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button onClick={() => setEditProduct(p)} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors" title="Edit sweet">
                                 <Edit2 className="size-3.5" />
@@ -921,6 +962,7 @@ export type OrderFormData = {
   productId?: string;
   qty?: string;
   rate?: string;
+  amountPaid?: string;
 };
 
 function OrderModal({ initial, products, customers = [], initialCustomer, onSave, onClose }: {
@@ -962,6 +1004,7 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
   const [deliveryDate, setDeliveryDate] = useState(initial?.deliveryDate ?? getTodayStr());
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [items, setItems] = useState<OrderItemFormData[]>(initialItems);
+  const [amountPaid, setAmountPaid] = useState(initial?.amountPaid ? String(initial.amountPaid) : "");
   const [errors, setErrors] = useState<{ customer?: string; deliveryDate?: string; items?: string }>({});
 
   const selectCustomer = (name: string) => {
@@ -1028,6 +1071,7 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
         qty: it.qty,
         rate: it.rate,
       })),
+      amountPaid: amountPaid.trim() || undefined,
     });
   };
 
@@ -1274,6 +1318,26 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
             />
           </div>
 
+          {/* Payment Received */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold text-slate-700">Payment Received (Rs.) <span className="font-normal text-slate-400">Optional</span></label>
+              {grandTotal > 0 && Number(amountPaid) >= grandTotal && (
+                <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full">✓ FULLY PAID</span>
+              )}
+            </div>
+            <input
+              type="number"
+              value={amountPaid}
+              onChange={(e) => setAmountPaid(e.target.value)}
+              placeholder="e.g. 5000"
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+            />
+            {grandTotal > 0 && Number(amountPaid) > 0 && Number(amountPaid) < grandTotal && (
+              <p className="mt-1.5 text-xs font-semibold text-amber-700">Balance due: {money(grandTotal - Number(amountPaid))}</p>
+            )}
+          </div>
+
           {totalKg > 0 && (
             <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 sm:p-4 flex items-center justify-between">
               <div>
@@ -1310,15 +1374,20 @@ function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate
   const address = order.address || info?.address;
 
   return (
-    <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm hover:border-amber-300 transition-all space-y-3">
-      <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-sm border border-amber-300/40 shadow-2xs">
-            {order.customer.charAt(0).toUpperCase()}
+    <div className="rounded-xl border border-slate-200/90 bg-white shadow-sm hover:border-amber-300 transition-all overflow-hidden">
+      {/* Header Row */}
+      <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-slate-100">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40">
+          {order.customer.charAt(0).toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="font-bold text-slate-900 text-sm truncate leading-tight">{order.customer}</h4>
+            {badge && <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${badge.style}`}>{badge.label}</span>}
           </div>
-          <div className="min-w-0">
-            <h4 className="font-bold text-slate-900 text-base truncate leading-tight">{order.customer}</h4>
-            <span className="text-[11px] font-semibold text-slate-400">{items.length} item{items.length !== 1 ? "s" : ""} · {totalKg.toFixed(2)} kg</span>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="text-[10px] text-slate-500">{totalKg.toFixed(1)} kg · {dateLabel(order.deliveryDate)}</span>
+            {phone && <a href={`tel:${phone}`} className="text-[10px] font-bold text-amber-700 hover:underline flex items-center gap-0.5"><Phone className="size-2.5" />{phone}</a>}
           </div>
         </div>
         <div className="shrink-0">
@@ -1326,79 +1395,38 @@ function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate
         </div>
       </div>
 
-      {(phone || address) && (
-        <div className="flex flex-col gap-1.5 bg-slate-50/90 rounded-xl p-2.5 text-xs border border-slate-200/80">
-          {phone && (
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500">Contact:</span>
-              <a
-                href={`tel:${phone}`}
-                className="inline-flex items-center gap-1.5 font-bold text-amber-800 bg-amber-100/90 hover:bg-amber-200 border border-amber-300/80 px-2.5 py-1 rounded-lg transition-colors active:scale-95 shadow-2xs"
-                title="Tap to open phone dial pad"
-              >
-                <Phone className="size-3 text-amber-700" />
-                <span>{phone}</span>
-                <span className="text-[10px] text-amber-700 font-semibold">📞 Call</span>
-              </a>
-            </div>
-          )}
-          {address && (
-            <div className="flex items-start gap-1.5 text-slate-600 pt-0.5 border-t border-slate-200/60">
-              <MapPin className="size-3 text-slate-400 shrink-0 mt-0.5" />
-              <span className="text-[11px] text-slate-700 leading-tight">{address}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Multiple Products Display */}
-      <div className="rounded-xl border border-amber-100/70 bg-amber-50/40 p-2.5 divide-y divide-amber-100/60 space-y-1.5">
+      {/* Products */}
+      <div className="px-3 py-2 space-y-1 bg-amber-50/30 border-b border-amber-100/60">
         {items.map((item, idx) => {
           const prod = products.find((p) => p.id === item.productId);
           const r = item.rate ?? prod?.price ?? 0;
-          const lineTotal = item.qty * r;
           return (
-            <div key={idx} className={`flex items-center justify-between gap-2 ${idx > 0 ? "pt-1.5" : ""}`}>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-900 truncate">{prod?.name ?? "Sweet Item"}</p>
-                <p className="text-[11px] text-slate-500">{item.qty} {prod?.unit ?? "kg"} × {money(r)}</p>
-              </div>
-              <p className="text-xs font-bold text-slate-900 shrink-0">{money(lineTotal)}</p>
+            <div key={idx} className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-slate-800 truncate">{prod?.name ?? "Sweet"}</span>
+              <span className="text-[11px] text-slate-500 shrink-0">{item.qty}{prod?.unit ?? "kg"} · {money(item.qty * r)}</span>
             </div>
           );
         })}
-        <div className="flex items-center justify-between pt-2 text-xs font-black text-slate-900">
-          <span>Total Order Value:</span>
-          <span className="text-amber-700 text-sm">{money(total)}</span>
+        <div className="flex items-center justify-between pt-1 border-t border-amber-100/60">
+          <div className="flex items-center gap-1.5">
+            <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
+            {order.notes && <span className="text-[10px] text-slate-500 italic truncate max-w-[120px]">{order.notes}</span>}
+          </div>
+          <span className="text-xs font-black text-amber-700">{money(total)}</span>
         </div>
       </div>
 
-      {order.notes && (
-        <div className="rounded-xl bg-slate-50 border border-slate-200/80 px-3 py-2 text-xs text-slate-700 flex items-start gap-1.5">
-          <span className="font-bold text-amber-700 shrink-0">Note:</span>
-          <span className="italic">{order.notes}</span>
-        </div>
-      )}
-
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
-        <div className="flex items-center gap-1.5 text-xs text-slate-600">
-          <Calendar className="size-3.5 text-amber-600 shrink-0" />
-          <span className="font-semibold text-slate-800">{dateLabel(order.deliveryDate)}</span>
-          {badge && (
-            <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-bold ${badge.style}`}>{badge.label}</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          <Button size="sm" variant="outline" onClick={() => onGenerate(order)} className="h-8 border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100 text-xs font-bold px-3 gap-1 shadow-2xs">
-            <FileText className="size-3.5" data-icon="inline-start" /> Bill
-          </Button>
-          <button onClick={() => onEdit(order)} className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
-            <Edit2 className="size-3" /> Edit
-          </button>
-          <button onClick={() => onDelete(order.id)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors">
-            <Trash2 className="size-3.5" />
-          </button>
-        </div>
+      {/* Footer Actions */}
+      <div className="flex items-center gap-1.5 px-3 py-2">
+        <Button size="sm" variant="outline" onClick={() => onGenerate(order)} className="h-7 border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100 text-[11px] font-bold px-2.5 gap-1">
+          <FileText className="size-3" /> Bill
+        </Button>
+        <button onClick={() => onEdit(order)} className="flex h-7 items-center gap-1 rounded-lg border border-slate-200 px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+          <Edit2 className="size-3" /> Edit
+        </button>
+        <button onClick={() => onDelete(order.id)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors ml-auto">
+          <Trash2 className="size-3.5" />
+        </button>
       </div>
     </div>
   );
@@ -1413,13 +1441,13 @@ function OrdersTable({ orders, products, customerLookup, onStatusChange, onGener
         <table className="w-full min-w-[960px] text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
             <tr>
-              <th className="px-6 py-4">Customer</th>
-              <th className="px-6 py-4">Sweets & Products</th>
-              <th className="px-6 py-4">Total Qty</th>
-              <th className="px-6 py-4">Handover Schedule</th>
-              <th className="px-6 py-4">Amount</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4 text-right">Actions</th>
+              <th className="px-4 py-3">Customer</th>
+              <th className="px-4 py-3">Sweets & Qty</th>
+              <th className="px-4 py-3">Handover</th>
+              <th className="px-4 py-3">Amount</th>
+              <th className="px-4 py-3">Payment</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -1537,6 +1565,7 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
   const [filterDate, setFilterDate] = useState("");
   const [quickTab, setQuickTab] = useState<"all" | "today" | "ready" | "kitchen" | "completed">("all");
   const [groupBy, setGroupBy] = useState<"date" | "product" | "status" | "none">("date");
+  const [showFilters, setShowFilters] = useState(false);
   const todayStr = getTodayStr();
 
   // Combine customers passed in with all distinct customer names currently in orders
@@ -1581,8 +1610,10 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
   const activeFilteredProduct = useMemo(() => (filterProductId !== "All" ? products.find((p) => p.id === Number(filterProductId)) : null), [filterProductId, products]);
 
   const filtered = useMemo(() => orders.filter((o) => {
-    const matchProduct = filterProductId === "All" || o.productId === Number(filterProductId);
-    const matchQuery = o.customer.toLowerCase().includes(query.toLowerCase()) || o.id.toLowerCase().includes(query.toLowerCase()) || (o.notes && o.notes.toLowerCase().includes(query.toLowerCase())) || (products.find((p) => p.id === o.productId)?.name ?? "").toLowerCase().includes(query.toLowerCase());
+    const orderItems = getOrderItems(o);
+    const matchProduct = filterProductId === "All" || orderItems.some(it => it.productId === Number(filterProductId));
+    const productNames = orderItems.map(it => products.find(p => p.id === it.productId)?.name ?? "").join(" ").toLowerCase();
+    const matchQuery = !query || o.customer.toLowerCase().includes(query.toLowerCase()) || o.id.toLowerCase().includes(query.toLowerCase()) || (o.notes && o.notes.toLowerCase().includes(query.toLowerCase())) || productNames.includes(query.toLowerCase());
     const matchStatus = filterStatus === "All" || o.status === filterStatus;
     const matchDate = !filterDate || o.date === filterDate || o.deliveryDate === filterDate;
     return matchProduct && matchQuery && matchStatus && matchDate;
@@ -1659,8 +1690,7 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
       <div className="mx-auto max-w-[1250px] px-3.5 py-5 sm:px-6 sm:py-8 lg:px-10">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-amber-600">Order Management</span>
-          <h2 className="mt-1 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Customer Orders & Dispatch</h2>
-          <p className="mt-1 text-xs sm:text-sm text-slate-500">Track and manage every customer order separately with timeline stages.</p>
+          <h2 className="mt-0.5 text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">Customer Orders</h2>
         </div>
 
         <div className="mt-4 sm:mt-5 flex items-center gap-2 overflow-x-auto pb-1.5">
@@ -1700,44 +1730,55 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
           </div>
         )}
 
-        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm">
-          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 sm:gap-3">
-            <label className="flex flex-1 min-w-[200px] items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 sm:py-0">
-              <Search className="size-4 shrink-0 text-slate-400" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search customer, order ID, notes…" className="w-full bg-transparent py-2 text-sm text-slate-900 outline-none" />
+        {/* Search + Filter Bar */}
+        <div className="mt-3 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          {/* Always-visible toolbar */}
+          <div className="flex items-center gap-2 px-3 py-2.5">
+            <label className="flex flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 py-1.5">
+              <Search className="size-3.5 shrink-0 text-slate-400" />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search customer, notes…" className="w-full bg-transparent text-xs text-slate-900 outline-none placeholder:text-slate-400" />
+              {query && <button onClick={() => setQuery("")} className="text-slate-400 hover:text-slate-600"><X className="size-3.5" /></button>}
             </label>
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
-              <select value={filterProductId} onChange={(e) => { setFilterProductId(e.target.value); if (e.target.value === "All") onClearProductFilter?.(); }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-semibold text-slate-700 outline-none focus:border-amber-600">
-                <option value="All">All Sweets ({products.length})</option>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all ${showFilters || filterProductId !== "All" || filterStatus !== "All" || filterDate ? "border-amber-500 bg-amber-50 text-amber-800" : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"}`}
+            >
+              <SlidersHorizontal className="size-3.5" />
+              Filters
+              {(filterProductId !== "All" || filterStatus !== "All" || filterDate) && (
+                <span className="size-4 rounded-full bg-amber-600 text-white text-[9px] flex items-center justify-center font-black">
+                  {[filterProductId !== "All", filterStatus !== "All", !!filterDate].filter(Boolean).length}
+                </span>
+              )}
+            </button>
+            <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
+              {(["date", "product", "status", "none"] as const).map((mode) => (
+                <button key={mode} onClick={() => setGroupBy(mode)} title={mode === "date" ? "By Date" : mode === "product" ? "By Sweet" : mode === "status" ? "By Status" : "Individual"} className={`rounded-md px-1.5 py-1 text-[10px] font-bold capitalize transition-all ${groupBy === mode ? "bg-amber-600 text-white" : "text-slate-400 hover:text-slate-700"}`}>
+                  {mode === "date" ? "Date" : mode === "product" ? "Sweet" : mode === "status" ? "Status" : "All"}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Collapsible filter panel */}
+          {showFilters && (
+            <div className="border-t border-slate-100 px-3 py-2.5 bg-slate-50/50 flex flex-wrap items-center gap-2">
+              <select value={filterProductId} onChange={(e) => { setFilterProductId(e.target.value); if (e.target.value === "All") onClearProductFilter?.(); }} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-amber-600">
+                <option value="All">All Sweets</option>
                 {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-amber-600">
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-amber-600">
                 <option value="All">All Statuses</option>
                 {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
               </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="flex-1 sm:flex-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm text-slate-700 outline-none focus:border-amber-600" />
-              {(query || filterProductId !== "All" || filterStatus !== "All" || filterDate) && (
-                <button onClick={() => { setQuery(""); setFilterProductId("All"); setFilterStatus("All"); setFilterDate(""); onClearProductFilter?.(); }} className="rounded-xl border border-slate-200 px-3 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 shrink-0">
-                  Clear
+              <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-amber-600" />
+              {(filterProductId !== "All" || filterStatus !== "All" || filterDate) && (
+                <button onClick={() => { setFilterProductId("All"); setFilterStatus("All"); setFilterDate(""); onClearProductFilter?.(); }} className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-100">
+                  Clear filters
                 </button>
               )}
+              <span className="ml-auto text-[11px] font-semibold text-slate-400">{displayedOrders.length} order{displayedOrders.length !== 1 ? "s" : ""}</span>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-500">Organize:</span>
-              <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200">
-                {(["date", "product", "status", "none"] as const).map((mode) => (
-                  <button key={mode} onClick={() => setGroupBy(mode)} className={`rounded-lg px-2.5 py-1 text-xs font-bold capitalize transition-all ${groupBy === mode ? "bg-white text-amber-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"}`}>
-                    {mode === "date" ? "By Date" : mode === "product" ? "By Sweet" : mode === "status" ? "By Status" : "Individual"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <span className="text-xs font-bold text-slate-400">Showing {displayedOrders.length} order{displayedOrders.length !== 1 ? "s" : ""}</span>
-          </div>
+          )}
         </div>
 
         {displayedOrders.length === 0 ? (
@@ -1817,12 +1858,12 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
   const [expandCustomers, setExpandCustomers] = useState(false);
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
   const activeOrders = orders.filter((o) => !["Completed", "Cancelled"].includes(o.status));
-  const totalKg = activeOrders.reduce((sum, o) => sum + o.qty, 0);
+  const totalKg = activeOrders.reduce((sum, o) => sum + getOrderTotalKg(o), 0);
   const activeProductCount = products.filter((p) => p.active).length;
 
   const productBreakdown = products.map((p) => {
-    const orderList = activeOrders.filter((o) => o.productId === p.id).sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate));
-    const kg = orderList.reduce((sum, o) => sum + o.qty, 0);
+    const orderList = activeOrders.filter((o) => getOrderItems(o).some(it => it.productId === p.id)).sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate));
+    const kg = orderList.reduce((sum, o) => sum + getOrderItems(o).filter(it => it.productId === p.id).reduce((s, it) => s + it.qty, 0), 0);
     return { product: p, kg, count: orderList.length, orders: orderList };
   }).filter((b) => b.count > 0);
 
@@ -1831,7 +1872,7 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
   const customerMap = new Map<string, { orders: number; kg: number }>();
   activeOrders.forEach((o) => {
     const existing = customerMap.get(o.customer) ?? { orders: 0, kg: 0 };
-    customerMap.set(o.customer, { orders: existing.orders + 1, kg: existing.kg + o.qty });
+    customerMap.set(o.customer, { orders: existing.orders + 1, kg: existing.kg + getOrderTotalKg(o) });
   });
   const customers = Array.from(customerMap.entries());
   const totalCustomerCount = Math.max(allCustomersList.length, customerMap.size);
@@ -2632,19 +2673,32 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         if (ordErr) throw ordErr;
         let loadedOrders: Order[] = [];
         if (ordData && ordData.length > 0) {
-          loadedOrders = ordData.map((o: any) => ({
-            id: o.id,
-            date: o.date,
-            deliveryDate: o.delivery_date,
-            customer: o.customer,
-            productId: Number(o.product_id),
-            qty: Number(o.qty),
-            rate: o.rate ? Number(o.rate) : undefined,
-            status: o.status,
-            notes: o.notes || undefined,
-            phone: o.phone || undefined,
-            address: o.address || undefined,
-          }));
+          loadedOrders = ordData.map((o: any) => {
+            let items: OrderItem[] | undefined;
+            if (Array.isArray(o.items) && o.items.length > 0) {
+              items = o.items.map((it: any) => ({
+                productId: Number(it.productId ?? it.product_id ?? 0),
+                qty: Number(it.qty ?? 0),
+                rate: it.rate ? Number(it.rate) : undefined,
+              }));
+            }
+            return {
+              id: o.id,
+              date: o.date,
+              deliveryDate: o.delivery_date,
+              customer: o.customer,
+              items,
+              productId: o.product_id ? Number(o.product_id) : undefined,
+              qty: Number(o.qty),
+              rate: o.rate ? Number(o.rate) : undefined,
+              status: o.status,
+              notes: o.notes || undefined,
+              phone: o.phone || undefined,
+              address: o.address || undefined,
+              amountPaid: o.amount_paid ? Number(o.amount_paid) : undefined,
+              paymentStatus: (o.payment_status as Order["paymentStatus"]) || undefined,
+            };
+          });
           setOrders(loadedOrders);
           try { localStorage.setItem("dhuniya_orders", JSON.stringify(loadedOrders)); } catch { }
         } else {
@@ -2847,6 +2901,13 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const primaryItem = parsedItems[0];
     const totalQty = parsedItems.reduce((sum, it) => sum + it.qty, 0);
 
+    const paidAmt = data.amountPaid ? Number(data.amountPaid) : 0;
+    const orderTotal = parsedItems.reduce((sum, it) => {
+      const prod = products.find((p) => p.id === it.productId);
+      const r = it.rate ?? prod?.price ?? 0;
+      return sum + it.qty * r;
+    }, 0);
+    const payStatus: Order["paymentStatus"] = paidAmt >= orderTotal && orderTotal > 0 ? "Paid" : paidAmt > 0 ? "Partial" : "Unpaid";
     const newOrder: Order = {
       id: newOrderId,
       date: getTodayStr(),
@@ -2860,6 +2921,8 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       notes: data.notes?.trim() || undefined,
       phone: data.phone?.trim() || undefined,
       address: data.address?.trim() || undefined,
+      amountPaid: paidAmt || undefined,
+      paymentStatus: payStatus,
     };
     setOrders((prev) => { const updated = [newOrder, ...prev]; try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
     
@@ -2927,6 +2990,8 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           notes: newOrder.notes ?? null,
           phone: newOrder.phone ?? null,
           address: newOrder.address ?? null,
+          amount_paid: newOrder.amountPaid ?? null,
+          payment_status: newOrder.paymentStatus ?? "Unpaid",
         });
 
         if (error && (error.message?.includes("items") || error.code === "PGRST204")) {
@@ -2980,6 +3045,13 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const primaryItem = parsedItems[0];
     const totalQty = parsedItems.reduce((sum, it) => sum + it.qty, 0);
 
+    const paidAmt2 = data.amountPaid ? Number(data.amountPaid) : (current?.amountPaid ?? 0);
+    const orderTotal2 = parsedItems.reduce((sum, it) => {
+      const prod = products.find((p) => p.id === it.productId);
+      const r = it.rate ?? prod?.price ?? 0;
+      return sum + it.qty * r;
+    }, 0);
+    const payStatus2: Order["paymentStatus"] = paidAmt2 >= orderTotal2 && orderTotal2 > 0 ? "Paid" : paidAmt2 > 0 ? "Partial" : "Unpaid";
     const updatedOrder: Order = {
       id,
       date: current?.date ?? getTodayStr(),
@@ -2993,6 +3065,8 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       phone: data.phone?.trim() || current?.phone || undefined,
       address: data.address?.trim() || current?.address || undefined,
       status: current?.status ?? "Pending",
+      amountPaid: paidAmt2 || undefined,
+      paymentStatus: payStatus2,
     };
     setOrders((prev) => { const updated = prev.map((o) => (o.id === id ? updatedOrder : o)); try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
     
@@ -3057,6 +3131,8 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           notes: data.notes?.trim() || null,
           phone: updatedOrder.phone ?? null,
           address: updatedOrder.address ?? null,
+          amount_paid: updatedOrder.amountPaid ?? null,
+          payment_status: updatedOrder.paymentStatus ?? "Unpaid",
         }).eq("id", id);
 
         if (error && (error.message?.includes("items") || error.code === "PGRST204")) {
