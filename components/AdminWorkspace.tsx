@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -28,7 +28,6 @@ import {
   Printer,
   Search,
   Sparkles,
-  SlidersHorizontal,
   Trash2,
   User,
   Users,
@@ -74,9 +73,10 @@ export type Order = {
   date: string;
   deliveryDate: string;
   customer: string;
-  items?: OrderItem[];
+  items: OrderItem[];
+  // Keep legacy fields optional for backwards compatibility
   productId?: number;
-  qty: number;
+  qty?: number;
   rate?: number;
   status: string;
   notes?: string;
@@ -85,6 +85,8 @@ export type Order = {
   amountPaid?: number;
   paymentStatus?: "Unpaid" | "Partial" | "Paid";
 };
+
+// --- Constants ---
 
 export const getOrderItems = (o: Order): OrderItem[] => {
   if (Array.isArray(o.items) && o.items.length > 0) return o.items;
@@ -106,7 +108,13 @@ export const getOrderTotalKg = (o: Order): number => {
   return items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
 };
 
-// --- Constants ---
+export const isWholeNumberUnit = (unit?: string): boolean => {
+  if (!unit) return false;
+  const u = unit.trim().toLowerCase();
+  return ["pcs", "box", "piece", "pieces", "boxes"].includes(u);
+};
+
+
 export const STATUS_OPTIONS = [
   "Pending",
   "Confirmed",
@@ -141,10 +149,10 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
         <div
           key={t.id}
           className={`pointer-events-auto flex items-center justify-between gap-3 p-3.5 rounded-xl shadow-lg border text-xs font-semibold animate-in slide-in-from-bottom-2 transition-all ${t.type === "success"
-              ? "bg-emerald-600 text-white border-emerald-700"
-              : t.type === "error"
-                ? "bg-rose-600 text-white border-rose-700"
-                : "bg-slate-900 text-white border-slate-800"
+            ? "bg-emerald-600 text-white border-emerald-700"
+            : t.type === "error"
+              ? "bg-rose-600 text-white border-rose-700"
+              : "bg-slate-900 text-white border-slate-800"
             }`}
         >
           <div className="flex items-center gap-2">
@@ -454,7 +462,6 @@ function Sidebar({ active, setActive, open, setOpen, orderCount, customerCount =
 function Invoice({ order, products, onClose }: {
   order: Order; products: Product[]; onClose: () => void;
 }) {
-  const amountPaidInv = order.amountPaid ?? 0;
   const items = getOrderItems(order);
   const lineItems = items.map((item) => {
     const prod = products.find((p) => p.id === item.productId);
@@ -548,7 +555,7 @@ function Invoice({ order, products, onClose }: {
             </div>
           </div>
 
-          {/* Mobile Items List */}
+          {/* Mobile Item Breakdown */}
           <div className="mt-4 sm:hidden print:hidden space-y-2">
             {lineItems.map((item, idx) => (
               <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-1.5">
@@ -588,34 +595,13 @@ function Invoice({ order, products, onClose }: {
             </table>
           </div>
 
-          {/* Grand Total + Payment Summary */}
+          {/* Grand Total */}
           <div className="mt-4 print:mt-3 flex justify-end">
-            <div className="w-full sm:max-w-[280px] border-t-2 border-slate-900 pt-2.5 space-y-1.5">
+            <div className="w-full sm:max-w-[260px] border-t-2 border-slate-900 pt-2.5">
               <div className="flex items-center justify-between text-sm sm:text-base font-bold text-slate-900">
                 <span>Grand Total:</span>
                 <span className="text-xl sm:text-2xl text-amber-600">{money(total)}</span>
               </div>
-              {amountPaidInv >= total && total > 0 ? (
-                <div className="mt-2 rounded-xl bg-emerald-50 border border-emerald-300 px-3 py-2 text-center">
-                  <p className="text-sm font-black text-emerald-800 tracking-wider">✓ PAID IN FULL</p>
-                </div>
-              ) : amountPaidInv > 0 ? (
-                <>
-                  <div className="flex items-center justify-between text-xs text-slate-600">
-                    <span>Amount Paid:</span>
-                    <span className="font-bold text-emerald-700">{money(amountPaidInv)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs font-bold border-t border-slate-200 pt-1.5">
-                    <span className="text-rose-700">Balance Due:</span>
-                    <span className="text-rose-700 text-sm">{money(total - amountPaidInv)}</span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span>Payment Due:</span>
-                  <span className="font-semibold">On Receipt</span>
-                </div>
-              )}
             </div>
           </div>
 
@@ -784,7 +770,8 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
       <div className="mx-auto max-w-[1250px] px-3.5 py-5 sm:px-6 sm:py-8 lg:px-10">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-amber-600">Sweet Catalog</span>
-          <h2 className="mt-0.5 text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">Products & Production</h2>
+          <h2 className="mt-1 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Products & Production Demand</h2>
+          <p className="mt-1 text-xs sm:text-sm text-slate-500">Manage sweet catalog, standard rates, and live customer orders in production.</p>
         </div>
 
         {products.length === 0 ? (
@@ -800,47 +787,57 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
           <div className="mt-6">
             <div className="block sm:hidden space-y-3">
               {products.map((p) => {
-                const activeOrders = orders.filter((o) => getOrderItems(o).some(it => it.productId === p.id) && !["Completed", "Cancelled"].includes(o.status));
-                const totalOrderedKg = activeOrders.reduce((sum, o) => sum + getOrderItems(o).filter(it => it.productId === p.id).reduce((s, it) => s + it.qty, 0), 0);
+                const activeOrders = orders.filter((o) => getOrderItems(o).some((it) => it.productId === p.id) && !["Completed", "Cancelled"].includes(o.status));
+                const totalOrderedKg = activeOrders.reduce((sum, o) => {
+                  const it = getOrderItems(o).find((i) => i.productId === p.id);
+                  return sum + (Number(it?.qty) || 0);
+                }, 0);
                 return (
-                  <div key={p.id} className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm hover:border-amber-300 transition-all">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div key={p.id} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm hover:border-amber-300 transition-all space-y-3">
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         {p.imageUrl ? (
-                          <img src={optimizeImageUrl(p.imageUrl, 80)} alt={p.name} loading="lazy" decoding="async" className="size-9 shrink-0 rounded-lg object-cover border border-amber-300/40" />
+                          <img src={optimizeImageUrl(p.imageUrl, 100)} alt={p.name} loading="lazy" decoding="async" className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40 shadow-2xs" />
                         ) : (
-                          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40">
+                          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40 shadow-2xs">
                             {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-bold text-slate-900 text-sm truncate">{p.name}</p>
-                            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"}`}>
-                              <span className={`size-1.5 rounded-full ${p.active ? "bg-emerald-500" : "bg-slate-400"}`} />
-                              {p.active ? "Active" : "Off"}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            <p className="text-xs font-semibold text-amber-700">{money(p.price)}/{p.unit}</p>
-                            {activeOrders.length > 0 ? (
-                              <button onClick={() => onViewProductOrders(p.id)} className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">
-                                {totalOrderedKg.toFixed(1)} {p.unit} ordered →
-                              </button>
-                            ) : (
-                              <span className="text-[10px] text-slate-400">No orders</span>
-                            )}
-                          </div>
+                          <p className="font-bold text-slate-900 text-base truncate">{p.name}</p>
+                          {p.description && (
+                            <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{p.description}</p>
+                          )}
+                          <p className="text-xs font-semibold text-amber-700 mt-0.5">{money(p.price)} / {p.unit}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={() => setEditProduct(p)} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-100 transition-colors" title="Edit">
-                          <Edit2 className="size-3.5" />
-                        </button>
-                        <button onClick={() => setDeleteId(p.id)} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors" title="Delete">
-                          <Trash2 className="size-3.5" />
-                        </button>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                        <span className={`size-1.5 rounded-full ${p.active ? "bg-emerald-500" : "bg-slate-400"}`} />
+                        {p.active ? "Active" : "Archived"}
+                      </span>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Production Demand</p>
+                        {activeOrders.length > 0 ? (
+                          <p className="text-sm font-extrabold text-slate-900 mt-0.5">{totalOrderedKg.toFixed(2)} {p.unit} <span className="text-xs font-normal text-slate-500">({activeOrders.length} orders)</span></p>
+                        ) : (
+                          <p className="text-xs text-slate-400 mt-0.5">No active orders</p>
+                        )}
                       </div>
+                      {activeOrders.length > 0 && (
+                        <button onClick={() => onViewProductOrders(p.id)} className="text-xs font-bold text-amber-600 hover:text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                          View orders →
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button onClick={() => setEditProduct(p)} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
+                        <Edit2 className="size-3.5" /> Edit
+                      </button>
+                      <button onClick={() => setDeleteId(p.id)} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors">
+                        <Trash2 className="size-3.5" /> Delete
+                      </button>
                     </div>
                   </div>
                 );
@@ -852,21 +849,24 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                 <table className="w-full min-w-[760px] text-left text-sm">
                   <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     <tr>
-                      <th className="px-4 py-3">Sweet Product</th>
-                      <th className="px-4 py-3">Unit</th>
-                      <th className="px-4 py-3">Standard Rate</th>
-                      <th className="px-4 py-3">Production Demand</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
+                      <th className="px-6 py-4">Sweet Product</th>
+                      <th className="px-6 py-4">Unit</th>
+                      <th className="px-6 py-4">Standard Rate</th>
+                      <th className="px-6 py-4">Active Production Demand</th>
+                      <th className="px-6 py-4">Catalog Status</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {products.map((p) => {
-                      const activeOrders = orders.filter((o) => getOrderItems(o).some(it => it.productId === p.id) && !["Completed", "Cancelled"].includes(o.status));
-                      const totalOrderedKg = activeOrders.reduce((sum, o) => sum + getOrderItems(o).filter(it => it.productId === p.id).reduce((s, it) => s + it.qty, 0), 0);
+                      const activeOrders = orders.filter((o) => getOrderItems(o).some((it) => it.productId === p.id) && !["Completed", "Cancelled"].includes(o.status));
+                      const totalOrderedKg = activeOrders.reduce((sum, o) => {
+                        const it = getOrderItems(o).find((i) => i.productId === p.id);
+                        return sum + (Number(it?.qty) || 0);
+                      }, 0);
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-4 py-2.5">
+                          <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               {p.imageUrl ? (
                                 <img src={optimizeImageUrl(p.imageUrl, 100)} alt={p.name} loading="lazy" decoding="async" className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40" />
@@ -884,8 +884,8 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                             </div>
                           </td>
                           <td className="px-6 py-4 font-medium text-slate-600">{p.unit}</td>
-                          <td className="px-4 py-2.5 font-bold text-slate-900">{money(p.price)}<span className="ml-1 text-xs font-normal text-slate-400">/ {p.unit}</span></td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-6 py-4 font-bold text-slate-900">{money(p.price)}<span className="ml-1 text-xs font-normal text-slate-400">/ {p.unit}</span></td>
+                          <td className="px-6 py-4">
                             {activeOrders.length > 0 ? (
                               <div>
                                 <p className="font-bold text-slate-900">{totalOrderedKg.toFixed(2)} {p.unit}</p>
@@ -897,13 +897,13 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                               <span className="text-xs text-slate-400">No active orders</span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-6 py-4">
                             <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
                               <span className={`size-1.5 rounded-full ${p.active ? "bg-emerald-500" : "bg-slate-400"}`} />
                               {p.active ? "Active" : "Inactive"}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5 text-right">
+                          <td className="px-6 py-4 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button onClick={() => setEditProduct(p)} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors" title="Edit sweet">
                                 <Edit2 className="size-3.5" />
@@ -959,11 +959,331 @@ export type OrderFormData = {
   notes: string;
   phone?: string;
   address?: string;
+  // Legacy fields optional
   productId?: string;
   qty?: string;
   rate?: string;
-  amountPaid?: string;
 };
+
+
+function ProductItemDialog({
+  initial,
+  products,
+  onSave,
+  onClose,
+}: {
+  initial?: OrderItemFormData;
+  products: Product[];
+  onSave: (item: OrderItemFormData) => void;
+  onClose: () => void;
+}) {
+  const activeProducts = products.filter((p) => p.active);
+  const defaultProd = activeProducts[0] ?? products[0];
+
+  const [productId, setProductId] = useState<string>(
+    initial?.productId ? String(initial.productId) : String(defaultProd?.id ?? "")
+  );
+
+  const selectedProd = products.find((p) => p.id === Number(productId)) ?? defaultProd;
+  const isWhole = isWholeNumberUnit(selectedProd?.unit);
+
+  const [qty, setQty] = useState<string>(initial?.qty ? String(initial.qty) : "");
+  const [rate, setRate] = useState<string>(initial?.rate ? String(initial.rate) : "");
+  const [error, setError] = useState<string>("");
+
+  const handleProductChange = (newId: string) => {
+    setProductId(newId);
+    const p = products.find((prod) => prod.id === Number(newId));
+    if (p) {
+      const whole = isWholeNumberUnit(p.unit);
+      if (whole && qty && !Number.isInteger(Number(qty))) {
+        setQty(String(Math.max(1, Math.round(Number(qty)))));
+      }
+    }
+  };
+
+  const handleQtyChange = (val: string) => {
+    // Strip minus signs and negatives completely
+    let clean = val.replace(/-/g, "");
+    if (isWhole) {
+      // Whole numbers only for pcs / box
+      clean = clean.replace(/[^0-9]/g, "");
+    } else {
+      // Decimals allowed for kg/g
+      clean = clean.replace(/[^0-9.]/g, "");
+      const parts = clean.split(".");
+      if (parts.length > 2) clean = parts[0] + "." + parts.slice(1).join("");
+    }
+    setQty(clean);
+    if (error) setError("");
+  };
+
+  const handleRateChange = (val: string) => {
+    const clean = val.replace(/-/g, "").replace(/[^0-9.]/g, "");
+    setRate(clean);
+  };
+
+  const standardPrice = selectedProd?.price ?? 0;
+  const effectiveRate = Number(rate) > 0 ? Number(rate) : standardPrice;
+  const numQty = Number(qty) || 0;
+  const subtotal = numQty * effectiveRate;
+
+  const handleSubmit = () => {
+    if (!qty || Number(qty) <= 0) {
+      setError("Please enter a valid positive quantity greater than 0");
+      return;
+    }
+    if (isWhole && (!Number.isInteger(Number(qty)) || Number(qty) < 1)) {
+      setError(`For ${selectedProd?.unit ?? "pieces/boxes"}, only whole numbers are allowed (1, 2, 3...).`);
+      return;
+    }
+    onSave({
+      productId,
+      qty,
+      rate: rate.trim() || "",
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/60 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center">
+      <div className="my-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3.5 bg-slate-50">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">
+              {initial ? "Edit Sweet Item" : "Add Sweet Product"}
+            </span>
+            <h3 className="text-base font-bold text-slate-900">
+              {initial ? "Modify Sweet Item" : "Select Sweet & Quantity"}
+            </h3>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 transition-colors">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="p-4 sm:p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              Sweet Product *
+            </label>
+            <select
+              value={productId}
+              onChange={(e) => handleProductChange(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+            >
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} — {money(p.price)} / {p.unit}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Standard Rate: <strong className="text-slate-800">{money(selectedProd?.price ?? 0)}</strong> / <strong>{selectedProd?.unit ?? "kg"}</strong>
+            </p>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Quantity ({selectedProd?.unit ?? "kg"}) *
+              </label>
+              {isWhole ? (
+                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                  Whole numbers only (1, 2, 3...)
+                </span>
+              ) : (
+                <span className="text-[10px] font-medium text-slate-500">
+                  Decimals allowed (e.g. 0.5, 2.25)
+                </span>
+              )}
+            </div>
+            <input
+              type="text"
+              inputMode={isWhole ? "numeric" : "decimal"}
+              value={qty}
+              onChange={(e) => handleQtyChange(e.target.value)}
+              placeholder={isWhole ? "e.g. 5" : "e.g. 2.5"}
+              className={`w-full rounded-xl border px-3.5 py-2.5 text-sm font-semibold outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 ${
+                error ? "border-rose-400 bg-rose-50/40 text-rose-900" : "border-slate-300 text-slate-900"
+              }`}
+            />
+            {error && <p className="mt-1 text-xs font-semibold text-rose-600">{error}</p>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              Rate per {selectedProd?.unit ?? "kg"} (Rs.) <span className="font-normal text-slate-400">Optional custom rate</span>
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={rate}
+              onChange={(e) => handleRateChange(e.target.value)}
+              placeholder={`Standard: ${selectedProd?.price ?? 0}`}
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+            />
+          </div>
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800">Item Subtotal</p>
+              <p className="text-xs text-amber-700 font-medium">
+                {numQty > 0 ? `${numQty} ${selectedProd?.unit ?? "kg"} × ${money(effectiveRate)}` : "Enter quantity to calculate"}
+              </p>
+            </div>
+            <p className="text-lg font-black text-amber-950">
+              {money(subtotal)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-2.5 border-t border-slate-200 px-4 py-3 bg-slate-50">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-semibold text-slate-700 hover:bg-white transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="flex-1 rounded-xl bg-amber-600 py-2.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-xs"
+          >
+            {initial ? "Update Item" : "Add to Order"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PaymentModal({
+  order,
+  products,
+  onSave,
+  onClose,
+}: {
+  order: Order;
+  products: Product[];
+  onSave: (orderId: string, amountPaid: number) => void;
+  onClose: () => void;
+}) {
+  const total = getOrderTotal(order, products);
+  const [amountPaid, setAmountPaid] = useState<string>(
+    order.amountPaid !== undefined ? String(order.amountPaid) : ""
+  );
+
+  const numPaid = Math.max(0, Number(amountPaid) || 0);
+  const balance = Math.max(0, total - numPaid);
+  const isFullyPaid = numPaid >= total && total > 0;
+
+  const handleSave = () => {
+    onSave(order.id, numPaid);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center">
+      <div className="my-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3.5 bg-slate-50">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Manage Order Payment</span>
+            <h3 className="text-base font-bold text-slate-900 truncate">{order.customer}</h3>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 transition-colors">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="p-4 sm:p-5 space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-500">Total Order Amount:</span>
+              <span className="text-base font-black text-slate-900">{money(total)}</span>
+            </div>
+            <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/80">
+              <span className="text-slate-500">Current Payment:</span>
+              <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setAmountPaid(String(total))}
+              className="flex-1 rounded-xl bg-emerald-50 border border-emerald-300 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-colors shadow-2xs"
+            >
+              ✓ Mark Fully Paid ({money(total)})
+            </button>
+            <button
+              type="button"
+              onClick={() => setAmountPaid("0")}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              Reset
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              Amount Paid by Customer (Rs.)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rs.</span>
+              <input
+                type="number"
+                min="0"
+                step="50"
+                value={amountPaid}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/-/g, "");
+                  setAmountPaid(val);
+                }}
+                placeholder="0"
+                className="w-full rounded-xl border border-slate-300 pl-10 pr-3.5 py-2.5 text-base font-bold text-slate-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+              />
+            </div>
+          </div>
+
+          <div className={`rounded-xl border p-3 flex items-center justify-between transition-colors ${
+            isFullyPaid
+              ? "bg-emerald-50 border-emerald-200"
+              : numPaid > 0
+              ? "bg-amber-50 border-amber-200"
+              : "bg-slate-50 border-slate-200"
+          }`}>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                {isFullyPaid ? "Payment Status" : "Remaining Balance Due"}
+              </p>
+              <p className={`text-sm font-black ${isFullyPaid ? "text-emerald-700" : "text-amber-800"}`}>
+                {isFullyPaid ? "✓ PAID IN FULL" : money(balance)}
+              </p>
+            </div>
+            {isFullyPaid && <CheckCircle2 className="size-5 text-emerald-600" />}
+          </div>
+        </div>
+
+        <div className="flex gap-2.5 border-t border-slate-200 px-4 py-3 bg-slate-50">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-semibold text-slate-700 hover:bg-white transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 rounded-xl bg-amber-600 py-2.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-xs"
+          >
+            Save Payment
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function OrderModal({ initial, products, customers = [], initialCustomer, onSave, onClose }: {
   initial?: Order; products: Product[]; customers?: (Customer | string)[]; initialCustomer?: string | null; onSave: (data: OrderFormData) => void; onClose: () => void;
@@ -989,14 +1309,8 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
         }));
       }
     }
-    return [
-      {
-        productId: activeProducts[0]?.id ? String(activeProducts[0].id) : (products[0]?.id ? String(products[0].id) : ""),
-        qty: "",
-        rate: "",
-      },
-    ];
-  }, [initial, activeProducts, products]);
+    return [];
+  }, [initial, activeProducts]);
 
   const [customer, setCustomer] = useState(targetInitialCustomer);
   const [phone, setPhone] = useState(initial?.phone ?? (matchedInitial?.phone ?? ""));
@@ -1004,7 +1318,8 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
   const [deliveryDate, setDeliveryDate] = useState(initial?.deliveryDate ?? getTodayStr());
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [items, setItems] = useState<OrderItemFormData[]>(initialItems);
-  const [amountPaid, setAmountPaid] = useState(initial?.amountPaid ? String(initial.amountPaid) : "");
+  const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
+  const [showItemDialog, setShowItemDialog] = useState<boolean>(false);
   const [errors, setErrors] = useState<{ customer?: string; deliveryDate?: string; items?: string }>({});
 
   const selectCustomer = (name: string) => {
@@ -1015,27 +1330,8 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
     if (errors.customer) setErrors((prev) => ({ ...prev, customer: undefined }));
   };
 
-  const addItem = () => {
-    const firstProd = activeProducts[0] ?? products[0];
-    setItems((prev) => [
-      ...prev,
-      {
-        productId: firstProd?.id ? String(firstProd.id) : "",
-        qty: "",
-        rate: "",
-      },
-    ]);
-  };
-
   const removeItem = (idx: number) => {
-    if (items.length <= 1) return;
     setItems((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const updateItem = (idx: number, field: keyof OrderItemFormData, val: string) => {
-    setItems((prev) =>
-      prev.map((item, i) => (i === idx ? { ...item, [field]: val } : item))
-    );
   };
 
   const validate = () => {
@@ -1044,12 +1340,17 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
     if (!deliveryDate) e.deliveryDate = "Delivery / handover date required";
 
     if (items.length === 0) {
-      e.items = "At least one product line is required";
+      e.items = "Please add at least one sweet product using the '+ Add Product' button";
     } else {
-      const invalid = items.some(
-        (it) => !it.productId || !it.qty || isNaN(Number(it.qty)) || Number(it.qty) <= 0
-      );
-      if (invalid) e.items = "Please enter valid quantities for all product items";
+      const invalid = items.some((it) => {
+        const prod = products.find((p) => p.id === Number(it.productId));
+        const whole = isWholeNumberUnit(prod?.unit);
+        const q = Number(it.qty);
+        if (!it.productId || isNaN(q) || q <= 0) return true;
+        if (whole && (!Number.isInteger(q) || q < 1)) return true;
+        return false;
+      });
+      if (invalid) e.items = "Please ensure all product quantities are valid positive numbers";
     }
     return e;
   };
@@ -1071,7 +1372,6 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
         qty: it.qty,
         rate: it.rate,
       })),
-      amountPaid: amountPaid.trim() || undefined,
     });
   };
 
@@ -1082,288 +1382,288 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
     return sum + (q * r);
   }, 0);
 
-  const totalKg = items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
+  const totalKg = items.reduce((sum, it) => {
+    const p = products.find((prod) => prod.id === Number(it.productId));
+    return p?.unit === "kg" ? sum + (Number(it.qty) || 0) : sum;
+  }, 0);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center">
-      <div className="my-auto w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
-        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-4 py-3.5 sm:px-6 sm:py-5 bg-slate-50">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-600">{initial ? "Edit" : "New"} Order</p>
-            <h3 className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{initial ? "Update Customer Order" : "Place New Customer Order"}</h3>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200"><X className="size-4" /></button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5 sm:px-6 sm:py-6">
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-bold text-slate-700">Customer Name *</label>
-              {normalizedCustomers.length > 0 && (
-                <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                  {normalizedCustomers.length} saved customer{normalizedCustomers.length !== 1 ? "s" : ""}
-                </span>
-              )}
+    <>
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center">
+        <div className="my-auto w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+          <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-4 py-3.5 sm:px-6 sm:py-5 bg-slate-50">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-600">{initial ? "Edit" : "New"} Order</p>
+              <h3 className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{initial ? "Update Customer Order" : "Place New Customer Order"}</h3>
             </div>
+            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200"><X className="size-4" /></button>
+          </div>
 
-            {normalizedCustomers.length > 0 && (
-              <div className="mb-2">
-                <select
-                  value={normalizedCustomers.some((c) => c.name.toLowerCase() === customer.toLowerCase()) ? (normalizedCustomers.find((c) => c.name.toLowerCase() === customer.toLowerCase())?.name ?? customer) : ""}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      selectCustomer(e.target.value);
-                    }
-                  }}
-                  className="w-full rounded-xl border border-amber-300/80 bg-amber-50/70 px-3.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
-                >
-                  <option value="">▼ Select from saved customers ({normalizedCustomers.length})...</option>
-                  {normalizedCustomers.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      👤 {c.name} {c.phone ? `(${c.phone})` : ""}
-                    </option>
-                  ))}
-                </select>
+          <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+            {/* Customer Name */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-700">Customer Name *</label>
+                {normalizedCustomers.length > 0 && (
+                  <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                    {normalizedCustomers.length} saved customer{normalizedCustomers.length !== 1 ? "s" : ""}
+                  </span>
+                )}
               </div>
-            )}
 
-            <input
-              list="customer-suggestions"
-              value={customer}
-              onChange={(e) => selectCustomer(e.target.value)}
-              placeholder={normalizedCustomers.length > 0 ? "Or type a new customer name..." : "e.g. Sharma Sweets, Grand Banquets"}
-              autoComplete="off"
-              className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.customer ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
-            />
-            <datalist id="customer-suggestions">
-              {normalizedCustomers.map((c) => (
-                <option key={c.name} value={c.name} />
-              ))}
-            </datalist>
-            {errors.customer && <p className="mt-1 text-xs text-rose-600">{errors.customer}</p>}
+              {normalizedCustomers.length > 0 && (
+                <div className="mb-2">
+                  <select
+                    value={normalizedCustomers.some((c) => c.name.toLowerCase() === customer.toLowerCase()) ? (normalizedCustomers.find((c) => c.name.toLowerCase() === customer.toLowerCase())?.name ?? customer) : ""}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        selectCustomer(e.target.value);
+                      }
+                    }}
+                    className="w-full rounded-xl border border-amber-300/80 bg-amber-50/70 px-3.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
+                  >
+                    <option value="">▼ Select from saved customers ({normalizedCustomers.length})...</option>
+                    {normalizedCustomers.map((c) => (
+                      <option key={c.name} value={c.name}>
+                        👤 {c.name} {c.phone ? `(${c.phone})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-            {normalizedCustomers.length > 0 && (
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-0.5">Quick pick:</span>
-                {normalizedCustomers.slice(0, 5).map((c) => (
-                  <button
-                    key={c.name}
-                    type="button"
-                    onClick={() => selectCustomer(c.name)}
-                    className={`text-[11px] font-medium px-2 py-0.5 rounded-lg border transition-all ${
-                      customer.toLowerCase() === c.name.toLowerCase()
+              <input
+                list="customer-suggestions"
+                value={customer}
+                onChange={(e) => selectCustomer(e.target.value)}
+                placeholder={normalizedCustomers.length > 0 ? "Or type a new customer name..." : "e.g. Sharma Sweets, Grand Banquets"}
+                autoComplete="off"
+                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.customer ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
+              />
+              <datalist id="customer-suggestions">
+                {normalizedCustomers.map((c) => (
+                  <option key={c.name} value={c.name} />
+                ))}
+              </datalist>
+              {errors.customer && <p className="mt-1 text-xs text-rose-600">{errors.customer}</p>}
+
+              {normalizedCustomers.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-0.5">Quick pick:</span>
+                  {normalizedCustomers.slice(0, 5).map((c) => (
+                    <button
+                      key={c.name}
+                      type="button"
+                      onClick={() => selectCustomer(c.name)}
+                      className={`text-[11px] font-medium px-2 py-0.5 rounded-lg border transition-all ${customer.toLowerCase() === c.name.toLowerCase()
                         ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
                         : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300"
-                    }`}
-                  >
-                    {c.name}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Mobile Number <span className="font-normal text-slate-400">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="e.g. 0756656135"
-                    className="w-full rounded-xl border border-slate-300 pl-9 pr-3.5 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
-                  />
+                        }`}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
                 </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Delivery Address <span className="font-normal text-slate-400">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
-                  <input
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="e.g. 138 France City"
-                    className="w-full rounded-xl border border-slate-300 pl-9 pr-3.5 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+              )}
 
-          <div>
-            <label className="mb-1.5 block text-xs font-bold text-slate-700">Handover / Delivery Date *</label>
-            <input
-              type="date"
-              value={deliveryDate}
-              onChange={(e) => setDeliveryDate(e.target.value)}
-              className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.deliveryDate ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
-            />
-            {errors.deliveryDate && <p className="mt-1 text-xs text-rose-600">{errors.deliveryDate}</p>}
-          </div>
-
-          {/* Multiple Product Line Items */}
-          <div className="space-y-3 pt-2 border-t border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider">
-                  Order Items ({items.length})
-                </label>
-                <p className="text-[11px] text-slate-500">Add all sweets included in this customer order</p>
-              </div>
-              <button
-                type="button"
-                onClick={addItem}
-                className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-2xs"
-              >
-                <Plus className="size-3.5" />
-                <span>Add Product</span>
-              </button>
-            </div>
-
-            {errors.items && <p className="text-xs text-rose-600 font-semibold">{errors.items}</p>}
-
-            <div className="space-y-2.5">
-              {items.map((item, idx) => {
-                const prod = products.find((p) => p.id === Number(item.productId));
-                const itemRate = Number(item.rate) > 0 ? Number(item.rate) : (prod?.price ?? 0);
-                const itemSubtotal = (Number(item.qty) || 0) * itemRate;
-
-                return (
-                  <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 sm:p-3.5 space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                        Item #{idx + 1}
-                      </span>
-                      {items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeItem(idx)}
-                          className="text-slate-400 hover:text-rose-600 p-1 rounded-md transition-colors"
-                          title="Remove this product"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="grid gap-2 sm:grid-cols-12 sm:items-end">
-                      <div className="sm:col-span-5">
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Sweet Product</label>
-                        <select
-                          value={item.productId}
-                          onChange={(e) => updateItem(idx, "productId", e.target.value)}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
-                        >
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} ({money(p.price)}/{p.unit})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="sm:col-span-3">
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          Qty ({prod?.unit ?? "kg"})
-                        </label>
-                        <input
-                          type="number"
-                          step="0.25"
-                          value={item.qty}
-                          onChange={(e) => updateItem(idx, "qty", e.target.value)}
-                          placeholder="e.g. 5"
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
-                        />
-                      </div>
-
-                      <div className="sm:col-span-4">
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          Rate (Rs/{prod?.unit ?? "kg"})
-                        </label>
-                        <input
-                          type="number"
-                          value={item.rate}
-                          onChange={(e) => updateItem(idx, "rate", e.target.value)}
-                          placeholder={`${prod?.price ?? 0}`}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
-                        />
-                      </div>
-                    </div>
-
-                    {Number(item.qty) > 0 && (
-                      <div className="flex justify-between items-center text-xs text-slate-600 pt-1 border-t border-slate-200/60 font-medium">
-                        <span>{prod?.name ?? "Item"}: {item.qty} {prod?.unit ?? "kg"} × {money(itemRate)}</span>
-                        <span className="font-bold text-slate-900">{money(itemSubtotal)}</span>
-                      </div>
-                    )}
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Mobile Number <span className="font-normal text-slate-400">(Optional)</span>
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="e.g. 0756656135"
+                      className="w-full rounded-xl border border-slate-300 pl-9 pr-3.5 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+                    />
                   </div>
-                );
-              })}
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Delivery Address <span className="font-normal text-slate-400">(Optional)</span>
+                  </label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+                    <input
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="e.g. 138 France City"
+                      className="w-full rounded-xl border border-slate-300 pl-9 pr-3.5 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-bold text-slate-700">Special Notes (optional)</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Extra saffron, wedding gift packaging, morning handover…"
-              rows={2}
-              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 resize-none"
-            />
-          </div>
+            {/* Handover Date */}
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-slate-700">Handover / Delivery Date *</label>
+              <input
+                type="date"
+                value={deliveryDate}
+                onChange={(e) => setDeliveryDate(e.target.value)}
+                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.deliveryDate ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
+              />
+              {errors.deliveryDate && <p className="mt-1 text-xs text-rose-600">{errors.deliveryDate}</p>}
+            </div>
 
-          {/* Payment Received */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold text-slate-700">Payment Received (Rs.) <span className="font-normal text-slate-400">Optional</span></label>
-              {grandTotal > 0 && Number(amountPaid) >= grandTotal && (
-                <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full">✓ FULLY PAID</span>
+            {/* Product Line Items */}
+            <div className="space-y-3 pt-2 border-t border-slate-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Order Items ({items.length})
+                  </label>
+                  <p className="text-[11px] text-slate-500">Add all sweets included in this customer order</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingItemIdx(null);
+                    setShowItemDialog(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-2xs"
+                >
+                  <Plus className="size-3.5" />
+                  <span>Add Product</span>
+                </button>
+              </div>
+
+              {errors.items && <p className="text-xs text-rose-600 font-semibold">{errors.items}</p>}
+
+              {items.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center bg-slate-50/60">
+                  <Package className="size-8 text-slate-400 mx-auto mb-1.5" />
+                  <p className="text-xs font-bold text-slate-700">No sweet products added yet</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Click &ldquo;+ Add Product&rdquo; above to select sweets for this order.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingItemIdx(null);
+                      setShowItemDialog(true);
+                    }}
+                    className="mt-3 inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Add Product</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {items.map((item, idx) => {
+                    const prod = products.find((p) => p.id === Number(item.productId));
+                    const itemRate = Number(item.rate) > 0 ? Number(item.rate) : (prod?.price ?? 0);
+                    const itemSubtotal = (Number(item.qty) || 0) * itemRate;
+
+                    return (
+                      <div key={idx} className="rounded-xl border border-slate-200 bg-white p-3 flex items-center justify-between gap-3 shadow-2xs hover:border-amber-300 transition-colors">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="size-6 rounded-lg bg-amber-100 text-amber-800 text-xs font-bold flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 text-sm truncate">{prod?.name ?? "Sweet Item"}</p>
+                            <p className="text-xs text-slate-500">
+                              <strong className="text-slate-800">{item.qty} {prod?.unit ?? "kg"}</strong> × {money(itemRate)} = <strong className="text-amber-700 font-extrabold">{money(itemSubtotal)}</strong>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingItemIdx(idx);
+                              setShowItemDialog(true);
+                            }}
+                            className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100 transition-colors"
+                            title="Edit this sweet item"
+                          >
+                            <Edit2 className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeItem(idx)}
+                            className="rounded-lg border border-slate-200 p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors"
+                            title="Remove this sweet item"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
-            <input
-              type="number"
-              value={amountPaid}
-              onChange={(e) => setAmountPaid(e.target.value)}
-              placeholder="e.g. 5000"
-              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
-            />
-            {grandTotal > 0 && Number(amountPaid) > 0 && Number(amountPaid) < grandTotal && (
-              <p className="mt-1.5 text-xs font-semibold text-amber-700">Balance due: {money(grandTotal - Number(amountPaid))}</p>
+
+            {/* Special Notes */}
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-slate-700">Special Notes (optional)</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="e.g. Extra saffron, wedding gift packaging, morning handover…"
+                rows={2}
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 resize-none"
+              />
+            </div>
+
+            {/* Order Total Box */}
+            {items.length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 sm:p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-800">Order Total</p>
+                  <p className="text-xs text-amber-700 font-medium">
+                    {items.length} product{items.length !== 1 ? "s" : ""} {totalKg > 0 ? `· ${totalKg.toFixed(2)} kg total` : ""}
+                  </p>
+                </div>
+                <p className="text-xl sm:text-2xl font-black text-amber-950">
+                  {money(grandTotal)}
+                </p>
+              </div>
             )}
           </div>
 
-          {totalKg > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 sm:p-4 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-800">Order Summary</p>
-                <p className="text-xs text-amber-700 font-medium">{items.length} product{items.length !== 1 ? "s" : ""} · {totalKg.toFixed(2)} kg total</p>
-              </div>
-              <p className="text-xl sm:text-2xl font-bold text-amber-900">
-                {money(grandTotal)}
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="shrink-0 flex gap-3 border-t border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50">
-          <button onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-2.5 text-sm font-semibold text-slate-700 hover:bg-white transition-colors">Cancel</button>
-          <button onClick={submit} className="flex-1 rounded-xl bg-amber-600 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 shadow-xs font-bold">
-            {initial ? "Update Order" : "Place Order"}
-          </button>
+          <div className="shrink-0 flex gap-3 border-t border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50">
+            <button onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-2.5 text-sm font-semibold text-slate-700 hover:bg-white transition-colors">Cancel</button>
+            <button onClick={submit} className="flex-1 rounded-xl bg-amber-600 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 shadow-xs font-bold">
+              {initial ? "Update Order" : "Place Order"}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      {showItemDialog && (
+        <ProductItemDialog
+          initial={editingItemIdx !== null ? items[editingItemIdx] : undefined}
+          products={products}
+          onSave={(savedItem) => {
+            if (editingItemIdx !== null) {
+              setItems((prev) => prev.map((it, i) => (i === editingItemIdx ? savedItem : it)));
+            } else {
+              setItems((prev) => [...prev, savedItem]);
+            }
+            setShowItemDialog(false);
+            setEditingItemIdx(null);
+            if (errors.items) setErrors((prev) => ({ ...prev, items: undefined }));
+          }}
+          onClose={() => {
+            setShowItemDialog(false);
+            setEditingItemIdx(null);
+          }}
+        />
+      )}
+    </>
   );
 }
 
-function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate, onEdit, onDelete }: {
-  order: Order; products: Product[]; customerLookup?: Map<string, Customer>; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void;
+function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate, onEdit, onDelete, onManagePayment }: {
+  order: Order; products: Product[]; customerLookup?: Map<string, Customer>; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void; onManagePayment: (o: Order) => void;
 }) {
   const items = getOrderItems(order);
   const total = getOrderTotal(order, products);
@@ -1375,7 +1675,7 @@ function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate
 
   return (
     <div className="rounded-xl border border-slate-200/90 bg-white shadow-sm hover:border-amber-300 transition-all overflow-hidden">
-      {/* Header Row */}
+      {/* Header */}
       <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-slate-100">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40">
           {order.customer.charAt(0).toUpperCase()}
@@ -1386,8 +1686,12 @@ function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate
             {badge && <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${badge.style}`}>{badge.label}</span>}
           </div>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <span className="text-[10px] text-slate-500">{totalKg.toFixed(1)} kg · {dateLabel(order.deliveryDate)}</span>
-            {phone && <a href={`tel:${phone}`} className="text-[10px] font-bold text-amber-700 hover:underline flex items-center gap-0.5"><Phone className="size-2.5" />{phone}</a>}
+            <span className="text-[10px] text-slate-500">{items.length} item{items.length !== 1 ? "s" : ""} · {dateLabel(order.deliveryDate)}</span>
+            {phone && (
+              <a href={`tel:${phone}`} className="text-[10px] font-bold text-amber-700 hover:underline flex items-center gap-0.5">
+                <Phone className="size-2.5" />{phone}
+              </a>
+            )}
           </div>
         </div>
         <div className="shrink-0">
@@ -1395,7 +1699,7 @@ function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate
         </div>
       </div>
 
-      {/* Products */}
+      {/* Sweets List */}
       <div className="px-3 py-2 space-y-1 bg-amber-50/30 border-b border-amber-100/60">
         {items.map((item, idx) => {
           const prod = products.find((p) => p.id === item.productId);
@@ -1403,22 +1707,33 @@ function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate
           return (
             <div key={idx} className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-800 truncate">{prod?.name ?? "Sweet"}</span>
-              <span className="text-[11px] text-slate-500 shrink-0">{item.qty}{prod?.unit ?? "kg"} · {money(item.qty * r)}</span>
+              <span className="text-[11px] text-slate-500 shrink-0">{item.qty} {prod?.unit ?? "kg"} ({money(item.qty * r)})</span>
             </div>
           );
         })}
         <div className="flex items-center justify-between pt-1 border-t border-amber-100/60">
-          <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onManagePayment(order)}
+            className="cursor-pointer group flex items-center gap-1"
+            title="Click to manage payment"
+          >
             <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
-            {order.notes && <span className="text-[10px] text-slate-500 italic truncate max-w-[120px]">{order.notes}</span>}
-          </div>
-          <span className="text-xs font-black text-amber-700">{money(total)}</span>
+            <span className="text-[10px] text-amber-700 font-semibold underline group-hover:text-amber-800">Edit Pay</span>
+          </button>
+          <span className="text-xs font-black text-amber-800">{money(total)}</span>
         </div>
       </div>
 
-      {/* Footer Actions */}
+      {/* Actions */}
       <div className="flex items-center gap-1.5 px-3 py-2">
-        <Button size="sm" variant="outline" onClick={() => onGenerate(order)} className="h-7 border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100 text-[11px] font-bold px-2.5 gap-1">
+        <button
+          onClick={() => onManagePayment(order)}
+          className="h-7 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-[11px] font-bold px-2.5 transition-colors"
+        >
+          💳 Payment
+        </button>
+        <Button size="sm" variant="outline" onClick={() => onGenerate(order)} className="h-7 border-slate-200 text-slate-700 hover:bg-slate-50 text-[11px] font-bold px-2.5 gap-1">
           <FileText className="size-3" /> Bill
         </Button>
         <button onClick={() => onEdit(order)} className="flex h-7 items-center gap-1 rounded-lg border border-slate-200 px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
@@ -1432,8 +1747,8 @@ function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate
   );
 }
 
-function OrdersTable({ orders, products, customerLookup, onStatusChange, onGenerate, onEdit, onDelete }: {
-  orders: Order[]; products: Product[]; customerLookup?: Map<string, Customer>; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void;
+function OrdersTable({ orders, products, customerLookup, onStatusChange, onGenerate, onEdit, onDelete, onManagePayment }: {
+  orders: Order[]; products: Product[]; customerLookup?: Map<string, Customer>; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void; onManagePayment: (o: Order) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -1454,7 +1769,6 @@ function OrdersTable({ orders, products, customerLookup, onStatusChange, onGener
             {orders.map((order) => {
               const items = getOrderItems(order);
               const total = getOrderTotal(order, products);
-              const totalKg = getOrderTotalKg(order);
               const badge = getHandoverBadge(order.deliveryDate);
               const info = customerLookup?.get(order.customer.trim().toLowerCase());
               const phone = order.phone || info?.phone;
@@ -1462,80 +1776,75 @@ function OrdersTable({ orders, products, customerLookup, onStatusChange, onGener
 
               return (
                 <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 font-bold text-xs">
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 font-bold text-xs">
                         {order.customer.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-bold text-slate-900 leading-tight">{order.customer}</p>
-                        <div className="flex flex-col gap-0.5 mt-1 text-xs">
+                        <p className="font-bold text-slate-900 text-sm leading-tight">{order.customer}</p>
+                        <div className="flex items-center gap-2 mt-0.5 text-xs">
                           {phone && (
-                            <a
-                              href={`tel:${phone}`}
-                              className="inline-flex items-center gap-1 font-semibold text-amber-700 hover:text-amber-800 hover:underline w-fit"
-                              title="Click to dial"
-                            >
-                              <Phone className="size-3 text-amber-600" />
-                              <span>{phone}</span>
+                            <a href={`tel:${phone}`} className="inline-flex items-center gap-0.5 font-semibold text-amber-700 hover:underline">
+                              <Phone className="size-2.5" />{phone}
                             </a>
                           )}
-                          {address && (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 truncate max-w-[200px]" title={address}>
-                              <MapPin className="size-2.5 text-slate-400 shrink-0" />
-                              <span className="truncate">{address}</span>
-                            </span>
-                          )}
-                          {order.notes && (
-                            <span className="italic text-slate-500 max-w-[200px] truncate text-[11px]">
-                              &ldquo;{order.notes}&rdquo;
-                            </span>
-                          )}
+                          {order.notes && <span className="italic text-slate-400 truncate max-w-[140px] text-[11px]">{order.notes}</span>}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-1 max-w-xs">
+                  <td className="px-4 py-2.5">
+                    <div className="space-y-0.5 max-w-[220px]">
                       {items.map((item, idx) => {
                         const prod = products.find((p) => p.id === item.productId);
-                        const r = item.rate ?? prod?.price ?? 0;
                         return (
-                          <div key={idx} className="flex items-center justify-between text-xs gap-3">
-                            <span className="font-semibold text-slate-800 truncate">{prod?.name ?? "Sweet Item"}</span>
-                            <span className="text-slate-500 shrink-0">{item.qty} {prod?.unit ?? "kg"} ({money(r)})</span>
+                          <div key={idx} className="flex items-center gap-1.5 text-xs">
+                            <span className="font-semibold text-slate-800 truncate">{prod?.name ?? "Sweet"}</span>
+                            <span className="text-slate-400 shrink-0">{item.qty} {prod?.unit ?? "kg"}</span>
                           </div>
                         );
                       })}
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="text-base font-bold text-amber-600">{totalKg.toFixed(2)}</span>
-                    <span className="ml-1 text-xs text-slate-500">kg</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="size-3.5 text-amber-600" />
-                        <span className="font-bold text-sm text-slate-900">{dateLabel(order.deliveryDate)}</span>
+                  <td className="px-4 py-2.5">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="size-3 text-amber-600" />
+                        <span className="font-bold text-xs text-slate-900">{dateLabel(order.deliveryDate)}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {badge && (<span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${badge.style}`}>{badge.label}</span>)}
-                        <span className="text-[11px] text-slate-400">Placed: {dateLabel(order.date)}</span>
-                      </div>
+                      {badge && <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${badge.style}`}>{badge.label}</span>}
                     </div>
                   </td>
-                  <td className="px-6 py-4 font-bold text-slate-900">{money(total)}</td>
-                  <td className="px-6 py-4"><StatusDropdown value={order.status} onChange={(v) => onStatusChange(order.id, v)} /></td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button size="sm" variant="outline" onClick={() => onGenerate(order)} className="border-amber-200 bg-amber-50/70 text-amber-800 hover:bg-amber-100 font-semibold">
-                        <FileText className="size-3.5" data-icon="inline-start" /> Bill
+                  <td className="px-4 py-2.5 font-bold text-sm text-slate-900">{money(total)}</td>
+                  <td className="px-4 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => onManagePayment(order)}
+                      className="cursor-pointer group flex items-center gap-1 hover:opacity-80 transition-opacity"
+                      title="Click to manage payment"
+                    >
+                      <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
+                      <span className="text-[10px] text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">Edit</span>
+                    </button>
+                  </td>
+                  <td className="px-4 py-2.5"><StatusDropdown value={order.status} onChange={(v) => onStatusChange(order.id, v)} /></td>
+                  <td className="px-4 py-2.5 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => onManagePayment(order)}
+                        className="rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors"
+                        title="Manage payment"
+                      >
+                        💳 Pay
+                      </button>
+                      <Button size="sm" variant="outline" onClick={() => onGenerate(order)} className="h-7 border-amber-200 bg-amber-50/70 text-amber-800 hover:bg-amber-100 font-semibold text-xs px-2">
+                        <FileText className="size-3" /> Bill
                       </Button>
-                      <button onClick={() => onEdit(order)} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors" title="Edit order">
+                      <button onClick={() => onEdit(order)} className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors" title="Edit">
                         <Edit2 className="size-3.5" />
                       </button>
-                      <button onClick={() => onDelete(order.id)} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors" title="Delete order">
+                      <button onClick={() => onDelete(order.id)} className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors" title="Delete">
                         <Trash2 className="size-3.5" />
                       </button>
                     </div>
@@ -1550,14 +1859,15 @@ function OrdersTable({ orders, products, customerLookup, onStatusChange, onGener
   );
 }
 
-function OrdersPage({ orders, products, customers = [], initialCustomer = null, onClearInitialCustomer, onAdd, onEdit, onDelete, onStatusChange, onGenerate, initialProductFilter = null, onClearProductFilter, onOpenSidebar }: {
+function OrdersPage({ orders, products, customers = [], initialCustomer = null, onClearInitialCustomer, onAdd, onEdit, onDelete, onStatusChange, onGenerate, onUpdatePayment, initialProductFilter = null, onClearProductFilter, onOpenSidebar }: {
   orders: Order[]; products: Product[]; customers?: (Customer | string)[]; initialCustomer?: string | null; onClearInitialCustomer?: () => void; onAdd: (data: OrderFormData) => void; onEdit: (id: string, data: OrderFormData) => void;
-  onDelete: (id: string) => void; onStatusChange: (id: string, status: string) => void; onGenerate: (order: Order) => void;
+  onDelete: (id: string) => void; onStatusChange: (id: string, status: string) => void; onGenerate: (order: Order) => void; onUpdatePayment: (orderId: string, amount: number) => void;
   initialProductFilter?: number | null; onClearProductFilter?: () => void; onOpenSidebar?: () => void;
 }) {
   const [showModal, setShowModal] = useState(false);
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [paymentOrder, setPaymentOrder] = useState<Order | null>(null);
   const [selectedCustomerForNewOrder, setSelectedCustomerForNewOrder] = useState<string | null>(initialCustomer);
   const [query, setQuery] = useState("");
   const [filterProductId, setFilterProductId] = useState<string>(initialProductFilter ? String(initialProductFilter) : "All");
@@ -1565,7 +1875,6 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
   const [filterDate, setFilterDate] = useState("");
   const [quickTab, setQuickTab] = useState<"all" | "today" | "ready" | "kitchen" | "completed">("all");
   const [groupBy, setGroupBy] = useState<"date" | "product" | "status" | "none">("date");
-  const [showFilters, setShowFilters] = useState(false);
   const todayStr = getTodayStr();
 
   // Combine customers passed in with all distinct customer names currently in orders
@@ -1610,10 +1919,15 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
   const activeFilteredProduct = useMemo(() => (filterProductId !== "All" ? products.find((p) => p.id === Number(filterProductId)) : null), [filterProductId, products]);
 
   const filtered = useMemo(() => orders.filter((o) => {
-    const orderItems = getOrderItems(o);
-    const matchProduct = filterProductId === "All" || orderItems.some(it => it.productId === Number(filterProductId));
-    const productNames = orderItems.map(it => products.find(p => p.id === it.productId)?.name ?? "").join(" ").toLowerCase();
-    const matchQuery = !query || o.customer.toLowerCase().includes(query.toLowerCase()) || o.id.toLowerCase().includes(query.toLowerCase()) || (o.notes && o.notes.toLowerCase().includes(query.toLowerCase())) || productNames.includes(query.toLowerCase());
+    const items = getOrderItems(o);
+    const matchProduct = filterProductId === "All" || items.some((it) => it.productId === Number(filterProductId));
+    const matchQuery =
+      o.customer.toLowerCase().includes(query.toLowerCase()) ||
+      (o.notes && o.notes.toLowerCase().includes(query.toLowerCase())) ||
+      items.some((it) => {
+        const p = products.find((prod) => prod.id === it.productId);
+        return (p?.name ?? "").toLowerCase().includes(query.toLowerCase());
+      });
     const matchStatus = filterStatus === "All" || o.status === filterStatus;
     const matchDate = !filterDate || o.date === filterDate || o.deliveryDate === filterDate;
     return matchProduct && matchQuery && matchStatus && matchDate;
@@ -1690,7 +2004,8 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
       <div className="mx-auto max-w-[1250px] px-3.5 py-5 sm:px-6 sm:py-8 lg:px-10">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-amber-600">Order Management</span>
-          <h2 className="mt-0.5 text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">Customer Orders</h2>
+          <h2 className="mt-1 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Customer Orders & Dispatch</h2>
+          <p className="mt-1 text-xs sm:text-sm text-slate-500">Track and manage every customer order separately with timeline stages.</p>
         </div>
 
         <div className="mt-4 sm:mt-5 flex items-center gap-2 overflow-x-auto pb-1.5">
@@ -1730,55 +2045,44 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
           </div>
         )}
 
-        {/* Search + Filter Bar */}
-        <div className="mt-3 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          {/* Always-visible toolbar */}
-          <div className="flex items-center gap-2 px-3 py-2.5">
-            <label className="flex flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 py-1.5">
-              <Search className="size-3.5 shrink-0 text-slate-400" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search customer, notes…" className="w-full bg-transparent text-xs text-slate-900 outline-none placeholder:text-slate-400" />
-              {query && <button onClick={() => setQuery("")} className="text-slate-400 hover:text-slate-600"><X className="size-3.5" /></button>}
+        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 sm:gap-3">
+            <label className="flex flex-1 min-w-[200px] items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 sm:py-0">
+              <Search className="size-4 shrink-0 text-slate-400" />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search customer, order ID, notes…" className="w-full bg-transparent py-2 text-sm text-slate-900 outline-none" />
             </label>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all ${showFilters || filterProductId !== "All" || filterStatus !== "All" || filterDate ? "border-amber-500 bg-amber-50 text-amber-800" : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"}`}
-            >
-              <SlidersHorizontal className="size-3.5" />
-              Filters
-              {(filterProductId !== "All" || filterStatus !== "All" || filterDate) && (
-                <span className="size-4 rounded-full bg-amber-600 text-white text-[9px] flex items-center justify-center font-black">
-                  {[filterProductId !== "All", filterStatus !== "All", !!filterDate].filter(Boolean).length}
-                </span>
-              )}
-            </button>
-            <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
-              {(["date", "product", "status", "none"] as const).map((mode) => (
-                <button key={mode} onClick={() => setGroupBy(mode)} title={mode === "date" ? "By Date" : mode === "product" ? "By Sweet" : mode === "status" ? "By Status" : "Individual"} className={`rounded-md px-1.5 py-1 text-[10px] font-bold capitalize transition-all ${groupBy === mode ? "bg-amber-600 text-white" : "text-slate-400 hover:text-slate-700"}`}>
-                  {mode === "date" ? "Date" : mode === "product" ? "Sweet" : mode === "status" ? "Status" : "All"}
-                </button>
-              ))}
-            </div>
-          </div>
-          {/* Collapsible filter panel */}
-          {showFilters && (
-            <div className="border-t border-slate-100 px-3 py-2.5 bg-slate-50/50 flex flex-wrap items-center gap-2">
-              <select value={filterProductId} onChange={(e) => { setFilterProductId(e.target.value); if (e.target.value === "All") onClearProductFilter?.(); }} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-amber-600">
-                <option value="All">All Sweets</option>
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
+              <select value={filterProductId} onChange={(e) => { setFilterProductId(e.target.value); if (e.target.value === "All") onClearProductFilter?.(); }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-semibold text-slate-700 outline-none focus:border-amber-600">
+                <option value="All">All Sweets ({products.length})</option>
                 {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-amber-600">
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-amber-600">
                 <option value="All">All Statuses</option>
                 {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
               </select>
-              <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-amber-600" />
-              {(filterProductId !== "All" || filterStatus !== "All" || filterDate) && (
-                <button onClick={() => { setFilterProductId("All"); setFilterStatus("All"); setFilterDate(""); onClearProductFilter?.(); }} className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-100">
-                  Clear filters
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="flex-1 sm:flex-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm text-slate-700 outline-none focus:border-amber-600" />
+              {(query || filterProductId !== "All" || filterStatus !== "All" || filterDate) && (
+                <button onClick={() => { setQuery(""); setFilterProductId("All"); setFilterStatus("All"); setFilterDate(""); onClearProductFilter?.(); }} className="rounded-xl border border-slate-200 px-3 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 shrink-0">
+                  Clear
                 </button>
               )}
-              <span className="ml-auto text-[11px] font-semibold text-slate-400">{displayedOrders.length} order{displayedOrders.length !== 1 ? "s" : ""}</span>
             </div>
-          )}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-500">Organize:</span>
+              <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200">
+                {(["date", "product", "status", "none"] as const).map((mode) => (
+                  <button key={mode} onClick={() => setGroupBy(mode)} className={`rounded-lg px-2.5 py-1 text-xs font-bold capitalize transition-all ${groupBy === mode ? "bg-white text-amber-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"}`}>
+                    {mode === "date" ? "By Date" : mode === "product" ? "By Sweet" : mode === "status" ? "By Status" : "Individual"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <span className="text-xs font-bold text-slate-400">Showing {displayedOrders.length} order{displayedOrders.length !== 1 ? "s" : ""}</span>
+          </div>
         </div>
 
         {displayedOrders.length === 0 ? (
@@ -1805,12 +2109,12 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
                   )}
                   <div className="block sm:hidden space-y-3.5">
                     {group.orders.map((order) => {
-                      // multi-item
-                      return <OrderCard key={order.id} order={order} products={products} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} />;
+                      // multi-product ready
+                      return <OrderCard key={order.id} order={order} products={products} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} onManagePayment={setPaymentOrder} />;
                     })}
                   </div>
                   <div className="hidden sm:block">
-                    <OrdersTable orders={group.orders} products={products} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} />
+                    <OrdersTable orders={group.orders} products={products} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} onManagePayment={setPaymentOrder} />
                   </div>
                 </section>
               );
@@ -1848,6 +2152,17 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
           onConfirm={() => { onDelete(deleteId); setDeleteId(null); }} onCancel={() => setDeleteId(null)}
         />
       )}
+      {paymentOrder !== null && (
+        <PaymentModal
+          order={paymentOrder}
+          products={products}
+          onSave={(orderId, amount) => {
+            onUpdatePayment(orderId, amount);
+            setPaymentOrder(null);
+          }}
+          onClose={() => setPaymentOrder(null)}
+        />
+      )}
     </>
   );
 }
@@ -1862,8 +2177,13 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
   const activeProductCount = products.filter((p) => p.active).length;
 
   const productBreakdown = products.map((p) => {
-    const orderList = activeOrders.filter((o) => getOrderItems(o).some(it => it.productId === p.id)).sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate));
-    const kg = orderList.reduce((sum, o) => sum + getOrderItems(o).filter(it => it.productId === p.id).reduce((s, it) => s + it.qty, 0), 0);
+    const orderList = activeOrders
+      .filter((o) => getOrderItems(o).some((it) => it.productId === p.id))
+      .sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate));
+    const kg = orderList.reduce((sum, o) => {
+      const it = getOrderItems(o).find((i) => i.productId === p.id);
+      return sum + (Number(it?.qty) || 0);
+    }, 0);
     return { product: p, kg, count: orderList.length, orders: orderList };
   }).filter((b) => b.count > 0);
 
@@ -1994,7 +2314,7 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
                                     <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[11px] font-bold text-amber-800">{o.customer.charAt(0).toUpperCase()}</div>
                                     <div className="min-w-0">
                                       <p className="text-sm font-bold text-slate-900 truncate">{o.customer}</p>
-                                      
+
                                     </div>
                                   </div>
                                   <Badge status={o.status} />
@@ -2674,29 +2994,39 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         let loadedOrders: Order[] = [];
         if (ordData && ordData.length > 0) {
           loadedOrders = ordData.map((o: any) => {
-            let items: OrderItem[] | undefined;
-            if (Array.isArray(o.items) && o.items.length > 0) {
-              items = o.items.map((it: any) => ({
-                productId: Number(it.productId ?? it.product_id ?? 0),
-                qty: Number(it.qty ?? 0),
-                rate: it.rate ? Number(it.rate) : undefined,
-              }));
+            let parsedItems: OrderItem[] = [];
+            if (o.items) {
+              try {
+                const raw = typeof o.items === "string" ? JSON.parse(o.items) : o.items;
+                if (Array.isArray(raw)) {
+                  parsedItems = raw.map((it: any) => ({
+                    productId: Number(it.productId ?? it.product_id),
+                    qty: Number(it.qty),
+                    rate: it.rate ? Number(it.rate) : undefined,
+                  })).filter((it: OrderItem) => Boolean(it.productId && it.qty));
+                }
+              } catch { }
+            }
+            if (parsedItems.length === 0 && o.product_id) {
+              parsedItems = [{
+                productId: Number(o.product_id),
+                qty: Number(o.qty ?? 0),
+                rate: o.rate ? Number(o.rate) : undefined,
+              }];
             }
             return {
               id: o.id,
               date: o.date,
               deliveryDate: o.delivery_date,
               customer: o.customer,
-              items,
-              productId: o.product_id ? Number(o.product_id) : undefined,
-              qty: Number(o.qty),
-              rate: o.rate ? Number(o.rate) : undefined,
+              items: parsedItems,
+              productId: parsedItems[0]?.productId ?? Number(o.product_id),
+              qty: parsedItems.reduce((s, it) => s + it.qty, 0),
+              rate: parsedItems[0]?.rate ?? (o.rate ? Number(o.rate) : undefined),
               status: o.status,
               notes: o.notes || undefined,
               phone: o.phone || undefined,
               address: o.address || undefined,
-              amountPaid: o.amount_paid ? Number(o.amount_paid) : undefined,
-              paymentStatus: (o.payment_status as Order["paymentStatus"]) || undefined,
             };
           });
           setOrders(loadedOrders);
@@ -2892,22 +3222,15 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const newOrderId = genOrderId(orders);
     const parsedItems: OrderItem[] = (data.items && data.items.length > 0)
       ? data.items.map((it) => ({
-          productId: Number(it.productId),
-          qty: Number(it.qty),
-          rate: it.rate ? Number(it.rate) : undefined,
-        }))
+        productId: Number(it.productId),
+        qty: Number(it.qty),
+        rate: it.rate ? Number(it.rate) : undefined,
+      }))
       : (data.productId ? [{ productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined }] : []);
 
     const primaryItem = parsedItems[0];
     const totalQty = parsedItems.reduce((sum, it) => sum + it.qty, 0);
 
-    const paidAmt = data.amountPaid ? Number(data.amountPaid) : 0;
-    const orderTotal = parsedItems.reduce((sum, it) => {
-      const prod = products.find((p) => p.id === it.productId);
-      const r = it.rate ?? prod?.price ?? 0;
-      return sum + it.qty * r;
-    }, 0);
-    const payStatus: Order["paymentStatus"] = paidAmt >= orderTotal && orderTotal > 0 ? "Paid" : paidAmt > 0 ? "Partial" : "Unpaid";
     const newOrder: Order = {
       id: newOrderId,
       date: getTodayStr(),
@@ -2921,11 +3244,9 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       notes: data.notes?.trim() || undefined,
       phone: data.phone?.trim() || undefined,
       address: data.address?.trim() || undefined,
-      amountPaid: paidAmt || undefined,
-      paymentStatus: payStatus,
     };
     setOrders((prev) => { const updated = [newOrder, ...prev]; try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
-    
+
     // Auto-save customer name, phone, address for dropdown & directory reuse
     const custName = data.customer.trim();
     const custPhone = data.phone?.trim() || undefined;
@@ -2939,10 +3260,10 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           updated = prev.map((c) =>
             c.name.toLowerCase() === custName.toLowerCase()
               ? {
-                  ...c,
-                  phone: custPhone || c.phone,
-                  address: custAddress || c.address,
-                }
+                ...c,
+                phone: custPhone || c.phone,
+                address: custAddress || c.address,
+              }
               : c
           );
         } else {
@@ -2967,8 +3288,8 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
             address: custAddress || null,
           },
           { onConflict: "name" }
-        ).then(() => {}, () => {
-          client.from("customers").insert({ name: custName, phone: custPhone || null }).then(() => {}, () => {});
+        ).then(() => { }, () => {
+          client.from("customers").insert({ name: custName, phone: custPhone || null }).then(() => { }, () => { });
         });
       }
     }
@@ -2977,6 +3298,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const client = getSupabase();
     if (client) {
       try {
+        // Try inserting with items JSON
         let { error } = await client.from("orders").insert({
           id: newOrder.id,
           date: newOrder.date,
@@ -2990,10 +3312,9 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           notes: newOrder.notes ?? null,
           phone: newOrder.phone ?? null,
           address: newOrder.address ?? null,
-          amount_paid: newOrder.amountPaid ?? null,
-          payment_status: newOrder.paymentStatus ?? "Unpaid",
         });
 
+        // Fallback 1: table might not have items column yet
         if (error && (error.message?.includes("items") || error.code === "PGRST204")) {
           const fb = await client.from("orders").insert({
             id: newOrder.id,
@@ -3011,6 +3332,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           error = fb.error;
         }
 
+        // Fallback 2: table might not have phone/address
         if (error && (error.message?.includes("phone") || error.message?.includes("address") || error.code === "PGRST204")) {
           const fb2 = await client.from("orders").insert({
             id: newOrder.id,
@@ -3036,22 +3358,15 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const current = orders.find((o) => o.id === id);
     const parsedItems: OrderItem[] = (data.items && data.items.length > 0)
       ? data.items.map((it) => ({
-          productId: Number(it.productId),
-          qty: Number(it.qty),
-          rate: it.rate ? Number(it.rate) : undefined,
-        }))
+        productId: Number(it.productId),
+        qty: Number(it.qty),
+        rate: it.rate ? Number(it.rate) : undefined,
+      }))
       : (data.productId ? [{ productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined }] : []);
 
     const primaryItem = parsedItems[0];
     const totalQty = parsedItems.reduce((sum, it) => sum + it.qty, 0);
 
-    const paidAmt2 = data.amountPaid ? Number(data.amountPaid) : (current?.amountPaid ?? 0);
-    const orderTotal2 = parsedItems.reduce((sum, it) => {
-      const prod = products.find((p) => p.id === it.productId);
-      const r = it.rate ?? prod?.price ?? 0;
-      return sum + it.qty * r;
-    }, 0);
-    const payStatus2: Order["paymentStatus"] = paidAmt2 >= orderTotal2 && orderTotal2 > 0 ? "Paid" : paidAmt2 > 0 ? "Partial" : "Unpaid";
     const updatedOrder: Order = {
       id,
       date: current?.date ?? getTodayStr(),
@@ -3065,11 +3380,9 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       phone: data.phone?.trim() || current?.phone || undefined,
       address: data.address?.trim() || current?.address || undefined,
       status: current?.status ?? "Pending",
-      amountPaid: paidAmt2 || undefined,
-      paymentStatus: payStatus2,
     };
     setOrders((prev) => { const updated = prev.map((o) => (o.id === id ? updatedOrder : o)); try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
-    
+
     // Auto-save customer name, phone, address for dropdown reuse
     const custName = data.customer.trim();
     const custPhone = data.phone?.trim() || undefined;
@@ -3083,10 +3396,10 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           updated = prev.map((c) =>
             c.name.toLowerCase() === custName.toLowerCase()
               ? {
-                  ...c,
-                  phone: custPhone || c.phone,
-                  address: custAddress || c.address,
-                }
+                ...c,
+                phone: custPhone || c.phone,
+                address: custAddress || c.address,
+              }
               : c
           );
         } else {
@@ -3111,8 +3424,8 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
             address: custAddress || null,
           },
           { onConflict: "name" }
-        ).then(() => {}, () => {
-          client.from("customers").insert({ name: custName, phone: custPhone || null }).then(() => {}, () => {});
+        ).then(() => { }, () => {
+          client.from("customers").insert({ name: custName, phone: custPhone || null }).then(() => { }, () => { });
         });
       }
     }
@@ -3131,8 +3444,6 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           notes: data.notes?.trim() || null,
           phone: updatedOrder.phone ?? null,
           address: updatedOrder.address ?? null,
-          amount_paid: updatedOrder.amountPaid ?? null,
-          payment_status: updatedOrder.paymentStatus ?? "Unpaid",
         }).eq("id", id);
 
         if (error && (error.message?.includes("items") || error.code === "PGRST204")) {
@@ -3245,12 +3556,12 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       const updated = prev.map((c) =>
         c.id === id || c.name.toLowerCase() === trimmed.toLowerCase()
           ? {
-              ...c,
-              name: trimmed,
-              phone: data.phone.trim() || undefined,
-              address: data.address.trim() || undefined,
-              notes: data.notes.trim() || undefined,
-            }
+            ...c,
+            name: trimmed,
+            phone: data.phone.trim() || undefined,
+            address: data.address.trim() || undefined,
+            notes: data.notes.trim() || undefined,
+          }
           : c
       ).sort((a, b) => a.name.localeCompare(b.name));
       try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
@@ -3305,9 +3616,42 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     }
   };
 
+  const updatePayment = async (id: string, amountPaid: number) => {
+    const target = orders.find((o) => o.id === id);
+    if (!target) return;
+    const total = getOrderTotal(target, products);
+    const paymentStatus: Order["paymentStatus"] =
+      amountPaid >= total && total > 0 ? "Paid" : amountPaid > 0 ? "Partial" : "Unpaid";
+
+    const updatedOrders = orders.map((o) =>
+      o.id === id ? { ...o, amountPaid, paymentStatus } : o
+    );
+    setOrders(updatedOrders);
+    try {
+      localStorage.setItem("dhuniya_orders", JSON.stringify(updatedOrders));
+    } catch {}
+
+    addToast("success", `Payment of ${money(amountPaid)} recorded for ${target.customer}`);
+
+    const client = getSupabase();
+    if (client) {
+      try {
+        const { error } = await client
+          .from("orders")
+          .update({
+            amount_paid: amountPaid,
+            payment_status: paymentStatus,
+          })
+          .eq("id", id);
+        if (error) throw error;
+      } catch (err: any) {
+        console.warn("Supabase payment update note:", err.message);
+      }
+    }
+  };
+
   const generateInvoice = (order: Order) => setInvoiceOrder(order);
-  const invoiceProduct = invoiceOrder ? (products.find((p) => p.id === invoiceOrder.productId) ?? { id: invoiceOrder.productId, name: "Sweet Item", unit: "kg", price: invoiceOrder.rate ?? 0, active: true }) : null;
-  const invoiceRate = invoiceOrder ? (invoiceOrder.rate ?? invoiceProduct?.price ?? 0) : 0;
+
   const activeOrderCount = orders.filter((o) => !["Completed", "Cancelled"].includes(o.status)).length;
 
   return (
@@ -3321,7 +3665,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           </div>
         )}
         {active === "Dashboard" && (<Dashboard orders={orders} products={products} customers={customers} setActive={setActive} onViewProductOrders={viewProductOrders} onOpenSidebar={() => setSidebarOpen(true)} />)}
-        {active === "Orders" && (<OrdersPage orders={orders} products={products} customers={customers} initialCustomer={newOrderInitialCustomer} onClearInitialCustomer={() => setNewOrderInitialCustomer(null)} onAdd={addOrder} onEdit={editOrder} onDelete={deleteOrder} onStatusChange={updateStatus} onGenerate={generateInvoice} initialProductFilter={initialProductFilter} onClearProductFilter={() => setInitialProductFilter(null)} onOpenSidebar={() => setSidebarOpen(true)} />)}
+        {active === "Orders" && (<OrdersPage orders={orders} products={products} customers={customers} initialCustomer={newOrderInitialCustomer} onClearInitialCustomer={() => setNewOrderInitialCustomer(null)} onAdd={addOrder} onEdit={editOrder} onDelete={deleteOrder} onStatusChange={updateStatus} onGenerate={generateInvoice} onUpdatePayment={updatePayment} initialProductFilter={initialProductFilter} onClearProductFilter={() => setInitialProductFilter(null)} onOpenSidebar={() => setSidebarOpen(true)} />)}
         {active === "Products" && (<ProductsPage products={products} orders={orders} onAdd={addProduct} onEdit={editProduct} onDelete={deleteProduct} onViewProductOrders={viewProductOrders} onOpenSidebar={() => setSidebarOpen(true)} />)}
         {active === "Customers" && (<CustomersPage customers={customers} orders={orders} onAdd={addCustomer} onEdit={editCustomer} onDelete={deleteCustomer} onCreateOrder={(name) => { setNewOrderInitialCustomer(name); setActive("Orders"); }} onOpenSidebar={() => setSidebarOpen(true)} />)}
       </main>
