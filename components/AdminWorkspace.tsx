@@ -142,21 +142,22 @@ export const encodeDhuniyaData = (meta: { items?: OrderItem[]; amountPaid?: numb
   return `<!--DHUNIYA_DATA:${JSON.stringify(meta)}-->`;
 };
 
-export const parseDhuniyaData = (notes?: string | null): { cleanNotes?: string; items?: OrderItem[]; amountPaid?: number; paymentStatus?: "Unpaid" | "Partial" | "Paid" } => {
-  if (!notes) return {};
+export const parseDhuniyaData = (notes?: string | null): { cleanNotes?: string; hasTag: boolean; items?: OrderItem[]; amountPaid?: number; paymentStatus?: "Unpaid" | "Partial" | "Paid" } => {
+  if (!notes) return { hasTag: false };
   const match = notes.match(DHUNIYA_TAG_REGEX);
+  if (!match) return { cleanNotes: notes.trim() || undefined, hasTag: false };
   const cleanNotes = notes.replace(DHUNIYA_TAG_REGEX, "").trim() || undefined;
-  if (!match) return { cleanNotes };
   try {
     const parsed = JSON.parse(match[1]);
     return {
       cleanNotes,
+      hasTag: true,
       items: parsed.items,
       amountPaid: parsed.amountPaid != null ? Number(parsed.amountPaid) : undefined,
       paymentStatus: parsed.paymentStatus,
     };
   } catch {
-    return { cleanNotes };
+    return { cleanNotes, hasTag: true };
   }
 };
 
@@ -591,7 +592,11 @@ function Invoice({ order, products, onClose }: {
                   <span>{order.address}</span>
                 </p>
               )}
-              {order.notes && <p className="mt-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 inline-block">Note: {order.notes}</p>}
+              {order.notes && parseDhuniyaData(order.notes).cleanNotes && (
+                <p className="mt-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 inline-block">
+                  Note: {parseDhuniyaData(order.notes).cleanNotes}
+                </p>
+              )}
             </div>
             <div className="sm:text-right">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Handover Schedule</p>
@@ -1396,7 +1401,7 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
   const [address, setAddress] = useState(initial?.address ?? (matchedInitial?.address ?? ""));
   const [showContactFields, setShowContactFields] = useState<boolean>(false);
   const [deliveryDate, setDeliveryDate] = useState(initial?.deliveryDate ?? getTodayStr());
-  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [notes, setNotes] = useState(initial?.notes ? (parseDhuniyaData(initial.notes).cleanNotes ?? "") : "");
   const [items, setItems] = useState<OrderItemFormData[]>(initialItems);
   const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
   const [showItemDialog, setShowItemDialog] = useState<boolean>(false);
@@ -1491,40 +1496,23 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
                 )}
               </div>
 
-              {normalizedCustomers.length > 0 && (
-                <div className="mb-2">
-                  <select
-                    value={normalizedCustomers.some((c) => c.name.toLowerCase() === customer.toLowerCase()) ? (normalizedCustomers.find((c) => c.name.toLowerCase() === customer.toLowerCase())?.name ?? customer) : ""}
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        selectCustomer(e.target.value);
-                      }
-                    }}
-                    className="w-full rounded-xl border border-amber-300/80 bg-amber-50/70 px-3.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
-                  >
-                    <option value="">▼ Select from saved customers ({normalizedCustomers.length})...</option>
-                    {normalizedCustomers.map((c) => (
-                      <option key={c.name} value={c.name}>
-                        👤 {c.name} {c.phone ? `(${c.phone})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <input
-                list="customer-suggestions"
-                value={customer}
-                onChange={(e) => selectCustomer(e.target.value)}
-                placeholder={normalizedCustomers.length > 0 ? "Or type a new customer name..." : "e.g. Sharma Sweets, Grand Banquets"}
-                autoComplete="off"
-                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.customer ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
-              />
-              <datalist id="customer-suggestions">
-                {normalizedCustomers.map((c) => (
-                  <option key={c.name} value={c.name} />
-                ))}
-              </datalist>
+              <div className="relative">
+                <input
+                  list="customer-suggestions"
+                  value={customer}
+                  onChange={(e) => selectCustomer(e.target.value)}
+                  placeholder="Type customer name or choose existing..."
+                  autoComplete="off"
+                  className={`w-full rounded-xl border px-3.5 py-2.5 text-sm font-semibold outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.customer ? "border-rose-400 bg-rose-50/30 text-rose-900" : "border-slate-300 text-slate-900 bg-white"}`}
+                />
+                <datalist id="customer-suggestions">
+                  {normalizedCustomers.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.phone ? `${c.name} (${c.phone})` : c.name}
+                    </option>
+                  ))}
+                </datalist>
+              </div>
               {errors.customer && <p className="mt-1 text-xs text-rose-600">{errors.customer}</p>}
 
               {normalizedCustomers.length > 0 && (
@@ -1873,7 +1861,11 @@ function OrdersTable({ orders, products, customerLookup, onStatusChange, onGener
                               <Phone className="size-2.5" />{phone}
                             </a>
                           )}
-                          {order.notes && <span className="italic text-slate-400 truncate max-w-[140px] text-[11px]">{order.notes}</span>}
+                          {order.notes && parseDhuniyaData(order.notes).cleanNotes && (
+                            <span className="italic text-slate-400 truncate max-w-[140px] text-[11px]">
+                              {parseDhuniyaData(order.notes).cleanNotes}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -3157,7 +3149,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
               qty: parsedItems.reduce((s, it) => s + it.qty, 0),
               rate: parsedItems[0]?.rate ?? (o.rate ? Number(o.rate) : undefined),
               status: o.status,
-              notes: parsedMeta.cleanNotes || o.notes || undefined,
+              notes: parsedMeta.cleanNotes,
               phone: o.phone || cached?.phone || undefined,
               address: o.address || cached?.address || undefined,
               amountPaid,
@@ -3169,14 +3161,26 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           const remoteIds = new Set(loadedOrders.map((o) => o.id));
           for (const [id, cached] of cachedOrdersMap.entries()) {
             if (!remoteIds.has(id)) {
-              loadedOrders.push(cached);
+              loadedOrders.push({
+                ...cached,
+                notes: parseDhuniyaData(cached.notes).cleanNotes,
+              });
             }
           }
 
           setOrders(loadedOrders);
           try { localStorage.setItem("dhuniya_orders", JSON.stringify(loadedOrders)); } catch {}
         } else {
-          try { const lo = localStorage.getItem("dhuniya_orders"); if (lo) { loadedOrders = JSON.parse(lo); setOrders(loadedOrders); } } catch { }
+          try {
+            const lo = localStorage.getItem("dhuniya_orders");
+            if (lo) {
+              loadedOrders = JSON.parse(lo).map((o: Order) => ({
+                ...o,
+                notes: parseDhuniyaData(o.notes).cleanNotes,
+              }));
+              setOrders(loadedOrders);
+            }
+          } catch { }
         }
 
         // Load customers from Supabase table + existing orders + local storage
@@ -3375,6 +3379,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const primaryItem = parsedItems[0];
     const totalQty = parsedItems.reduce((sum, it) => sum + it.qty, 0);
 
+    const cleanUserNotes = parseDhuniyaData(data.notes).cleanNotes;
     const newOrder: Order = {
       id: newOrderId,
       date: getTodayStr(),
@@ -3385,9 +3390,11 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       qty: totalQty,
       rate: primaryItem?.rate,
       status: "Pending",
-      notes: data.notes?.trim() || undefined,
+      notes: cleanUserNotes,
       phone: data.phone?.trim() || undefined,
       address: data.address?.trim() || undefined,
+      amountPaid: 0,
+      paymentStatus: "Unpaid",
     };
     setOrders((prev) => { const updated = [newOrder, ...prev]; try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
 
@@ -3517,6 +3524,22 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const primaryItem = parsedItems[0];
     const totalQty = parsedItems.reduce((sum, it) => sum + it.qty, 0);
 
+    const prevAmountPaid = current?.amountPaid ?? 0;
+    const newTotal = parsedItems.reduce((sum, it) => {
+      const prod = products.find((p) => p.id === it.productId);
+      const r = it.rate ?? prod?.price ?? 0;
+      return sum + (it.qty * r);
+    }, 0);
+
+    const newPaymentStatus: Order["paymentStatus"] =
+      prevAmountPaid >= newTotal && newTotal > 0
+        ? "Paid"
+        : prevAmountPaid > 0
+        ? "Partial"
+        : "Unpaid";
+
+    const cleanUserNotes = parseDhuniyaData(data.notes).cleanNotes;
+
     const updatedOrder: Order = {
       id,
       date: current?.date ?? getTodayStr(),
@@ -3526,10 +3549,12 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       qty: totalQty,
       rate: primaryItem?.rate,
       deliveryDate: data.deliveryDate,
-      notes: data.notes?.trim() || undefined,
+      notes: cleanUserNotes,
       phone: data.phone?.trim() || current?.phone || undefined,
       address: data.address?.trim() || current?.address || undefined,
       status: current?.status ?? "Pending",
+      amountPaid: prevAmountPaid,
+      paymentStatus: newPaymentStatus,
     };
     setOrders((prev) => { const updated = prev.map((o) => (o.id === id ? updatedOrder : o)); try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
 
