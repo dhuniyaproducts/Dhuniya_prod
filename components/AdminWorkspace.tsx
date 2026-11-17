@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
 import CloudinaryUpload from "@/components/CloudinaryUpload";
+import { deleteCloudinaryImage, optimizeImageUrl } from "@/lib/cloudinary";
 import {
   ArrowRight,
   Bell,
@@ -18,15 +19,18 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  MapPin,
   Menu,
   Package,
   PackagePlus,
+  Phone,
   Plus,
   Printer,
   Search,
   Sparkles,
   Trash2,
   User,
+  Users,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,6 +43,23 @@ export type Product = {
   price: number;
   active: boolean;
   imageUrl?: string;
+  description?: string;
+};
+
+export type Customer = {
+  id?: number | string;
+  name: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
+  createdAt?: string;
+};
+
+export type CustomerFormData = {
+  name: string;
+  phone: string;
+  address: string;
+  notes: string;
 };
 
 export type OrderItem = {
@@ -52,16 +73,15 @@ export type Order = {
   date: string;
   deliveryDate: string;
   customer: string;
-  items: OrderItem[];
-  // Keep legacy fields optional for backwards compatibility
+  items?: OrderItem[];
   productId?: number;
-  qty?: number;
+  qty: number;
   rate?: number;
   status: string;
   notes?: string;
+  phone?: string;
+  address?: string;
 };
-
-// --- Constants ---
 
 export const getOrderItems = (o: Order): OrderItem[] => {
   if (Array.isArray(o.items) && o.items.length > 0) return o.items;
@@ -83,6 +103,7 @@ export const getOrderTotalKg = (o: Order): number => {
   return items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
 };
 
+// --- Constants ---
 export const STATUS_OPTIONS = [
   "Pending",
   "Confirmed",
@@ -298,13 +319,14 @@ function ConfirmDialog({ title, message, onConfirm, onCancel }: { title: string;
   );
 }
 
-function Sidebar({ active, setActive, open, setOpen, orderCount, onLogout }: {
-  active: string; setActive: (v: string) => void; open: boolean; setOpen: (v: boolean) => void; orderCount: number; onLogout: () => void;
+function Sidebar({ active, setActive, open, setOpen, orderCount, customerCount = 0, onLogout }: {
+  active: string; setActive: (v: string) => void; open: boolean; setOpen: (v: boolean) => void; orderCount: number; customerCount?: number; onLogout: () => void;
 }) {
   const items = [
     { label: "Dashboard", Icon: LayoutDashboard, path: "/dashboard" },
     { label: "Orders", Icon: ClipboardList, path: "/orders" },
     { label: "Products", Icon: Package, path: "/products" },
+    { label: "Customers", Icon: Users, path: "/customers" },
   ] as const;
 
   return (
@@ -321,11 +343,11 @@ function Sidebar({ active, setActive, open, setOpen, orderCount, onLogout }: {
       >
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 text-white shadow-lg shadow-amber-500/20">
-              <Sparkles className="size-5" />
+            <div className="flex size-11 items-center justify-center rounded-xl overflow-hidden bg-white/10 p-0.5 border border-white/15 shrink-0">
+              <img src="/logo.jpg" alt="Dhuniya Products" className="size-full object-cover rounded-lg" />
             </div>
             <div>
-              <p className="text-[18px] font-bold tracking-tight text-white leading-tight">Dhuniya Products</p>
+              <p className="text-[17px] font-bold tracking-tight text-white leading-tight">Dhuniya Products</p>
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-400">Eastern Traditional Sweets</p>
             </div>
           </div>
@@ -362,6 +384,16 @@ function Sidebar({ active, setActive, open, setOpen, orderCount, onLogout }: {
                       }`}
                   >
                     {orderCount}
+                  </span>
+                )}
+                {label === "Customers" && customerCount > 0 && (
+                  <span
+                    className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold ${isActive
+                      ? "bg-amber-700 text-white"
+                      : "bg-slate-800 text-slate-300 border border-slate-700"
+                      }`}
+                  >
+                    {customerCount}
                   </span>
                 )}
               </button>
@@ -412,7 +444,7 @@ function Invoice({ order, products, onClose }: {
   const total = lineItems.reduce((sum, item) => sum + item.amount, 0);
 
   return (
-    <div className="invoice-modal-overlay fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-3 sm:p-4 backdrop-blur-xs flex items-center justify-center">
+    <div className="invoice-modal-overlay fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-2.5 sm:p-4 backdrop-blur-xs flex items-center justify-center">
       <style dangerouslySetInnerHTML={{
         __html: `
         @media print {
@@ -420,21 +452,21 @@ function Invoice({ order, products, onClose }: {
           html, body { background: #ffffff !important; color: #0f172a !important; margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; overflow: visible !important; }
           aside, header, main, nav, .print-hide, .toast-container { display: none !important; }
           .invoice-modal-overlay { position: static !important; display: block !important; padding: 0 !important; margin: 0 !important; background: transparent !important; overflow: visible !important; height: auto !important; min-height: 0 !important; }
-          .invoice-card { border: none !important; box-shadow: none !important; margin: 0 !important; padding: 0 !important; max-width: 100% !important; border-radius: 0 !important; overflow: visible !important; height: auto !important; }
-          #printable-invoice { position: static !important; display: block !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; page-break-inside: avoid !important; break-inside: avoid !important; }
+          .invoice-card { border: none !important; box-shadow: none !important; margin: 0 !important; padding: 0 !important; max-width: 100% !important; border-radius: 0 !important; overflow: visible !important; height: auto !important; max-height: none !important; }
+          #printable-invoice { position: static !important; display: block !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; page-break-inside: avoid !important; break-inside: avoid !important; height: auto !important; max-height: none !important; overflow: visible !important; }
         }
       ` }} />
-      <div className="invoice-card my-5 w-full max-w-[760px] rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
-        <div className="border-b border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50 flex items-center justify-between print:hidden gap-2">
+      <div className="invoice-card my-auto w-full max-w-[760px] max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="shrink-0 border-b border-slate-200 px-3.5 py-3 sm:px-6 sm:py-4 bg-slate-50 flex items-center justify-between print:hidden gap-2">
           <div>
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-600">Official Bill</p>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">Customer Invoice</h2>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <Button variant="outline" size="sm" onClick={() => window.print()} className="border-slate-300 text-slate-700 text-xs h-8 px-2.5 sm:px-3">
+            <Button variant="outline" size="sm" onClick={() => window.print()} className="border-slate-300 text-slate-700 text-xs h-8 px-2 sm:px-3">
               <Printer className="size-3.5" /> <span className="hidden sm:inline">Print Bill</span>
             </Button>
-            <Button size="sm" onClick={() => window.print()} className="bg-amber-600 text-white hover:bg-amber-700 text-xs h-8 px-2.5 sm:px-3">
+            <Button size="sm" onClick={() => window.print()} className="bg-amber-600 text-white hover:bg-amber-700 text-xs h-8 px-2 sm:px-3">
               <Download className="size-3.5" /> <span className="hidden sm:inline">Download PDF</span>
             </Button>
             <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700" aria-label="Close invoice">
@@ -442,11 +474,11 @@ function Invoice({ order, products, onClose }: {
             </button>
           </div>
         </div>
-        <article id="printable-invoice" className="p-6 sm:p-8 print:p-0">
+        <article id="printable-invoice" className="flex-1 overflow-y-auto p-4 sm:p-8 print:p-0 print:overflow-visible">
           <div className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-4 print:pb-3 sm:flex-row">
             <div>
-              <div className="flex items-center gap-2 text-amber-600">
-                <Sparkles className="size-5 sm:size-6" />
+              <div className="flex items-center gap-2.5">
+                <img src="/logo.jpg" alt="Dhuniya Products" className="size-9 rounded-xl object-contain border border-slate-200" />
                 <span className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Dhuniya Products</span>
               </div>
               <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-amber-700">Eastern Traditional Sweets</p>
@@ -462,7 +494,7 @@ function Invoice({ order, products, onClose }: {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:gap-6 border-b border-slate-200 py-4 print:py-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:gap-6 border-b border-slate-200 py-3.5 print:py-3 sm:grid-cols-2">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Billed To</p>
               <p className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{order.customer}</p>
@@ -488,7 +520,7 @@ function Invoice({ order, products, onClose }: {
             </div>
           </div>
 
-          {/* Mobile Item Breakdown */}
+          {/* Mobile Items List */}
           <div className="mt-4 sm:hidden print:hidden space-y-2">
             {lineItems.map((item, idx) => (
               <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-1.5">
@@ -528,8 +560,9 @@ function Invoice({ order, products, onClose }: {
             </table>
           </div>
 
+          {/* Grand Total */}
           <div className="mt-4 print:mt-3 flex justify-end">
-            <div className="w-full max-w-[240px] border-t-2 border-slate-900 pt-2.5">
+            <div className="w-full sm:max-w-[260px] border-t-2 border-slate-900 pt-2.5">
               <div className="flex items-center justify-between text-sm sm:text-base font-bold text-slate-900">
                 <span>Grand Total:</span>
                 <span className="text-xl sm:text-2xl text-amber-600">{money(total)}</span>
@@ -537,7 +570,7 @@ function Invoice({ order, products, onClose }: {
             </div>
           </div>
 
-          <p className="mt-6 print:mt-4 border-t border-slate-200 pt-3 text-center text-xs text-slate-400">
+          <p className="mt-5 print:mt-4 border-t border-slate-200 pt-3 text-center text-xs text-slate-400">
             Thank you for choosing Dhuniya Products. We take pride in authentic eastern sweets.
           </p>
         </article>
@@ -547,7 +580,7 @@ function Invoice({ order, products, onClose }: {
 }
 
 // --- Product Modal with Cloudinary Upload ---
-type ProductFormData = { name: string; unit: string; price: string; active: boolean; imageUrl?: string };
+type ProductFormData = { name: string; unit: string; price: string; active: boolean; imageUrl?: string; description?: string };
 
 function ProductModal({ initial, onSave, onClose }: {
   initial?: Product;
@@ -560,6 +593,7 @@ function ProductModal({ initial, onSave, onClose }: {
     price: initial?.price?.toString() ?? "",
     active: initial?.active ?? true,
     imageUrl: initial?.imageUrl ?? "",
+    description: initial?.description ?? "",
   });
   const [errors, setErrors] = useState<Partial<ProductFormData>>({});
 
@@ -578,15 +612,15 @@ function ProductModal({ initial, onSave, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6 sm:py-5 bg-slate-50">
+      <div className="my-auto w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-4 py-3.5 sm:px-6 sm:py-5 bg-slate-50">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-amber-600">{initial ? "Edit" : "New"} Sweet</p>
             <h3 className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{initial ? "Update Sweet Details" : "Add Sweet to Catalog"}</h3>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200"><X className="size-4" /></button>
         </div>
-        <div className="space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+        <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5 sm:px-6 sm:py-6">
           <div>
             <label className="mb-1.5 block text-xs font-bold text-slate-700">Sweet Name *</label>
             <input
@@ -622,6 +656,18 @@ function ProductModal({ initial, onSave, onClose }: {
             {errors.price && <p className="mt-1 text-xs text-rose-600">{errors.price}</p>}
           </div>
 
+          <div>
+            <label className="mb-1.5 block text-xs font-bold text-slate-700">Description (Shown on Homepage)</label>
+            <textarea
+              rows={3}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="e.g. Traditional slow-cooked musket halwa prepared with pure ghee, cashews, and aromatic spices."
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 resize-none placeholder:text-slate-400"
+            />
+            <p className="mt-1 text-[11px] text-slate-400">Describe the sweet recipe, ingredients, or specialty for public visitors.</p>
+          </div>
+
           {/* Cloudinary Image Upload */}
           <div>
             <label className="mb-1.5 block text-xs font-bold text-slate-700">Product Image (Cloudinary)</label>
@@ -648,7 +694,7 @@ function ProductModal({ initial, onSave, onClose }: {
             </button>
           </div>
         </div>
-        <div className="flex gap-3 border-t border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50">
+        <div className="shrink-0 flex gap-3 border-t border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50">
           <button onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-2.5 text-sm font-semibold text-slate-700 hover:bg-white transition-colors">Cancel</button>
           <button onClick={submit} className="flex-1 rounded-xl bg-amber-600 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 shadow-xs transition-colors">
             {initial ? "Update Sweet" : "Add Sweet"}
@@ -706,25 +752,25 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
           <div className="mt-6">
             <div className="block sm:hidden space-y-3">
               {products.map((p) => {
-                const activeOrders = orders.filter((o) => getOrderItems(o).some((it) => it.productId === p.id) && !["Completed", "Cancelled"].includes(o.status));
-                const totalOrderedKg = activeOrders.reduce((sum, o) => {
-                  const it = getOrderItems(o).find((i) => i.productId === p.id);
-                  return sum + (Number(it?.qty) || 0);
-                }, 0);
+                const activeOrders = orders.filter((o) => o.productId === p.id && !["Completed", "Cancelled"].includes(o.status));
+                const totalOrderedKg = activeOrders.reduce((sum, o) => sum + o.qty, 0);
                 return (
                   <div key={p.id} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm hover:border-amber-300 transition-all space-y-3">
                     <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-3 min-w-0">
                         {p.imageUrl ? (
-                          <img src={p.imageUrl} alt={p.name} className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40 shadow-2xs" />
+                          <img src={optimizeImageUrl(p.imageUrl, 100)} alt={p.name} loading="lazy" decoding="async" className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40 shadow-2xs" />
                         ) : (
                           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40 shadow-2xs">
                             {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
                           </div>
                         )}
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="font-bold text-slate-900 text-base truncate">{p.name}</p>
-                          <p className="text-xs font-semibold text-amber-700">{money(p.price)} / {p.unit}</p>
+                          {p.description && (
+                            <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{p.description}</p>
+                          )}
+                          <p className="text-xs font-semibold text-amber-700 mt-0.5">{money(p.price)} / {p.unit}</p>
                         </div>
                       </div>
                       <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
@@ -775,23 +821,25 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {products.map((p) => {
-                      const activeOrders = orders.filter((o) => getOrderItems(o).some((it) => it.productId === p.id) && !["Completed", "Cancelled"].includes(o.status));
-                      const totalOrderedKg = activeOrders.reduce((sum, o) => {
-                        const it = getOrderItems(o).find((i) => i.productId === p.id);
-                        return sum + (Number(it?.qty) || 0);
-                      }, 0);
+                      const activeOrders = orders.filter((o) => o.productId === p.id && !["Completed", "Cancelled"].includes(o.status));
+                      const totalOrderedKg = activeOrders.reduce((sum, o) => sum + o.qty, 0);
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               {p.imageUrl ? (
-                                <img src={p.imageUrl} alt={p.name} className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40" />
+                                <img src={optimizeImageUrl(p.imageUrl, 100)} alt={p.name} loading="lazy" decoding="async" className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40" />
                               ) : (
                                 <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 font-bold text-xs">
                                   {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
                                 </div>
                               )}
-                              <span className="font-bold text-slate-900">{p.name}</span>
+                              <div className="min-w-0 max-w-xs">
+                                <span className="font-bold text-slate-900 block truncate">{p.name}</span>
+                                {p.description && (
+                                  <span className="text-xs text-slate-400 block truncate mt-0.5">{p.description}</span>
+                                )}
+                              </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 font-medium text-slate-600">{p.unit}</td>
@@ -870,14 +918,13 @@ export type OrderFormData = {
   notes: string;
   phone?: string;
   address?: string;
-  // Legacy fields optional
   productId?: string;
   qty?: string;
   rate?: string;
 };
 
-function OrderModal({ initial, products, onSave, onClose }: {
-  initial?: Order; products: Product[]; onSave: (data: OrderFormData) => void; onClose: () => void;
+function OrderModal({ initial, products, customers = [], initialCustomer, onSave, onClose }: {
+  initial?: Order; products: Product[]; customers?: (Customer | string)[]; initialCustomer?: string | null; onSave: (data: OrderFormData) => void; onClose: () => void;
 }) {
   const activeProducts = products.filter((p) => p.active);
   const normalizedCustomers = useMemo(() => {
@@ -889,7 +936,6 @@ function OrderModal({ initial, products, onSave, onClose }: {
     ? normalizedCustomers.find((c) => c.name.toLowerCase() === targetInitialCustomer.toLowerCase())
     : null;
 
-  // Initialize line items
   const initialItems: OrderItemFormData[] = useMemo(() => {
     if (initial) {
       const existingItems = getOrderItems(initial);
@@ -985,7 +1031,6 @@ function OrderModal({ initial, products, onSave, onClose }: {
     });
   };
 
-  // Grand total calculation for all items in the modal
   const grandTotal = items.reduce((sum, it) => {
     const p = products.find((prod) => prod.id === Number(it.productId));
     const r = Number(it.rate) > 0 ? Number(it.rate) : (p?.price ?? 0);
@@ -1007,7 +1052,6 @@ function OrderModal({ initial, products, onSave, onClose }: {
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5 sm:px-6 sm:py-6">
-          {/* Customer Selection */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-xs font-bold text-slate-700">Customer Name *</label>
@@ -1047,6 +1091,11 @@ function OrderModal({ initial, products, onSave, onClose }: {
               autoComplete="off"
               className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.customer ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
             />
+            <datalist id="customer-suggestions">
+              {normalizedCustomers.map((c) => (
+                <option key={c.name} value={c.name} />
+              ))}
+            </datalist>
             {errors.customer && <p className="mt-1 text-xs text-rose-600">{errors.customer}</p>}
 
             {normalizedCustomers.length > 0 && (
@@ -1069,7 +1118,6 @@ function OrderModal({ initial, products, onSave, onClose }: {
               </div>
             )}
 
-            {/* Customer Phone & Address */}
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1103,7 +1151,6 @@ function OrderModal({ initial, products, onSave, onClose }: {
             </div>
           </div>
 
-          {/* Delivery Date */}
           <div>
             <label className="mb-1.5 block text-xs font-bold text-slate-700">Handover / Delivery Date *</label>
             <input
@@ -1161,7 +1208,6 @@ function OrderModal({ initial, products, onSave, onClose }: {
                     </div>
 
                     <div className="grid gap-2 sm:grid-cols-12 sm:items-end">
-                      {/* Product select */}
                       <div className="sm:col-span-5">
                         <label className="block text-[11px] font-semibold text-slate-600 mb-1">Sweet Product</label>
                         <select
@@ -1177,7 +1223,6 @@ function OrderModal({ initial, products, onSave, onClose }: {
                         </select>
                       </div>
 
-                      {/* Quantity */}
                       <div className="sm:col-span-3">
                         <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                           Qty ({prod?.unit ?? "kg"})
@@ -1192,7 +1237,6 @@ function OrderModal({ initial, products, onSave, onClose }: {
                         />
                       </div>
 
-                      {/* Custom Rate (Optional) */}
                       <div className="sm:col-span-4">
                         <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                           Rate (Rs/{prod?.unit ?? "kg"})
@@ -1219,7 +1263,6 @@ function OrderModal({ initial, products, onSave, onClose }: {
             </div>
           </div>
 
-          {/* Notes */}
           <div>
             <label className="mb-1.5 block text-xs font-bold text-slate-700">Special Notes (optional)</label>
             <textarea
@@ -1231,7 +1274,6 @@ function OrderModal({ initial, products, onSave, onClose }: {
             />
           </div>
 
-          {/* Running total */}
           {totalKg > 0 && (
             <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 sm:p-4 flex items-center justify-between">
               <div>
@@ -1263,6 +1305,9 @@ function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate
   const total = getOrderTotal(order, products);
   const totalKg = getOrderTotalKg(order);
   const badge = getHandoverBadge(order.deliveryDate);
+  const info = customerLookup?.get(order.customer.trim().toLowerCase());
+  const phone = order.phone || info?.phone;
+  const address = order.address || info?.address;
 
   return (
     <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm hover:border-amber-300 transition-all space-y-3">
@@ -1383,6 +1428,10 @@ function OrdersTable({ orders, products, customerLookup, onStatusChange, onGener
               const total = getOrderTotal(order, products);
               const totalKg = getOrderTotalKg(order);
               const badge = getHandoverBadge(order.deliveryDate);
+              const info = customerLookup?.get(order.customer.trim().toLowerCase());
+              const phone = order.phone || info?.phone;
+              const address = order.address || info?.address;
+
               return (
                 <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="px-6 py-4">
@@ -1473,14 +1522,15 @@ function OrdersTable({ orders, products, customerLookup, onStatusChange, onGener
   );
 }
 
-function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange, onGenerate, initialProductFilter = null, onClearProductFilter, onOpenSidebar }: {
-  orders: Order[]; products: Product[]; onAdd: (data: OrderFormData) => void; onEdit: (id: string, data: OrderFormData) => void;
+function OrdersPage({ orders, products, customers = [], initialCustomer = null, onClearInitialCustomer, onAdd, onEdit, onDelete, onStatusChange, onGenerate, initialProductFilter = null, onClearProductFilter, onOpenSidebar }: {
+  orders: Order[]; products: Product[]; customers?: (Customer | string)[]; initialCustomer?: string | null; onClearInitialCustomer?: () => void; onAdd: (data: OrderFormData) => void; onEdit: (id: string, data: OrderFormData) => void;
   onDelete: (id: string) => void; onStatusChange: (id: string, status: string) => void; onGenerate: (order: Order) => void;
   initialProductFilter?: number | null; onClearProductFilter?: () => void; onOpenSidebar?: () => void;
 }) {
   const [showModal, setShowModal] = useState(false);
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [selectedCustomerForNewOrder, setSelectedCustomerForNewOrder] = useState<string | null>(initialCustomer);
   const [query, setQuery] = useState("");
   const [filterProductId, setFilterProductId] = useState<string>(initialProductFilter ? String(initialProductFilter) : "All");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -1488,6 +1538,39 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
   const [quickTab, setQuickTab] = useState<"all" | "today" | "ready" | "kitchen" | "completed">("all");
   const [groupBy, setGroupBy] = useState<"date" | "product" | "status" | "none">("date");
   const todayStr = getTodayStr();
+
+  // Combine customers passed in with all distinct customer names currently in orders
+  const allCustomers = useMemo(() => {
+    const list = customers.map((c) => (typeof c === "string" ? { name: c } : c));
+    const fromOrders = orders.map((o) => o.customer?.trim()).filter(Boolean);
+    const existing = new Set(list.map((c) => c.name.toLowerCase()));
+    for (const name of fromOrders) {
+      if (!existing.has(name.toLowerCase())) {
+        existing.add(name.toLowerCase());
+        list.push({ id: name, name });
+      }
+    }
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  }, [customers, orders]);
+
+  const customerLookup = useMemo(() => {
+    const map = new Map<string, Customer>();
+    for (const c of customers) {
+      if (typeof c === "object" && c.name) {
+        map.set(c.name.trim().toLowerCase(), c);
+      }
+    }
+    return map;
+  }, [customers]);
+
+  useEffect(() => {
+    if (initialCustomer) {
+      setEditOrder(null);
+      setSelectedCustomerForNewOrder(initialCustomer);
+      setShowModal(true);
+      onClearInitialCustomer?.();
+    }
+  }, [initialCustomer, onClearInitialCustomer]);
 
   useEffect(() => {
     if (initialProductFilter !== null && initialProductFilter !== undefined) {
@@ -1498,15 +1581,8 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
   const activeFilteredProduct = useMemo(() => (filterProductId !== "All" ? products.find((p) => p.id === Number(filterProductId)) : null), [filterProductId, products]);
 
   const filtered = useMemo(() => orders.filter((o) => {
-    const items = getOrderItems(o);
-    const matchProduct = filterProductId === "All" || items.some((it) => it.productId === Number(filterProductId));
-    const matchQuery =
-      o.customer.toLowerCase().includes(query.toLowerCase()) ||
-      (o.notes && o.notes.toLowerCase().includes(query.toLowerCase())) ||
-      items.some((it) => {
-        const p = products.find((prod) => prod.id === it.productId);
-        return (p?.name ?? "").toLowerCase().includes(query.toLowerCase());
-      });
+    const matchProduct = filterProductId === "All" || o.productId === Number(filterProductId);
+    const matchQuery = o.customer.toLowerCase().includes(query.toLowerCase()) || o.id.toLowerCase().includes(query.toLowerCase()) || (o.notes && o.notes.toLowerCase().includes(query.toLowerCase())) || (products.find((p) => p.id === o.productId)?.name ?? "").toLowerCase().includes(query.toLowerCase());
     const matchStatus = filterStatus === "All" || o.status === filterStatus;
     const matchDate = !filterDate || o.date === filterDate || o.deliveryDate === filterDate;
     return matchProduct && matchQuery && matchStatus && matchDate;
@@ -1551,16 +1627,7 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
     }
     if (groupBy === "product") {
       const map = new Map<number, Order[]>();
-      displayedOrders.forEach((o) => {
-        const items = getOrderItems(o);
-        items.forEach((it) => {
-          const list = map.get(it.productId) ?? [];
-          if (!list.some((existing) => existing.id === o.id)) {
-            list.push(o);
-          }
-          map.set(it.productId, list);
-        });
-      });
+      displayedOrders.forEach((o) => { const list = map.get(o.productId) ?? []; list.push(o); map.set(o.productId, list); });
       return Array.from(map.entries()).map(([productId, ords]) => {
         const prod = products.find((p) => p.id === productId);
         return { key: `prod-${productId}`, title: prod?.name ?? `Product #${productId}`, orders: ords };
@@ -1688,7 +1755,7 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
                   )}
                   <div className="block sm:hidden space-y-3.5">
                     {group.orders.map((order) => {
-                      // multi-product ready
+                      // multi-item
                       return <OrderCard key={order.id} order={order} products={products} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} />;
                     })}
                   </div>
@@ -1703,9 +1770,27 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
       </div>
 
       {(showModal || editOrder) && (
-        <OrderModal initial={editOrder ?? undefined} products={products}
-          onSave={(data) => { if (editOrder) { onEdit(editOrder.id, data); setEditOrder(null); } else { onAdd(data); setShowModal(false); } }}
-          onClose={() => { setShowModal(false); setEditOrder(null); }}
+        <OrderModal
+          key={editOrder ? `edit-${editOrder.id}` : (selectedCustomerForNewOrder ? `new-${selectedCustomerForNewOrder}` : "new-order")}
+          initial={editOrder ?? undefined}
+          products={products}
+          customers={allCustomers}
+          initialCustomer={selectedCustomerForNewOrder}
+          onSave={(data) => {
+            if (editOrder) {
+              onEdit(editOrder.id, data);
+              setEditOrder(null);
+            } else {
+              onAdd(data);
+              setShowModal(false);
+              setSelectedCustomerForNewOrder(null);
+            }
+          }}
+          onClose={() => {
+            setShowModal(false);
+            setEditOrder(null);
+            setSelectedCustomerForNewOrder(null);
+          }}
         />
       )}
       {deleteId !== null && (
@@ -1717,23 +1802,18 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
   );
 }
 
-function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSidebar }: {
-  orders: Order[]; products: Product[]; setActive: (v: string) => void; onViewProductOrders: (productId: number) => void; onOpenSidebar?: () => void;
+function Dashboard({ orders, products, customers: allCustomersList = [], setActive, onViewProductOrders, onOpenSidebar }: {
+  orders: Order[]; products: Product[]; customers?: Customer[]; setActive: (v: string) => void; onViewProductOrders: (productId: number) => void; onOpenSidebar?: () => void;
 }) {
   const [expandCustomers, setExpandCustomers] = useState(false);
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
   const activeOrders = orders.filter((o) => !["Completed", "Cancelled"].includes(o.status));
-  const totalKg = activeOrders.reduce((sum, o) => sum + getOrderTotalKg(o), 0);
+  const totalKg = activeOrders.reduce((sum, o) => sum + o.qty, 0);
   const activeProductCount = products.filter((p) => p.active).length;
 
   const productBreakdown = products.map((p) => {
-    const orderList = activeOrders
-      .filter((o) => getOrderItems(o).some((it) => it.productId === p.id))
-      .sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate));
-    const kg = orderList.reduce((sum, o) => {
-      const it = getOrderItems(o).find((i) => i.productId === p.id);
-      return sum + (Number(it?.qty) || 0);
-    }, 0);
+    const orderList = activeOrders.filter((o) => o.productId === p.id).sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate));
+    const kg = orderList.reduce((sum, o) => sum + o.qty, 0);
     return { product: p, kg, count: orderList.length, orders: orderList };
   }).filter((b) => b.count > 0);
 
@@ -1742,9 +1822,10 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
   const customerMap = new Map<string, { orders: number; kg: number }>();
   activeOrders.forEach((o) => {
     const existing = customerMap.get(o.customer) ?? { orders: 0, kg: 0 };
-    customerMap.set(o.customer, { orders: existing.orders + 1, kg: existing.kg + getOrderTotalKg(o) });
+    customerMap.set(o.customer, { orders: existing.orders + 1, kg: existing.kg + o.qty });
   });
   const customers = Array.from(customerMap.entries());
+  const totalCustomerCount = Math.max(allCustomersList.length, customerMap.size);
 
   return (
     <>
@@ -1756,41 +1837,58 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
           <p className="mt-1 text-xs sm:text-sm text-slate-500">Monitor daily production output, customer orders, and upcoming handovers.</p>
         </div>
 
-        <div className="mt-5 sm:mt-6 grid gap-3 sm:gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-white to-amber-50/40 p-4 sm:p-5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-700">Total Production Demand</p>
-              <div className="size-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700"><Factory className="size-4" /></div>
+        <div className="mt-5 sm:mt-6 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="rounded-xl sm:rounded-2xl border border-amber-200/80 bg-gradient-to-br from-white to-amber-50/40 p-3 sm:p-5 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-700 truncate">Total Demand</p>
+              <div className="size-6 sm:size-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 shrink-0"><Factory className="size-3.5 sm:size-4" /></div>
             </div>
-            <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900">{totalKg.toFixed(2)}</span>
-              <span className="text-xs sm:text-sm font-bold text-amber-600">kg active</span>
+            <div className="mt-2 sm:mt-2.5 flex items-baseline gap-1">
+              <span className="text-xl sm:text-3xl font-black text-slate-900">{totalKg.toFixed(2)}</span>
+              <span className="text-[10px] sm:text-xs font-bold text-amber-600">kg active</span>
             </div>
-            <p className="mt-1.5 text-xs text-slate-500">Across {activeOrders.length} customer orders in pipeline</p>
+            <p className="mt-1 sm:mt-1.5 text-[10px] sm:text-xs text-slate-500 truncate">{activeOrders.length} orders in pipeline</p>
           </div>
 
-          <div className="rounded-2xl border border-blue-200/80 bg-gradient-to-br from-white to-blue-50/40 p-4 sm:p-5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-blue-700">Active Sweet Products</p>
-              <div className="size-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700"><Package className="size-4" /></div>
+          <div className="rounded-xl sm:rounded-2xl border border-blue-200/80 bg-gradient-to-br from-white to-blue-50/40 p-3 sm:p-5 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-blue-700 truncate">Sweet Products</p>
+              <div className="size-6 sm:size-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 shrink-0"><Package className="size-3.5 sm:size-4" /></div>
             </div>
-            <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900">{activeProductCount}</span>
-              <span className="text-xs sm:text-sm font-bold text-blue-600">catalog items</span>
+            <div className="mt-2 sm:mt-2.5 flex items-baseline gap-1">
+              <span className="text-xl sm:text-3xl font-black text-slate-900">{activeProductCount}</span>
+              <span className="text-[10px] sm:text-xs font-bold text-blue-600">catalog items</span>
             </div>
-            <p className="mt-1.5 text-xs text-slate-500">{productBreakdown.length} sweets currently ordered</p>
+            <p className="mt-1 sm:mt-1.5 text-[10px] sm:text-xs text-slate-500 truncate">{productBreakdown.length} currently ordered</p>
           </div>
 
-          <div className="rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white to-emerald-50/40 p-4 sm:p-5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-700">Kitchen Pipeline</p>
-              <div className="size-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700"><ClipboardList className="size-4" /></div>
+          <div className="rounded-xl sm:rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white to-emerald-50/40 p-3 sm:p-5 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-700 truncate">Kitchen Orders</p>
+              <div className="size-6 sm:size-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0"><ClipboardList className="size-3.5 sm:size-4" /></div>
             </div>
-            <div className="mt-2.5 flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900">{activeOrders.length}</span>
-              <span className="text-xs sm:text-sm font-bold text-emerald-600">orders</span>
+            <div className="mt-2 sm:mt-2.5 flex items-baseline gap-1">
+              <span className="text-xl sm:text-3xl font-black text-slate-900">{activeOrders.length}</span>
+              <span className="text-[10px] sm:text-xs font-bold text-emerald-600">orders</span>
             </div>
-            <p className="mt-1.5 text-xs text-slate-500">{customers.length} unique customers waiting for delivery</p>
+            <p className="mt-1 sm:mt-1.5 text-[10px] sm:text-xs text-slate-500 truncate">{customers.length} waiting for delivery</p>
+          </div>
+
+          <div
+            onClick={() => setActive("Customers")}
+            className="group cursor-pointer rounded-xl sm:rounded-2xl border border-violet-200/80 bg-gradient-to-br from-white to-violet-50/50 p-3 sm:p-5 shadow-xs hover:border-violet-400 hover:shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-violet-700 truncate">Saved Customers</p>
+              <div className="size-6 sm:size-8 rounded-lg bg-violet-100 flex items-center justify-center text-violet-700 shrink-0 group-hover:scale-110 transition-transform"><Users className="size-3.5 sm:size-4" /></div>
+            </div>
+            <div className="mt-2 sm:mt-2.5 flex items-baseline gap-1">
+              <span className="text-xl sm:text-3xl font-black text-slate-900">{totalCustomerCount}</span>
+              <span className="text-[10px] sm:text-xs font-bold text-violet-600">registered</span>
+            </div>
+            <p className="mt-1 sm:mt-1.5 text-[10px] sm:text-xs font-semibold text-violet-700 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              <span>View & Manage →</span>
+            </p>
           </div>
         </div>
 
@@ -2445,22 +2543,24 @@ function CustomersPage({
 // ============================================================
 // ADMIN WORKSPACE COMPONENT
 // ============================================================
-export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTab?: "Dashboard" | "Orders" | "Products" }) {
+export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTab?: "Dashboard" | "Orders" | "Products" | "Customers" }) {
   const router = useRouter();
-  const [active, setActiveState] = useState<"Dashboard" | "Orders" | "Products">(initialTab);
+  const [active, setActiveState] = useState<"Dashboard" | "Orders" | "Products" | "Customers">(initialTab);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [newOrderInitialCustomer, setNewOrderInitialCustomer] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
   const [initialProductFilter, setInitialProductFilter] = useState<number | null>(null);
 
   // Sync tab changes with URL
-  const setActive = (tab: "Dashboard" | "Orders" | "Products" | string) => {
-    const validTab = tab as "Dashboard" | "Orders" | "Products";
+  const setActive = (tab: "Dashboard" | "Orders" | "Products" | "Customers" | string) => {
+    const validTab = tab as "Dashboard" | "Orders" | "Products" | "Customers";
     setActiveState(validTab);
-    const targetPath = validTab === "Dashboard" ? "/dashboard" : validTab === "Orders" ? "/orders" : "/products";
+    const targetPath = validTab === "Dashboard" ? "/dashboard" : validTab === "Orders" ? "/orders" : validTab === "Products" ? "/products" : "/customers";
     if (typeof window !== "undefined" && window.location.pathname !== targetPath) {
       window.history.pushState(null, "", targetPath);
     }
@@ -2486,59 +2586,115 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         setIsLoading(false); return;
       }
       try {
-        const { data: prodData, error: prodErr } = await client.from("products").select("*").order("id", { ascending: true });
+        const { data: prodData, error: prodErr } = await client
+          .from("products")
+          .select("id,name,unit,price,active,image_url,description")
+          .order("id", { ascending: true });
         if (prodErr) throw prodErr;
         if (prodData && prodData.length > 0) {
-          const loadedProducts: Product[] = prodData.map((p: any) => ({ id: Number(p.id), name: p.name, unit: p.unit, price: Number(p.price), active: Boolean(p.active), imageUrl: p.image_url || undefined }));
-          setProducts(loadedProducts);
-          try { localStorage.setItem("dhuniya_products", JSON.stringify(loadedProducts)); } catch { }
+          const loadedProducts: Product[] = prodData.map((p: any) => ({
+            id: Number(p.id),
+            name: p.name,
+            unit: p.unit,
+            price: Number(p.price),
+            active: Boolean(p.active),
+            imageUrl: p.image_url || undefined,
+            description: p.description || undefined,
+          }));
+
+          // Deduplicate products by lowercase name so duplicates in database never double up
+          const mapByName = new Map<string, Product>();
+          for (const p of loadedProducts) {
+            const key = p.name.trim().toLowerCase();
+            const existing = mapByName.get(key);
+            if (!existing) {
+              mapByName.set(key, p);
+            } else if ((!existing.imageUrl && p.imageUrl) || (!existing.description && p.description)) {
+              mapByName.set(key, { ...existing, ...p });
+            }
+          }
+          const deduplicatedProducts = Array.from(mapByName.values());
+          setProducts(deduplicatedProducts);
+          try { localStorage.setItem("dhuniya_products", JSON.stringify(deduplicatedProducts)); } catch { }
         } else {
-          try { const lp = localStorage.getItem("dhuniya_products"); if (lp) setProducts(JSON.parse(lp)); } catch { }
+          setProducts([]);
         }
         const { data: ordData, error: ordErr } = await client.from("orders").select("*").order("created_at", { ascending: false });
         if (ordErr) throw ordErr;
+        let loadedOrders: Order[] = [];
         if (ordData && ordData.length > 0) {
-          loadedOrders = ordData.map((o: any) => {
-            let parsedItems: OrderItem[] = [];
-            if (o.items) {
-              try {
-                const raw = typeof o.items === "string" ? JSON.parse(o.items) : o.items;
-                if (Array.isArray(raw)) {
-                  parsedItems = raw.map((it: any) => ({
-                    productId: Number(it.productId ?? it.product_id),
-                    qty: Number(it.qty),
-                    rate: it.rate ? Number(it.rate) : undefined,
-                  })).filter((it: OrderItem) => Boolean(it.productId && it.qty));
-                }
-              } catch {}
-            }
-            if (parsedItems.length === 0 && o.product_id) {
-              parsedItems = [{
-                productId: Number(o.product_id),
-                qty: Number(o.qty ?? 0),
-                rate: o.rate ? Number(o.rate) : undefined,
-              }];
-            }
-            return {
-              id: o.id,
-              date: o.date,
-              deliveryDate: o.delivery_date,
-              customer: o.customer,
-              items: parsedItems,
-              productId: parsedItems[0]?.productId ?? Number(o.product_id),
-              qty: parsedItems.reduce((s, it) => s + it.qty, 0),
-              rate: parsedItems[0]?.rate ?? (o.rate ? Number(o.rate) : undefined),
-              status: o.status,
-              notes: o.notes || undefined,
-              phone: o.phone || undefined,
-              address: o.address || undefined,
-            };
-          });
+          loadedOrders = ordData.map((o: any) => ({
+            id: o.id,
+            date: o.date,
+            deliveryDate: o.delivery_date,
+            customer: o.customer,
+            productId: Number(o.product_id),
+            qty: Number(o.qty),
+            rate: o.rate ? Number(o.rate) : undefined,
+            status: o.status,
+            notes: o.notes || undefined,
+            phone: o.phone || undefined,
+            address: o.address || undefined,
+          }));
           setOrders(loadedOrders);
           try { localStorage.setItem("dhuniya_orders", JSON.stringify(loadedOrders)); } catch { }
         } else {
-          try { const lo = localStorage.getItem("dhuniya_orders"); if (lo) setOrders(JSON.parse(lo)); } catch { }
+          try { const lo = localStorage.getItem("dhuniya_orders"); if (lo) { loadedOrders = JSON.parse(lo); setOrders(loadedOrders); } } catch { }
         }
+
+        // Load customers from Supabase table + existing orders + local storage
+        let remoteCust: Customer[] = [];
+        try {
+          const { data: cData } = await client.from("customers").select("id,name,phone,address,notes,created_at").order("name");
+          if (cData && cData.length > 0) {
+            remoteCust = cData.map((c: any) => ({
+              id: c.id,
+              name: c.name?.trim(),
+              phone: c.phone || undefined,
+              address: c.address || undefined,
+              notes: c.notes || undefined,
+              createdAt: c.created_at || undefined,
+            })).filter((c: Customer) => Boolean(c.name));
+          }
+        } catch {
+          try {
+            const { data: minData } = await client.from("customers").select("id,name,phone").order("name");
+            if (minData) {
+              remoteCust = minData.map((c: any) => ({
+                id: c.id,
+                name: c.name?.trim(),
+                phone: c.phone || undefined,
+              })).filter((c: Customer) => Boolean(c.name));
+            }
+          } catch { }
+        }
+
+        const existingNames = new Set(remoteCust.map((c) => c.name.toLowerCase()));
+        const orderCust: Customer[] = [];
+        for (const o of loadedOrders) {
+          const name = o.customer?.trim();
+          if (name && !existingNames.has(name.toLowerCase())) {
+            existingNames.add(name.toLowerCase());
+            orderCust.push({ id: `order-${name}`, name });
+          }
+        }
+
+        let localCust: Customer[] = [];
+        try {
+          const lc = localStorage.getItem("dhuniya_customers_v2");
+          if (lc) localCust = JSON.parse(lc);
+        } catch { }
+
+        for (const c of localCust) {
+          if (c.name && !existingNames.has(c.name.trim().toLowerCase())) {
+            existingNames.add(c.name.trim().toLowerCase());
+            orderCust.push(c);
+          }
+        }
+
+        const combinedCustomers = [...remoteCust, ...orderCust].sort((a, b) => a.name.localeCompare(b.name));
+        setCustomers(combinedCustomers);
+        try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(combinedCustomers)); } catch { }
       } catch (err: any) {
         console.error("Error loading Supabase data:", err);
         addToast("error", `Supabase connection note: ${err.message || "Using local storage"}`);
@@ -2560,13 +2716,42 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
   const addProduct = async (data: ProductFormData) => {
     const tempId = Date.now();
-    const newProduct: Product = { id: tempId, name: data.name.trim(), unit: data.unit, price: Number(data.price), active: data.active, imageUrl: data.imageUrl?.trim() || undefined };
+    const newProduct: Product = {
+      id: tempId,
+      name: data.name.trim(),
+      unit: data.unit,
+      price: Number(data.price),
+      active: data.active,
+      imageUrl: data.imageUrl?.trim() || undefined,
+      description: data.description?.trim() || undefined,
+    };
     setProducts((prev) => { const updated = [...prev, newProduct]; try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { } return updated; });
     addToast("success", `Sweet "${data.name}" added`);
     const client = getSupabase();
     if (client) {
       try {
-        const { data: inserted, error } = await client.from("products").insert({ name: data.name.trim(), unit: data.unit, price: Number(data.price), active: data.active, image_url: data.imageUrl?.trim() || null }).select().single();
+        let { data: inserted, error } = await client.from("products").insert({
+          name: data.name.trim(),
+          unit: data.unit,
+          price: Number(data.price),
+          active: data.active,
+          image_url: data.imageUrl?.trim() || null,
+          description: data.description?.trim() || null,
+        }).select().single();
+
+        // Fallback: If Supabase table does not yet have 'description' column, save without it
+        if (error && (error.message?.includes("description") || error.code === "PGRST204")) {
+          const fallback = await client.from("products").insert({
+            name: data.name.trim(),
+            unit: data.unit,
+            price: Number(data.price),
+            active: data.active,
+            image_url: data.imageUrl?.trim() || null,
+          }).select().single();
+          inserted = fallback.data;
+          error = fallback.error;
+        }
+
         if (error) throw error;
         if (inserted) { setProducts((prev) => prev.map((p) => (p.id === tempId ? { ...p, id: Number(inserted.id) } : p))); }
       } catch (err: any) { addToast("error", `Failed to save product: ${err.message}`); setProducts((prev) => prev.filter((p) => p.id !== tempId)); }
@@ -2575,13 +2760,48 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
   const editProduct = async (id: number, data: ProductFormData) => {
     const prevProducts = [...products];
-    const updatedProduct: Product = { id, name: data.name.trim(), unit: data.unit, price: Number(data.price), active: data.active, imageUrl: data.imageUrl?.trim() || undefined };
+    const current = products.find((p) => p.id === id);
+
+    // If existing image changed or was cleared, delete the old image from Cloudinary
+    if (current?.imageUrl && current.imageUrl !== data.imageUrl) {
+      deleteCloudinaryImage(current.imageUrl);
+    }
+
+    const updatedProduct: Product = {
+      id,
+      name: data.name.trim(),
+      unit: data.unit,
+      price: Number(data.price),
+      active: data.active,
+      imageUrl: data.imageUrl?.trim() || undefined,
+      description: data.description?.trim() || undefined,
+    };
     setProducts((prev) => { const updated = prev.map((p) => (p.id === id ? updatedProduct : p)); try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { } return updated; });
     addToast("success", `Sweet "${data.name}" updated`);
     const client = getSupabase();
     if (client) {
       try {
-        const { error } = await client.from("products").update({ name: data.name.trim(), unit: data.unit, price: Number(data.price), active: data.active, image_url: data.imageUrl?.trim() || null }).eq("id", id);
+        let { error } = await client.from("products").update({
+          name: data.name.trim(),
+          unit: data.unit,
+          price: Number(data.price),
+          active: data.active,
+          image_url: data.imageUrl?.trim() || null,
+          description: data.description?.trim() || null,
+        }).eq("id", id);
+
+        // Fallback: If Supabase table does not yet have 'description' column, update without it
+        if (error && (error.message?.includes("description") || error.code === "PGRST204")) {
+          const fallback = await client.from("products").update({
+            name: data.name.trim(),
+            unit: data.unit,
+            price: Number(data.price),
+            active: data.active,
+            image_url: data.imageUrl?.trim() || null,
+          }).eq("id", id);
+          error = fallback.error;
+        }
+
         if (error) throw error;
       } catch (err: any) { addToast("error", `Supabase update failed: ${err.message}`); setProducts(prevProducts); }
     }
@@ -2590,6 +2810,12 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
   const deleteProduct = async (id: number) => {
     const prevProducts = [...products];
     const target = products.find((p) => p.id === id);
+
+    // Delete image from Cloudinary storage to save quota
+    if (target?.imageUrl) {
+      deleteCloudinaryImage(target.imageUrl);
+    }
+
     setProducts((prev) => { const updated = prev.filter((p) => p.id !== id); try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { } return updated; });
     addToast("info", `Deleted "${target?.name ?? "Sweet"}"`);
     const client = getSupabase();
@@ -2679,7 +2905,6 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const client = getSupabase();
     if (client) {
       try {
-        // Try inserting with items JSON
         let { error } = await client.from("orders").insert({
           id: newOrder.id,
           date: newOrder.date,
@@ -2695,7 +2920,6 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           address: newOrder.address ?? null,
         });
 
-        // Fallback 1: table might not have items column yet
         if (error && (error.message?.includes("items") || error.code === "PGRST204")) {
           const fb = await client.from("orders").insert({
             id: newOrder.id,
@@ -2713,7 +2937,6 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           error = fb.error;
         }
 
-        // Fallback 2: table might not have phone/address
         if (error && (error.message?.includes("phone") || error.message?.includes("address") || error.code === "PGRST204")) {
           const fb2 = await client.from("orders").insert({
             id: newOrder.id,
@@ -2858,6 +3081,123 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     }
   };
 
+  const addCustomer = async (data: CustomerFormData) => {
+    const trimmed = data.name.trim();
+    if (!trimmed) return;
+    if (customers.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) {
+      addToast("error", `Customer "${trimmed}" already exists`);
+      return;
+    }
+
+    let insertedId: any = Date.now();
+    const client = getSupabase();
+    if (client) {
+      try {
+        let { data: ins, error } = await client.from("customers").insert({
+          name: trimmed,
+          phone: data.phone.trim() || null,
+          address: data.address.trim() || null,
+          notes: data.notes.trim() || null,
+        }).select();
+
+        if (error) {
+          const fb = await client.from("customers").insert({
+            name: trimmed,
+            phone: data.phone.trim() || null,
+          }).select();
+          if (fb.data?.[0]?.id) insertedId = fb.data[0].id;
+        } else if (ins?.[0]?.id) {
+          insertedId = ins[0].id;
+        }
+      } catch (err: any) {
+        console.warn("Supabase customer insert warning:", err);
+      }
+    }
+
+    const newCustomer: Customer = {
+      id: insertedId,
+      name: trimmed,
+      phone: data.phone.trim() || undefined,
+      address: data.address.trim() || undefined,
+      notes: data.notes.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    setCustomers((prev) => {
+      const updated = [...prev, newCustomer].sort((a, b) => a.name.localeCompare(b.name));
+      try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
+      return updated;
+    });
+    addToast("success", `Customer "${trimmed}" saved`);
+  };
+
+  const editCustomer = async (id: number | string, data: CustomerFormData) => {
+    const trimmed = data.name.trim();
+    if (!trimmed) return;
+
+    const client = getSupabase();
+    if (client) {
+      try {
+        let { error } = await client.from("customers").update({
+          name: trimmed,
+          phone: data.phone.trim() || null,
+          address: data.address.trim() || null,
+          notes: data.notes.trim() || null,
+        }).eq("id", id);
+
+        if (error) {
+          await client.from("customers").update({
+            name: trimmed,
+            phone: data.phone.trim() || null,
+          }).eq("id", id);
+        }
+      } catch (err: any) {
+        console.warn("Supabase customer update error:", err);
+      }
+    }
+
+    setCustomers((prev) => {
+      const updated = prev.map((c) =>
+        c.id === id || c.name.toLowerCase() === trimmed.toLowerCase()
+          ? {
+              ...c,
+              name: trimmed,
+              phone: data.phone.trim() || undefined,
+              address: data.address.trim() || undefined,
+              notes: data.notes.trim() || undefined,
+            }
+          : c
+      ).sort((a, b) => a.name.localeCompare(b.name));
+      try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
+      return updated;
+    });
+    addToast("success", `Customer "${trimmed}" updated`);
+  };
+
+  const deleteCustomer = async (id: number | string, name: string) => {
+    const prevCustomers = [...customers];
+    setCustomers((prev) => {
+      const updated = prev.filter((c) => c.id !== id && c.name !== name);
+      try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
+      return updated;
+    });
+
+    const client = getSupabase();
+    if (client) {
+      try {
+        const { error } = await client.from("customers").delete().or(`id.eq.${id},name.eq.${name}`);
+        if (error) throw error;
+        addToast("info", `Customer "${name}" deleted`);
+      } catch (err: any) {
+        console.error("Failed to delete customer from Supabase:", err);
+        setCustomers(prevCustomers);
+        addToast("error", `Failed to delete customer: ${err.message}`);
+      }
+    } else {
+      addToast("info", `Customer "${name}" deleted`);
+    }
+  };
+
   const deleteOrder = async (id: string) => {
     const prevOrders = [...orders];
     setOrders((prev) => { const updated = prev.filter((o) => o.id !== id); try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
@@ -2881,12 +3221,13 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
   };
 
   const generateInvoice = (order: Order) => setInvoiceOrder(order);
-  
+  const invoiceProduct = invoiceOrder ? (products.find((p) => p.id === invoiceOrder.productId) ?? { id: invoiceOrder.productId, name: "Sweet Item", unit: "kg", price: invoiceOrder.rate ?? 0, active: true }) : null;
+  const invoiceRate = invoiceOrder ? (invoiceOrder.rate ?? invoiceProduct?.price ?? 0) : 0;
   const activeOrderCount = orders.filter((o) => !["Completed", "Cancelled"].includes(o.status)).length;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 antialiased font-sans">
-      <Sidebar active={active} setActive={setActive} open={sidebarOpen} setOpen={setSidebarOpen} orderCount={activeOrderCount} onLogout={handleLogout} />
+      <Sidebar active={active} setActive={setActive} open={sidebarOpen} setOpen={setSidebarOpen} orderCount={activeOrderCount} customerCount={customers.length} onLogout={handleLogout} />
       <main className="min-h-screen lg:ml-[260px] pb-24 lg:pb-16">
         {isLoading && (
           <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center text-xs font-semibold text-amber-800 flex items-center justify-center gap-2">
@@ -2894,13 +3235,14 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
             Connecting and syncing with Supabase...
           </div>
         )}
-        {active === "Dashboard" && (<Dashboard orders={orders} products={products} setActive={setActive} onViewProductOrders={viewProductOrders} onOpenSidebar={() => setSidebarOpen(true)} />)}
-        {active === "Orders" && (<OrdersPage orders={orders} products={products} onAdd={addOrder} onEdit={editOrder} onDelete={deleteOrder} onStatusChange={updateStatus} onGenerate={generateInvoice} initialProductFilter={initialProductFilter} onClearProductFilter={() => setInitialProductFilter(null)} onOpenSidebar={() => setSidebarOpen(true)} />)}
+        {active === "Dashboard" && (<Dashboard orders={orders} products={products} customers={customers} setActive={setActive} onViewProductOrders={viewProductOrders} onOpenSidebar={() => setSidebarOpen(true)} />)}
+        {active === "Orders" && (<OrdersPage orders={orders} products={products} customers={customers} initialCustomer={newOrderInitialCustomer} onClearInitialCustomer={() => setNewOrderInitialCustomer(null)} onAdd={addOrder} onEdit={editOrder} onDelete={deleteOrder} onStatusChange={updateStatus} onGenerate={generateInvoice} initialProductFilter={initialProductFilter} onClearProductFilter={() => setInitialProductFilter(null)} onOpenSidebar={() => setSidebarOpen(true)} />)}
         {active === "Products" && (<ProductsPage products={products} orders={orders} onAdd={addProduct} onEdit={editProduct} onDelete={deleteProduct} onViewProductOrders={viewProductOrders} onOpenSidebar={() => setSidebarOpen(true)} />)}
+        {active === "Customers" && (<CustomersPage customers={customers} orders={orders} onAdd={addCustomer} onEdit={editCustomer} onDelete={deleteCustomer} onCreateOrder={(name) => { setNewOrderInitialCustomer(name); setActive("Orders"); }} onOpenSidebar={() => setSidebarOpen(true)} />)}
       </main>
 
       {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 inset-x-0 z-30 flex h-16 items-center justify-around border-t border-slate-200/90 bg-white/95 backdrop-blur-md px-2 lg:hidden shadow-[0_-2px_10px_rgba(0,0,0,0.03)]">
+      <nav className="fixed bottom-0 inset-x-0 z-30 flex h-16 items-center justify-around border-t border-slate-200/90 bg-white/95 backdrop-blur-md px-1 sm:px-2 lg:hidden shadow-[0_-2px_10px_rgba(0,0,0,0.03)]">
         <button onClick={() => setActive("Dashboard")} className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${active === "Dashboard" ? "text-amber-600 font-bold" : "text-slate-400 hover:text-slate-700"}`}>
           <LayoutDashboard className="size-5" />
           <span className="text-[10px] mt-1 font-semibold">Dashboard</span>
@@ -2915,6 +3257,10 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         <button onClick={() => setActive("Products")} className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${active === "Products" ? "text-amber-600 font-bold" : "text-slate-400 hover:text-slate-700"}`}>
           <Package className="size-5" />
           <span className="text-[10px] mt-1 font-semibold">Products</span>
+        </button>
+        <button onClick={() => setActive("Customers")} className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${active === "Customers" ? "text-amber-600 font-bold" : "text-slate-400 hover:text-slate-700"}`}>
+          <Users className="size-5" />
+          <span className="text-[10px] mt-1 font-semibold">Customers</span>
         </button>
         <button onClick={() => setSidebarOpen(true)} className="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-700 transition-colors">
           <Menu className="size-5" />
