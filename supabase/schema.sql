@@ -40,6 +40,9 @@ create table if not exists public.orders (
 -- Migrations if table already exists
 alter table public.orders add column if not exists phone text;
 alter table public.orders add column if not exists address text;
+alter table public.orders add column if not exists items jsonb;
+alter table public.orders add column if not exists amount_paid numeric default 0;
+alter table public.orders add column if not exists payment_status text default 'Unpaid';
 
 -- 3. CUSTOMERS TABLE (Customer directory & auto-saves customer names for dropdown reuse)
 create table if not exists public.customers (

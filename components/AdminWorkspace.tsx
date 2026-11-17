@@ -103,15 +103,61 @@ export const getOrderTotal = (o: Order, products: Product[]): number => {
   }, 0);
 };
 
-export const getOrderTotalKg = (o: Order): number => {
-  const items = getOrderItems(o);
-  return items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
-};
-
 export const isWholeNumberUnit = (unit?: string): boolean => {
   if (!unit) return false;
   const u = unit.trim().toLowerCase();
   return ["pcs", "box", "piece", "pieces", "boxes"].includes(u);
+};
+
+export const getOrderTotalKg = (o: Order, products?: Product[]): number => {
+  const items = getOrderItems(o);
+  return items.reduce((sum, item) => {
+    if (products) {
+      const prod = products.find((p) => p.id === item.productId);
+      if (prod && isWholeNumberUnit(prod.unit)) return sum;
+      if (prod && prod.unit && prod.unit.toLowerCase() !== "kg") return sum;
+    }
+    return sum + (Number(item.qty) || 0);
+  }, 0);
+};
+
+export const getOrderTotalPcs = (o: Order, products?: Product[]): number => {
+  const items = getOrderItems(o);
+  return items.reduce((sum, item) => {
+    if (products) {
+      const prod = products.find((p) => p.id === item.productId);
+      if (prod && isWholeNumberUnit(prod.unit)) {
+        return sum + Math.round(Number(item.qty) || 0);
+      }
+    }
+    return sum;
+  }, 0);
+};
+
+// Tag used to embed rich order metadata (multi-items, payments) into order notes
+// if the Supabase table doesn't have dedicated columns yet.
+const DHUNIYA_TAG_REGEX = /<!--DHUNIYA_DATA:([\s\S]*?)-->/;
+
+export const encodeDhuniyaData = (meta: { items?: OrderItem[]; amountPaid?: number; paymentStatus?: string }): string => {
+  return `<!--DHUNIYA_DATA:${JSON.stringify(meta)}-->`;
+};
+
+export const parseDhuniyaData = (notes?: string | null): { cleanNotes?: string; items?: OrderItem[]; amountPaid?: number; paymentStatus?: "Unpaid" | "Partial" | "Paid" } => {
+  if (!notes) return {};
+  const match = notes.match(DHUNIYA_TAG_REGEX);
+  const cleanNotes = notes.replace(DHUNIYA_TAG_REGEX, "").trim() || undefined;
+  if (!match) return { cleanNotes };
+  try {
+    const parsed = JSON.parse(match[1]);
+    return {
+      cleanNotes,
+      items: parsed.items,
+      amountPaid: parsed.amountPaid != null ? Number(parsed.amountPaid) : undefined,
+      paymentStatus: parsed.paymentStatus,
+    };
+  } catch {
+    return { cleanNotes };
+  }
 };
 
 
@@ -1348,7 +1394,7 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
   const [customer, setCustomer] = useState(targetInitialCustomer);
   const [phone, setPhone] = useState(initial?.phone ?? (matchedInitial?.phone ?? ""));
   const [address, setAddress] = useState(initial?.address ?? (matchedInitial?.address ?? ""));
-  const [showContactFields, setShowContactFields] = useState(!!(initial?.phone || initial?.address || matchedInitial?.phone || matchedInitial?.address));
+  const [showContactFields, setShowContactFields] = useState<boolean>(false);
   const [deliveryDate, setDeliveryDate] = useState(initial?.deliveryDate ?? getTodayStr());
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [items, setItems] = useState<OrderItemFormData[]>(initialItems);
@@ -1359,8 +1405,8 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
   const selectCustomer = (name: string) => {
     const matched = normalizedCustomers.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
     setCustomer(name);
-    if (matched?.phone) { setPhone(matched.phone); setShowContactFields(true); }
-    if (matched?.address) { setAddress(matched.address); setShowContactFields(true); }
+    if (matched?.phone) setPhone(matched.phone);
+    if (matched?.address) setAddress(matched.address);
     if (errors.customer) setErrors((prev) => ({ ...prev, customer: undefined }));
   };
 
@@ -1500,14 +1546,14 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
                 </div>
               )}
 
-              {/* Toggle for contact details */}
+              {/* Toggle for contact details (hidden by default) */}
               <button
                 type="button"
                 onClick={() => setShowContactFields((v) => !v)}
                 className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800 transition-colors"
               >
                 <ChevronDown className={`size-3.5 transition-transform duration-200 ${showContactFields ? "rotate-180" : ""}`} />
-                {showContactFields ? "Hide contact details" : "+ Add mobile / address"}
+                {showContactFields ? "Hide contact details" : (phone || address ? "Show contact details" : "+ Add mobile / address")}
               </button>
               {showContactFields && (
                 <div className="mt-2 grid gap-3 sm:grid-cols-2">
@@ -1748,10 +1794,12 @@ function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate
         {items.map((item, idx) => {
           const prod = products.find((p) => p.id === item.productId);
           const r = item.rate ?? prod?.price ?? 0;
+          const isWhole = isWholeNumberUnit(prod?.unit);
+          const displayQty = isWhole ? Math.round(Number(item.qty)) : item.qty;
           return (
             <div key={idx} className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-800 truncate">{prod?.name ?? "Sweet"}</span>
-              <span className="text-[11px] text-slate-500 shrink-0">{item.qty} {prod?.unit ?? "kg"} ({money(item.qty * r)})</span>
+              <span className="text-[11px] text-slate-500 shrink-0">{displayQty} {prod?.unit ?? "kg"} ({money(item.qty * r)})</span>
             </div>
           );
         })}
@@ -1834,10 +1882,12 @@ function OrdersTable({ orders, products, customerLookup, onStatusChange, onGener
                     <div className="space-y-0.5 max-w-[220px]">
                       {items.map((item, idx) => {
                         const prod = products.find((p) => p.id === item.productId);
+                        const isWhole = isWholeNumberUnit(prod?.unit);
+                        const displayQty = isWhole ? Math.round(Number(item.qty)) : item.qty;
                         return (
                           <div key={idx} className="flex items-center gap-1.5 text-xs">
                             <span className="font-semibold text-slate-800 truncate">{prod?.name ?? "Sweet"}</span>
-                            <span className="text-slate-400 shrink-0">{item.qty} {prod?.unit ?? "kg"}</span>
+                            <span className="text-slate-400 shrink-0">{displayQty} {prod?.unit ?? "kg"}</span>
                           </div>
                         );
                       })}
@@ -1977,7 +2027,8 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
     return true;
   }), [filtered, quickTab, todayStr]);
 
-  const totalFilteredKg = useMemo(() => displayedOrders.reduce((sum, o) => sum + getOrderTotalKg(o), 0), [displayedOrders]);
+  const totalFilteredKg = useMemo(() => displayedOrders.reduce((sum, o) => sum + getOrderTotalKg(o, products), 0), [displayedOrders, products]);
+  const totalFilteredPcs = useMemo(() => displayedOrders.reduce((sum, o) => sum + getOrderTotalPcs(o, products), 0), [displayedOrders, products]);
   const getProduct = (id: number) => products.find((p) => p.id === id);
 
   const groupedOrders = useMemo(() => {
@@ -2122,7 +2173,8 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
         ) : (
           <div className="mt-6 space-y-7">
             {groupedOrders.map((group) => {
-              const groupKg = group.orders.reduce((sum, o) => sum + getOrderTotalKg(o), 0);
+              const groupKg = group.orders.reduce((sum, o) => sum + getOrderTotalKg(o, products), 0);
+              const groupPcs = group.orders.reduce((sum, o) => sum + getOrderTotalPcs(o, products), 0);
               return (
                 <section key={group.key} className="space-y-3">
                   {groupBy !== "none" && (
@@ -2132,7 +2184,18 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
                         <h3 className="text-sm sm:text-base font-extrabold text-slate-900">{group.title}</h3>
                         {(group as any).badge && (<span className="rounded-md bg-amber-100 border border-amber-300/60 px-2 py-0.5 text-[10px] font-bold text-amber-800">{(group as any).badge}</span>)}
                       </div>
-                      <span className="text-xs font-bold text-slate-500">Total: <strong className="text-amber-600 font-extrabold">{groupKg.toFixed(2)} kg</strong></span>
+                      <span className="text-xs font-bold text-slate-500">
+                        Total:{" "}
+                        {groupKg > 0 && (
+                          <strong className="text-amber-600 font-extrabold mr-1.5">{groupKg.toFixed(2)} kg</strong>
+                        )}
+                        {groupPcs > 0 && (
+                          <strong className="text-blue-700 font-extrabold">{groupPcs} pcs</strong>
+                        )}
+                        {groupKg === 0 && groupPcs === 0 && (
+                          <strong className="text-slate-400 font-semibold">0 kg</strong>
+                        )}
+                      </span>
                     </div>
                   )}
                   <div className="block sm:hidden space-y-3.5">
@@ -3021,8 +3084,21 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         if (ordErr) throw ordErr;
         let loadedOrders: Order[] = [];
         if (ordData && ordData.length > 0) {
+          // Read local cache to merge payment or multi-items if remote columns were missing
+          let cachedOrdersMap = new Map<string, Order>();
+          try {
+            const lo = localStorage.getItem("dhuniya_orders");
+            if (lo) {
+              const parsed: Order[] = JSON.parse(lo);
+              parsed.forEach((o) => cachedOrdersMap.set(o.id, o));
+            }
+          } catch {}
+
           loadedOrders = ordData.map((o: any) => {
+            const parsedMeta = parseDhuniyaData(o.notes);
             let parsedItems: OrderItem[] = [];
+
+            // 1. Dedicated o.items column
             if (o.items) {
               try {
                 const raw = typeof o.items === "string" ? JSON.parse(o.items) : o.items;
@@ -3033,8 +3109,25 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
                     rate: it.rate ? Number(it.rate) : undefined,
                   })).filter((it: OrderItem) => Boolean(it.productId && it.qty));
                 }
-              } catch { }
+              } catch {}
             }
+
+            // 2. Embedded items in notes
+            if (parsedItems.length === 0 && parsedMeta.items && Array.isArray(parsedMeta.items)) {
+              parsedItems = parsedMeta.items.map((it: any) => ({
+                productId: Number(it.productId ?? it.product_id),
+                qty: Number(it.qty),
+                rate: it.rate ? Number(it.rate) : undefined,
+              })).filter((it: OrderItem) => Boolean(it.productId && it.qty));
+            }
+
+            // 3. Fallback to cached order
+            const cached = cachedOrdersMap.get(o.id);
+            if (parsedItems.length === 0 && cached?.items && cached.items.length > 0) {
+              parsedItems = cached.items;
+            }
+
+            // 4. Legacy single product
             if (parsedItems.length === 0 && o.product_id) {
               parsedItems = [{
                 productId: Number(o.product_id),
@@ -3042,6 +3135,18 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
                 rate: o.rate ? Number(o.rate) : undefined,
               }];
             }
+
+            const amountPaid = o.amount_paid != null
+              ? Number(o.amount_paid)
+              : (parsedMeta.amountPaid != null
+                  ? Number(parsedMeta.amountPaid)
+                  : (cached?.amountPaid != null ? Number(cached.amountPaid) : 0));
+
+            const paymentStatus = (o.payment_status
+              || parsedMeta.paymentStatus
+              || cached?.paymentStatus
+              || (amountPaid > 0 ? "Partial" : "Unpaid")) as Order["paymentStatus"];
+
             return {
               id: o.id,
               date: o.date,
@@ -3052,13 +3157,24 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
               qty: parsedItems.reduce((s, it) => s + it.qty, 0),
               rate: parsedItems[0]?.rate ?? (o.rate ? Number(o.rate) : undefined),
               status: o.status,
-              notes: o.notes || undefined,
-              phone: o.phone || undefined,
-              address: o.address || undefined,
+              notes: parsedMeta.cleanNotes || o.notes || undefined,
+              phone: o.phone || cached?.phone || undefined,
+              address: o.address || cached?.address || undefined,
+              amountPaid,
+              paymentStatus,
             };
           });
+
+          // Merge any locally created orders that might not be in Supabase yet
+          const remoteIds = new Set(loadedOrders.map((o) => o.id));
+          for (const [id, cached] of cachedOrdersMap.entries()) {
+            if (!remoteIds.has(id)) {
+              loadedOrders.push(cached);
+            }
+          }
+
           setOrders(loadedOrders);
-          try { localStorage.setItem("dhuniya_orders", JSON.stringify(loadedOrders)); } catch { }
+          try { localStorage.setItem("dhuniya_orders", JSON.stringify(loadedOrders)); } catch {}
         } else {
           try { const lo = localStorage.getItem("dhuniya_orders"); if (lo) { loadedOrders = JSON.parse(lo); setOrders(loadedOrders); } } catch { }
         }
@@ -3326,7 +3442,14 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const client = getSupabase();
     if (client) {
       try {
-        // Try inserting with items JSON
+        const metaTag = encodeDhuniyaData({
+          items: newOrder.items,
+          amountPaid: newOrder.amountPaid ?? 0,
+          paymentStatus: newOrder.paymentStatus ?? "Unpaid",
+        });
+        const combinedNotes = newOrder.notes ? `${newOrder.notes}\n${metaTag}` : metaTag;
+
+        // Try inserting with items, amount_paid, payment_status
         let { error } = await client.from("orders").insert({
           id: newOrder.id,
           date: newOrder.date,
@@ -3337,14 +3460,17 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           qty: newOrder.qty,
           rate: newOrder.rate ?? null,
           status: newOrder.status,
-          notes: newOrder.notes ?? null,
+          notes: combinedNotes,
           phone: newOrder.phone ?? null,
           address: newOrder.address ?? null,
+          amount_paid: newOrder.amountPaid ?? 0,
+          payment_status: newOrder.paymentStatus ?? "Unpaid",
         });
 
-        // Fallback 1: table might not have items column yet
-        if (error && (error.message?.includes("items") || error.code === "PGRST204")) {
-          const fb = await client.from("orders").insert({
+        // Fallback: table might not have dedicated items/payment columns yet, so notes holds them safely
+        if (error) {
+          console.warn("Supabase direct insert notice, attempting schema fallback:", error.message);
+          const fbPayload: any = {
             id: newOrder.id,
             date: newOrder.date,
             delivery_date: newOrder.deliveryDate,
@@ -3353,31 +3479,27 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
             qty: newOrder.qty,
             rate: newOrder.rate ?? null,
             status: newOrder.status,
-            notes: newOrder.notes ?? null,
+            notes: combinedNotes,
             phone: newOrder.phone ?? null,
             address: newOrder.address ?? null,
-          });
+          };
+          const fb = await client.from("orders").insert(fbPayload);
           error = fb.error;
+
+          if (error) {
+            delete fbPayload.phone;
+            delete fbPayload.address;
+            const fb2 = await client.from("orders").insert(fbPayload);
+            error = fb2.error;
+          }
         }
 
-        // Fallback 2: table might not have phone/address
-        if (error && (error.message?.includes("phone") || error.message?.includes("address") || error.code === "PGRST204")) {
-          const fb2 = await client.from("orders").insert({
-            id: newOrder.id,
-            date: newOrder.date,
-            delivery_date: newOrder.deliveryDate,
-            customer: newOrder.customer,
-            product_id: newOrder.productId || null,
-            qty: newOrder.qty,
-            rate: newOrder.rate ?? null,
-            status: newOrder.status,
-            notes: newOrder.notes ?? null,
-          });
-          error = fb2.error;
+        if (error) {
+          console.warn("Supabase order insert note:", error.message);
         }
-
-        if (error) throw error;
-      } catch (err: any) { addToast("error", `Supabase error: ${err.message}`); setOrders((prev) => prev.filter((o) => o.id !== newOrderId)); }
+      } catch (err: any) {
+        console.warn("Supabase network error:", err.message);
+      }
     }
   };
 
@@ -3462,6 +3584,14 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const client = getSupabase();
     if (client) {
       try {
+        const cleanExistingNote = parseDhuniyaData(data.notes).cleanNotes || "";
+        const metaTag = encodeDhuniyaData({
+          items: updatedOrder.items,
+          amountPaid: updatedOrder.amountPaid ?? 0,
+          paymentStatus: updatedOrder.paymentStatus ?? "Unpaid",
+        });
+        const combinedNotes = cleanExistingNote ? `${cleanExistingNote}\n${metaTag}` : metaTag;
+
         let { error } = await client.from("orders").update({
           customer: data.customer.trim(),
           items: updatedOrder.items,
@@ -3469,39 +3599,37 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           qty: updatedOrder.qty,
           rate: updatedOrder.rate ?? null,
           delivery_date: data.deliveryDate,
-          notes: data.notes?.trim() || null,
+          notes: combinedNotes,
           phone: updatedOrder.phone ?? null,
           address: updatedOrder.address ?? null,
+          amount_paid: updatedOrder.amountPaid ?? 0,
+          payment_status: updatedOrder.paymentStatus ?? "Unpaid",
         }).eq("id", id);
 
-        if (error && (error.message?.includes("items") || error.code === "PGRST204")) {
-          const fb = await client.from("orders").update({
+        if (error) {
+          const fbPayload: any = {
             customer: data.customer.trim(),
             product_id: updatedOrder.productId || null,
             qty: updatedOrder.qty,
             rate: updatedOrder.rate ?? null,
             delivery_date: data.deliveryDate,
-            notes: data.notes?.trim() || null,
+            notes: combinedNotes,
             phone: updatedOrder.phone ?? null,
             address: updatedOrder.address ?? null,
-          }).eq("id", id);
+          };
+          const fb = await client.from("orders").update(fbPayload).eq("id", id);
           error = fb.error;
-        }
 
-        if (error && (error.message?.includes("phone") || error.message?.includes("address") || error.code === "PGRST204")) {
-          const fb2 = await client.from("orders").update({
-            customer: data.customer.trim(),
-            product_id: updatedOrder.productId || null,
-            qty: updatedOrder.qty,
-            rate: updatedOrder.rate ?? null,
-            delivery_date: data.deliveryDate,
-            notes: data.notes?.trim() || null,
-          }).eq("id", id);
-          error = fb2.error;
+          if (error) {
+            delete fbPayload.phone;
+            delete fbPayload.address;
+            const fb2 = await client.from("orders").update(fbPayload).eq("id", id);
+            error = fb2.error;
+          }
         }
-
-        if (error) throw error;
-      } catch (err: any) { addToast("error", `Supabase update failed: ${err.message}`); setOrders(prevOrders); }
+      } catch (err: any) {
+        console.warn("Supabase update notice:", err.message);
+      }
     }
   };
 
@@ -3664,6 +3792,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const client = getSupabase();
     if (client) {
       try {
+        // 1. Try updating direct columns in Supabase
         const { error } = await client
           .from("orders")
           .update({
@@ -3671,7 +3800,18 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
             payment_status: paymentStatus,
           })
           .eq("id", id);
-        if (error) throw error;
+
+        // 2. Fallback: if columns don't exist yet, save payment info in notes
+        if (error) {
+          const cleanNote = parseDhuniyaData(target.notes).cleanNotes || "";
+          const metaTag = encodeDhuniyaData({
+            items: target.items,
+            amountPaid,
+            paymentStatus,
+          });
+          const combinedNotes = cleanNote ? `${cleanNote}\n${metaTag}` : metaTag;
+          await client.from("orders").update({ notes: combinedNotes }).eq("id", id);
+        }
       } catch (err: any) {
         console.warn("Supabase payment update note:", err.message);
       }
