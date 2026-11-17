@@ -1627,7 +1627,16 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
     }
     if (groupBy === "product") {
       const map = new Map<number, Order[]>();
-      displayedOrders.forEach((o) => { const list = map.get(o.productId) ?? []; list.push(o); map.set(o.productId, list); });
+      displayedOrders.forEach((o) => {
+        const items = getOrderItems(o);
+        items.forEach((it) => {
+          const list = map.get(it.productId) ?? [];
+          if (!list.some((existing) => existing.id === o.id)) {
+            list.push(o);
+          }
+          map.set(it.productId, list);
+        });
+      });
       return Array.from(map.entries()).map(([productId, ords]) => {
         const prod = products.find((p) => p.id === productId);
         return { key: `prod-${productId}`, title: prod?.name ?? `Product #${productId}`, orders: ords };
