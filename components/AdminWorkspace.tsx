@@ -41,19 +41,48 @@ export type Product = {
   imageUrl?: string;
 };
 
+export type OrderItem = {
+  productId: number;
+  qty: number;
+  rate?: number;
+};
+
 export type Order = {
   id: string;
   date: string;
   deliveryDate: string;
   customer: string;
-  productId: number;
-  qty: number;
+  items: OrderItem[];
+  // Keep legacy fields optional for backwards compatibility
+  productId?: number;
+  qty?: number;
   rate?: number;
   status: string;
   notes?: string;
 };
 
 // --- Constants ---
+
+export const getOrderItems = (o: Order): OrderItem[] => {
+  if (Array.isArray(o.items) && o.items.length > 0) return o.items;
+  if (o.productId) return [{ productId: o.productId, qty: o.qty ?? 0, rate: o.rate }];
+  return [];
+};
+
+export const getOrderTotal = (o: Order, products: Product[]): number => {
+  const items = getOrderItems(o);
+  return items.reduce((sum, item) => {
+    const prod = products.find((p) => p.id === item.productId);
+    const r = item.rate ?? prod?.price ?? 0;
+    return sum + (item.qty * r);
+  }, 0);
+};
+
+export const getOrderTotalKg = (o: Order): number => {
+  const items = getOrderItems(o);
+  return items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+};
+
 export const STATUS_OPTIONS = [
   "Pending",
   "Confirmed",
@@ -363,12 +392,25 @@ function Sidebar({ active, setActive, open, setOpen, orderCount, onLogout }: {
   );
 }
 
-function Invoice({ order, product, rate, onClose }: {
-  order: Order; product?: Product | null; rate: number; onClose: () => void;
+function Invoice({ order, products, onClose }: {
+  order: Order; products: Product[]; onClose: () => void;
 }) {
-  const total = order.qty * rate;
-  const productName = product?.name ?? "Sweet Item";
-  const productUnit = product?.unit ?? "kg";
+  const items = getOrderItems(order);
+  const lineItems = items.map((item) => {
+    const prod = products.find((p) => p.id === item.productId);
+    const unitPrice = item.rate ?? prod?.price ?? 0;
+    const amount = item.qty * unitPrice;
+    return {
+      product: prod,
+      name: prod?.name ?? "Sweet Item",
+      unit: prod?.unit ?? "kg",
+      qty: item.qty,
+      rate: unitPrice,
+      amount,
+    };
+  });
+  const total = lineItems.reduce((sum, item) => sum + item.amount, 0);
+
   return (
     <div className="invoice-modal-overlay fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-3 sm:p-4 backdrop-blur-xs flex items-center justify-center">
       <style dangerouslySetInnerHTML={{
@@ -386,7 +428,7 @@ function Invoice({ order, product, rate, onClose }: {
         <div className="border-b border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50 flex items-center justify-between print:hidden gap-2">
           <div>
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-600">Official Bill</p>
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">Invoice {order.id}</h2>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">Customer Invoice</h2>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
             <Button variant="outline" size="sm" onClick={() => window.print()} className="border-slate-300 text-slate-700 text-xs h-8 px-2.5 sm:px-3">
@@ -415,7 +457,7 @@ function Invoice({ order, product, rate, onClose }: {
             </div>
             <div className="text-left sm:text-right">
               <span className="inline-block rounded-md bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Customer Invoice</span>
-              <p className="mt-1 text-xl sm:text-2xl font-mono font-bold text-slate-900">{order.id}</p>
+              <p className="mt-1 text-base sm:text-lg font-bold text-slate-900">{order.customer}</p>
               <p className="mt-0.5 text-xs text-slate-500">Date: {dateLabel(order.date)}</p>
             </div>
           </div>
@@ -424,8 +466,24 @@ function Invoice({ order, product, rate, onClose }: {
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Billed To</p>
               <p className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{order.customer}</p>
+<<<<<<< Updated upstream
               <p className="text-xs text-slate-600">Order ID: {order.id}</p>
               {order.notes && <p className="mt-1 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 inline-block">Note: {order.notes}</p>}
+=======
+              {order.phone && (
+                <p className="mt-0.5 text-xs text-slate-600 flex items-center gap-1.5">
+                  <Phone className="size-3 text-slate-400 shrink-0" />
+                  <a href={`tel:${order.phone}`} className="text-amber-700 hover:underline font-medium">{order.phone}</a>
+                </p>
+              )}
+              {order.address && (
+                <p className="mt-0.5 text-xs text-slate-500 flex items-start gap-1.5">
+                  <MapPin className="size-3 text-slate-400 mt-0.5 shrink-0" />
+                  <span>{order.address}</span>
+                </p>
+              )}
+              {order.notes && <p className="mt-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 inline-block">Note: {order.notes}</p>}
+>>>>>>> Stashed changes
             </div>
             <div className="sm:text-right">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Handover Schedule</p>
@@ -435,8 +493,30 @@ function Invoice({ order, product, rate, onClose }: {
             </div>
           </div>
 
+<<<<<<< Updated upstream
           <div className="mt-4 print:mt-3 overflow-x-auto">
             <table className="w-full min-w-[360px] text-left text-sm">
+=======
+          {/* Mobile Item Breakdown */}
+          <div className="mt-4 sm:hidden print:hidden space-y-2">
+            {lineItems.map((item, idx) => (
+              <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-1.5">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-bold text-slate-900">{item.name}</p>
+                  <p className="text-sm font-extrabold text-slate-900">{money(item.amount)}</p>
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
+                  <span>Quantity: <strong className="text-slate-900">{item.qty} {item.unit}</strong></span>
+                  <span>Rate: <strong className="text-slate-900">{money(item.rate)}</strong> / {item.unit}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop & Print Table */}
+          <div className="hidden sm:block print:block mt-4 print:mt-3">
+            <table className="w-full text-left text-sm">
+>>>>>>> Stashed changes
               <thead className="border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="pb-2.5">Sweet Product</th>
@@ -445,13 +525,15 @@ function Invoice({ order, product, rate, onClose }: {
                   <th className="pb-2.5 text-right">Amount</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr className="border-b border-slate-100">
-                  <td className="py-2.5 font-semibold text-slate-900">{productName}</td>
-                  <td className="py-2.5 text-right font-medium text-slate-700">{order.qty} {productUnit}</td>
-                  <td className="py-2.5 text-right text-slate-700">{money(rate)}</td>
-                  <td className="py-2.5 text-right font-bold text-slate-900">{money(total)}</td>
-                </tr>
+              <tbody className="divide-y divide-slate-100">
+                {lineItems.map((item, idx) => (
+                  <tr key={idx} className="border-b border-slate-100">
+                    <td className="py-2.5 font-semibold text-slate-900">{item.name}</td>
+                    <td className="py-2.5 text-right font-medium text-slate-700">{item.qty} {item.unit}</td>
+                    <td className="py-2.5 text-right text-slate-700">{money(item.rate)}</td>
+                    <td className="py-2.5 text-right font-bold text-slate-900">{money(item.amount)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -634,8 +716,11 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
           <div className="mt-6">
             <div className="block sm:hidden space-y-3">
               {products.map((p) => {
-                const activeOrders = orders.filter((o) => o.productId === p.id && !["Completed", "Cancelled"].includes(o.status));
-                const totalOrderedKg = activeOrders.reduce((sum, o) => sum + o.qty, 0);
+                const activeOrders = orders.filter((o) => getOrderItems(o).some((it) => it.productId === p.id) && !["Completed", "Cancelled"].includes(o.status));
+                const totalOrderedKg = activeOrders.reduce((sum, o) => {
+                  const it = getOrderItems(o).find((i) => i.productId === p.id);
+                  return sum + (Number(it?.qty) || 0);
+                }, 0);
                 return (
                   <div key={p.id} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm hover:border-amber-300 transition-all space-y-3">
                     <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
@@ -700,8 +785,11 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {products.map((p) => {
-                      const activeOrders = orders.filter((o) => o.productId === p.id && !["Completed", "Cancelled"].includes(o.status));
-                      const totalOrderedKg = activeOrders.reduce((sum, o) => sum + o.qty, 0);
+                      const activeOrders = orders.filter((o) => getOrderItems(o).some((it) => it.productId === p.id) && !["Completed", "Cancelled"].includes(o.status));
+                      const totalOrderedKg = activeOrders.reduce((sum, o) => {
+                        const it = getOrderItems(o).find((i) => i.productId === p.id);
+                        return sum + (Number(it?.qty) || 0);
+                      }, 0);
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="px-6 py-4">
@@ -779,12 +867,34 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
   );
 }
 
+<<<<<<< Updated upstream
 type OrderFormData = { customer: string; productId: string; qty: string; deliveryDate: string; rate: string; notes: string; };
+=======
+export type OrderItemFormData = {
+  productId: string;
+  qty: string;
+  rate: string;
+};
+
+export type OrderFormData = {
+  customer: string;
+  items: OrderItemFormData[];
+  deliveryDate: string;
+  notes: string;
+  phone?: string;
+  address?: string;
+  // Legacy fields optional
+  productId?: string;
+  qty?: string;
+  rate?: string;
+};
+>>>>>>> Stashed changes
 
 function OrderModal({ initial, products, onSave, onClose }: {
   initial?: Order; products: Product[]; onSave: (data: OrderFormData) => void; onClose: () => void;
 }) {
   const activeProducts = products.filter((p) => p.active);
+<<<<<<< Updated upstream
   const [form, setForm] = useState<OrderFormData>({
     customer: initial?.customer ?? "",
     productId: initial?.productId?.toString() ?? (activeProducts[0]?.id?.toString() ?? ""),
@@ -795,33 +905,139 @@ function OrderModal({ initial, products, onSave, onClose }: {
   });
   const [errors, setErrors] = useState<Partial<OrderFormData>>({});
 
+=======
+  const normalizedCustomers = useMemo(() => {
+    return customers.map((c) => (typeof c === "string" ? { name: c, phone: undefined, address: undefined } : c));
+  }, [customers]);
+
+  const targetInitialCustomer = initial?.customer ?? (initialCustomer ?? "");
+  const matchedInitial = targetInitialCustomer
+    ? normalizedCustomers.find((c) => c.name.toLowerCase() === targetInitialCustomer.toLowerCase())
+    : null;
+
+  // Initialize line items
+  const initialItems: OrderItemFormData[] = useMemo(() => {
+    if (initial) {
+      const existingItems = getOrderItems(initial);
+      if (existingItems.length > 0) {
+        return existingItems.map((it) => ({
+          productId: it.productId ? String(it.productId) : (activeProducts[0]?.id ? String(activeProducts[0].id) : ""),
+          qty: it.qty ? String(it.qty) : "",
+          rate: it.rate ? String(it.rate) : "",
+        }));
+      }
+    }
+    return [
+      {
+        productId: activeProducts[0]?.id ? String(activeProducts[0].id) : (products[0]?.id ? String(products[0].id) : ""),
+        qty: "",
+        rate: "",
+      },
+    ];
+  }, [initial, activeProducts, products]);
+
+  const [customer, setCustomer] = useState(targetInitialCustomer);
+  const [phone, setPhone] = useState(initial?.phone ?? (matchedInitial?.phone ?? ""));
+  const [address, setAddress] = useState(initial?.address ?? (matchedInitial?.address ?? ""));
+  const [deliveryDate, setDeliveryDate] = useState(initial?.deliveryDate ?? getTodayStr());
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [items, setItems] = useState<OrderItemFormData[]>(initialItems);
+  const [errors, setErrors] = useState<{ customer?: string; deliveryDate?: string; items?: string }>({});
+
+  const selectCustomer = (name: string) => {
+    const matched = normalizedCustomers.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
+    setCustomer(name);
+    if (matched?.phone) setPhone(matched.phone);
+    if (matched?.address) setAddress(matched.address);
+    if (errors.customer) setErrors((prev) => ({ ...prev, customer: undefined }));
+  };
+
+  const addItem = () => {
+    const firstProd = activeProducts[0] ?? products[0];
+    setItems((prev) => [
+      ...prev,
+      {
+        productId: firstProd?.id ? String(firstProd.id) : "",
+        qty: "",
+        rate: "",
+      },
+    ]);
+  };
+
+  const removeItem = (idx: number) => {
+    if (items.length <= 1) return;
+    setItems((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const updateItem = (idx: number, field: keyof OrderItemFormData, val: string) => {
+    setItems((prev) =>
+      prev.map((item, i) => (i === idx ? { ...item, [field]: val } : item))
+    );
+  };
+
+>>>>>>> Stashed changes
   const validate = () => {
-    const e: Partial<OrderFormData> = {};
-    if (!form.customer.trim()) e.customer = "Customer name is required";
-    if (!form.productId) e.productId = "Please select a sweet product";
-    if (!form.qty || isNaN(Number(form.qty)) || Number(form.qty) <= 0) e.qty = "Valid quantity is required";
-    if (!form.deliveryDate) e.deliveryDate = "Delivery / handover date required";
+    const e: { customer?: string; deliveryDate?: string; items?: string } = {};
+    if (!customer.trim()) e.customer = "Customer name is required";
+    if (!deliveryDate) e.deliveryDate = "Delivery / handover date required";
+
+    if (items.length === 0) {
+      e.items = "At least one product line is required";
+    } else {
+      const invalid = items.some(
+        (it) => !it.productId || !it.qty || isNaN(Number(it.qty)) || Number(it.qty) <= 0
+      );
+      if (invalid) e.items = "Please enter valid quantities for all product items";
+    }
     return e;
   };
 
   const submit = () => {
     const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
-    onSave(form);
+    if (Object.keys(e).length) {
+      setErrors(e);
+      return;
+    }
+    onSave({
+      customer: customer.trim(),
+      phone: phone.trim() || undefined,
+      address: address.trim() || undefined,
+      deliveryDate,
+      notes: notes.trim(),
+      items: items.map((it) => ({
+        productId: it.productId,
+        qty: it.qty,
+        rate: it.rate,
+      })),
+    });
   };
 
-  const selectedProduct = products.find((p) => p.id === Number(form.productId));
+  // Grand total calculation for all items in the modal
+  const grandTotal = items.reduce((sum, it) => {
+    const p = products.find((prod) => prod.id === Number(it.productId));
+    const r = Number(it.rate) > 0 ? Number(it.rate) : (p?.price ?? 0);
+    const q = Number(it.qty) || 0;
+    return sum + (q * r);
+  }, 0);
+
+  const totalKg = items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center">
+<<<<<<< Updated upstream
       <div className="my-5 w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6 sm:py-5 bg-slate-50">
+=======
+      <div className="my-auto w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-4 py-3.5 sm:px-6 sm:py-5 bg-slate-50">
+>>>>>>> Stashed changes
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-amber-600">{initial ? "Edit" : "New"} Order</p>
             <h3 className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{initial ? "Update Customer Order" : "Place New Customer Order"}</h3>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200"><X className="size-4" /></button>
         </div>
+<<<<<<< Updated upstream
         <div className="space-y-4 px-4 py-5 sm:px-6 sm:py-6">
           <div>
             <label className="mb-1.5 block text-xs font-bold text-slate-700">Customer Name *</label>
@@ -829,9 +1045,52 @@ function OrderModal({ initial, products, onSave, onClose }: {
               value={form.customer}
               onChange={(e) => setForm({ ...form, customer: e.target.value })}
               placeholder="e.g. Sharma Sweets, Grand Banquets"
+=======
+
+        <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+          {/* Customer Selection */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-700">Customer Name *</label>
+              {normalizedCustomers.length > 0 && (
+                <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                  {normalizedCustomers.length} saved customer{normalizedCustomers.length !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+
+            {normalizedCustomers.length > 0 && (
+              <div className="mb-2">
+                <select
+                  value={normalizedCustomers.some((c) => c.name.toLowerCase() === customer.toLowerCase()) ? (normalizedCustomers.find((c) => c.name.toLowerCase() === customer.toLowerCase())?.name ?? customer) : ""}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      selectCustomer(e.target.value);
+                    }
+                  }}
+                  className="w-full rounded-xl border border-amber-300/80 bg-amber-50/70 px-3.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
+                >
+                  <option value="">▼ Select from saved customers ({normalizedCustomers.length})...</option>
+                  {normalizedCustomers.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      👤 {c.name} {c.phone ? `(${c.phone})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <input
+              list="customer-suggestions"
+              value={customer}
+              onChange={(e) => selectCustomer(e.target.value)}
+              placeholder={normalizedCustomers.length > 0 ? "Or type a new customer name..." : "e.g. Sharma Sweets, Grand Banquets"}
+              autoComplete="off"
+>>>>>>> Stashed changes
               className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.customer ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
             />
             {errors.customer && <p className="mt-1 text-xs text-rose-600">{errors.customer}</p>}
+<<<<<<< Updated upstream
           </div>
           <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
             <div>
@@ -878,33 +1137,212 @@ function OrderModal({ initial, products, onSave, onClose }: {
                 placeholder={`Default: Rs. ${selectedProduct?.price ?? 0}`}
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
               />
+=======
+
+            {normalizedCustomers.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-0.5">Quick pick:</span>
+                {normalizedCustomers.slice(0, 5).map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => selectCustomer(c.name)}
+                    className={`text-[11px] font-medium px-2 py-0.5 rounded-lg border transition-all ${
+                      customer.toLowerCase() === c.name.toLowerCase()
+                        ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                        : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300"
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Customer Phone & Address */}
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Mobile Number <span className="font-normal text-slate-400">(Optional)</span>
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="e.g. 0756656135"
+                    className="w-full rounded-xl border border-slate-300 pl-9 pr-3.5 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Delivery Address <span className="font-normal text-slate-400">(Optional)</span>
+                </label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+                  <input
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="e.g. 138 France City"
+                    className="w-full rounded-xl border border-slate-300 pl-9 pr-3.5 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+                  />
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Delivery Date */}
+          <div>
+            <label className="mb-1.5 block text-xs font-bold text-slate-700">Handover / Delivery Date *</label>
+            <input
+              type="date"
+              value={deliveryDate}
+              onChange={(e) => setDeliveryDate(e.target.value)}
+              className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.deliveryDate ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
+            />
+            {errors.deliveryDate && <p className="mt-1 text-xs text-rose-600">{errors.deliveryDate}</p>}
+          </div>
+
+          {/* Multiple Product Line Items */}
+          <div className="space-y-3 pt-2 border-t border-slate-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Order Items ({items.length})
+                </label>
+                <p className="text-[11px] text-slate-500">Add all sweets included in this customer order</p>
+              </div>
+              <button
+                type="button"
+                onClick={addItem}
+                className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-2xs"
+              >
+                <Plus className="size-3.5" />
+                <span>Add Product</span>
+              </button>
+            </div>
+
+            {errors.items && <p className="text-xs text-rose-600 font-semibold">{errors.items}</p>}
+
+            <div className="space-y-2.5">
+              {items.map((item, idx) => {
+                const prod = products.find((p) => p.id === Number(item.productId));
+                const itemRate = Number(item.rate) > 0 ? Number(item.rate) : (prod?.price ?? 0);
+                const itemSubtotal = (Number(item.qty) || 0) * itemRate;
+
+                return (
+                  <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 sm:p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        Item #{idx + 1}
+                      </span>
+                      {items.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeItem(idx)}
+                          className="text-slate-400 hover:text-rose-600 p-1 rounded-md transition-colors"
+                          title="Remove this product"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-12 sm:items-end">
+                      {/* Product select */}
+                      <div className="sm:col-span-5">
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Sweet Product</label>
+                        <select
+                          value={item.productId}
+                          onChange={(e) => updateItem(idx, "productId", e.target.value)}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm font-medium outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+                        >
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({money(p.price)}/{p.unit})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Quantity */}
+                      <div className="sm:col-span-3">
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          Qty ({prod?.unit ?? "kg"})
+                        </label>
+                        <input
+                          type="number"
+                          step="0.25"
+                          value={item.qty}
+                          onChange={(e) => updateItem(idx, "qty", e.target.value)}
+                          placeholder="e.g. 5"
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+                        />
+                      </div>
+
+                      {/* Custom Rate (Optional) */}
+                      <div className="sm:col-span-4">
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          Rate (Rs/{prod?.unit ?? "kg"})
+                        </label>
+                        <input
+                          type="number"
+                          value={item.rate}
+                          onChange={(e) => updateItem(idx, "rate", e.target.value)}
+                          placeholder={`${prod?.price ?? 0}`}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+                        />
+                      </div>
+                    </div>
+
+                    {Number(item.qty) > 0 && (
+                      <div className="flex justify-between items-center text-xs text-slate-600 pt-1 border-t border-slate-200/60 font-medium">
+                        <span>{prod?.name ?? "Item"}: {item.qty} {prod?.unit ?? "kg"} × {money(itemRate)}</span>
+                        <span className="font-bold text-slate-900">{money(itemSubtotal)}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+>>>>>>> Stashed changes
+            </div>
+          </div>
+
+          {/* Notes */}
           <div>
             <label className="mb-1.5 block text-xs font-bold text-slate-700">Special Notes (optional)</label>
             <textarea
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="e.g. Extra saffron, wedding gift boxes, morning handover…"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Extra saffron, wedding gift packaging, morning handover…"
               rows={2}
               className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 resize-none"
             />
           </div>
-          {form.productId && form.qty && (
+
+          {/* Running total */}
+          {totalKg > 0 && (
             <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 sm:p-4 flex items-center justify-between">
               <div>
-                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-800">Estimated Total Amount</p>
-                <p className="text-xs text-amber-700">Based on {form.qty} {selectedProduct?.unit ?? "kg"}</p>
+                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-800">Order Summary</p>
+                <p className="text-xs text-amber-700 font-medium">{items.length} product{items.length !== 1 ? "s" : ""} · {totalKg.toFixed(2)} kg total</p>
               </div>
               <p className="text-xl sm:text-2xl font-bold text-amber-900">
-                {money((Number(form.rate) || selectedProduct?.price || 0) * Number(form.qty))}
+                {money(grandTotal)}
               </p>
             </div>
           )}
         </div>
+<<<<<<< Updated upstream
         <div className="flex gap-3 border-t border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50">
+=======
+
+        <div className="shrink-0 flex gap-3 border-t border-slate-200 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-50">
+>>>>>>> Stashed changes
           <button onClick={onClose} className="flex-1 rounded-xl border border-slate-300 py-2.5 text-sm font-semibold text-slate-700 hover:bg-white transition-colors">Cancel</button>
-          <button onClick={submit} className="flex-1 rounded-xl bg-amber-600 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 shadow-xs">
+          <button onClick={submit} className="flex-1 rounded-xl bg-amber-600 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 shadow-xs font-bold">
             {initial ? "Update Order" : "Place Order"}
           </button>
         </div>
@@ -913,11 +1351,17 @@ function OrderModal({ initial, products, onSave, onClose }: {
   );
 }
 
+<<<<<<< Updated upstream
 function OrderCard({ order, product, onStatusChange, onGenerate, onEdit, onDelete }: {
   order: Order; product?: Product; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void;
+=======
+function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate, onEdit, onDelete }: {
+  order: Order; products: Product[]; customerLookup?: Map<string, Customer>; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void;
+>>>>>>> Stashed changes
 }) {
-  const rate = order.rate ?? product?.price ?? 0;
-  const total = order.qty * rate;
+  const items = getOrderItems(order);
+  const total = getOrderTotal(order, products);
+  const totalKg = getOrderTotalKg(order);
   const badge = getHandoverBadge(order.deliveryDate);
 
   return (
@@ -929,7 +1373,7 @@ function OrderCard({ order, product, onStatusChange, onGenerate, onEdit, onDelet
           </div>
           <div className="min-w-0">
             <h4 className="font-bold text-slate-900 text-base truncate leading-tight">{order.customer}</h4>
-            <span className="text-xs font-mono font-medium text-slate-400">{order.id}</span>
+            <span className="text-[11px] font-semibold text-slate-400">{items.length} item{items.length !== 1 ? "s" : ""} · {totalKg.toFixed(2)} kg</span>
           </div>
         </div>
         <div className="shrink-0">
@@ -937,6 +1381,7 @@ function OrderCard({ order, product, onStatusChange, onGenerate, onEdit, onDelet
         </div>
       </div>
 
+<<<<<<< Updated upstream
       <div className="flex items-center justify-between gap-3 bg-amber-50/50 rounded-xl p-3 border border-amber-100/70">
         <div className="min-w-0">
           <p className="text-sm font-bold text-slate-900 truncate">{product?.name ?? "—"}</p>
@@ -948,6 +1393,52 @@ function OrderCard({ order, product, onStatusChange, onGenerate, onEdit, onDelet
             <span className="text-xs font-bold text-slate-500">{product?.unit ?? "kg"}</span>
           </div>
           <p className="text-xs font-black text-slate-900">{money(total)}</p>
+=======
+      {(phone || address) && (
+        <div className="flex flex-col gap-1.5 bg-slate-50/90 rounded-xl p-2.5 text-xs border border-slate-200/80">
+          {phone && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500">Contact:</span>
+              <a
+                href={`tel:${phone}`}
+                className="inline-flex items-center gap-1.5 font-bold text-amber-800 bg-amber-100/90 hover:bg-amber-200 border border-amber-300/80 px-2.5 py-1 rounded-lg transition-colors active:scale-95 shadow-2xs"
+                title="Tap to open phone dial pad"
+              >
+                <Phone className="size-3 text-amber-700" />
+                <span>{phone}</span>
+                <span className="text-[10px] text-amber-700 font-semibold">📞 Call</span>
+              </a>
+            </div>
+          )}
+          {address && (
+            <div className="flex items-start gap-1.5 text-slate-600 pt-0.5 border-t border-slate-200/60">
+              <MapPin className="size-3 text-slate-400 shrink-0 mt-0.5" />
+              <span className="text-[11px] text-slate-700 leading-tight">{address}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Multiple Products Display */}
+      <div className="rounded-xl border border-amber-100/70 bg-amber-50/40 p-2.5 divide-y divide-amber-100/60 space-y-1.5">
+        {items.map((item, idx) => {
+          const prod = products.find((p) => p.id === item.productId);
+          const r = item.rate ?? prod?.price ?? 0;
+          const lineTotal = item.qty * r;
+          return (
+            <div key={idx} className={`flex items-center justify-between gap-2 ${idx > 0 ? "pt-1.5" : ""}`}>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-900 truncate">{prod?.name ?? "Sweet Item"}</p>
+                <p className="text-[11px] text-slate-500">{item.qty} {prod?.unit ?? "kg"} × {money(r)}</p>
+              </div>
+              <p className="text-xs font-bold text-slate-900 shrink-0">{money(lineTotal)}</p>
+            </div>
+          );
+        })}
+        <div className="flex items-center justify-between pt-2 text-xs font-black text-slate-900">
+          <span>Total Order Value:</span>
+          <span className="text-amber-700 text-sm">{money(total)}</span>
+>>>>>>> Stashed changes
         </div>
       </div>
 
@@ -982,8 +1473,13 @@ function OrderCard({ order, product, onStatusChange, onGenerate, onEdit, onDelet
   );
 }
 
+<<<<<<< Updated upstream
 function OrdersTable({ orders, getProduct, onStatusChange, onGenerate, onEdit, onDelete }: {
   orders: Order[]; getProduct: (id: number) => Product | undefined; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void;
+=======
+function OrdersTable({ orders, products, customerLookup, onStatusChange, onGenerate, onEdit, onDelete }: {
+  orders: Order[]; products: Product[]; customerLookup?: Map<string, Customer>; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void;
+>>>>>>> Stashed changes
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -992,8 +1488,8 @@ function OrdersTable({ orders, getProduct, onStatusChange, onGenerate, onEdit, o
           <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
             <tr>
               <th className="px-6 py-4">Customer</th>
-              <th className="px-6 py-4">Sweet Product</th>
-              <th className="px-6 py-4">Quantity</th>
+              <th className="px-6 py-4">Sweets & Products</th>
+              <th className="px-6 py-4">Total Qty</th>
               <th className="px-6 py-4">Handover Schedule</th>
               <th className="px-6 py-4">Amount</th>
               <th className="px-6 py-4">Status</th>
@@ -1002,9 +1498,9 @@ function OrdersTable({ orders, getProduct, onStatusChange, onGenerate, onEdit, o
           </thead>
           <tbody className="divide-y divide-slate-100">
             {orders.map((order) => {
-              const prod = getProduct(order.productId);
-              const rate = order.rate ?? prod?.price ?? 0;
-              const total = order.qty * rate;
+              const items = getOrderItems(order);
+              const total = getOrderTotal(order, products);
+              const totalKg = getOrderTotalKg(order);
               const badge = getHandoverBadge(order.deliveryDate);
               return (
                 <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
@@ -1013,22 +1509,59 @@ function OrdersTable({ orders, getProduct, onStatusChange, onGenerate, onEdit, o
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 font-bold text-xs">
                         {order.customer.charAt(0).toUpperCase()}
                       </div>
+<<<<<<< Updated upstream
                       <div>
                         <p className="font-bold text-slate-900">{order.customer}</p>
                         <div className="flex items-center gap-1.5 text-xs text-slate-400">
                           <span className="font-mono text-slate-500">{order.id}</span>
                           {order.notes && (<><span>·</span><span className="italic text-slate-600 max-w-[200px] truncate">&ldquo;{order.notes}&rdquo;</span></>)}
+=======
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 leading-tight">{order.customer}</p>
+                        <div className="flex flex-col gap-0.5 mt-1 text-xs">
+                          {phone && (
+                            <a
+                              href={`tel:${phone}`}
+                              className="inline-flex items-center gap-1 font-semibold text-amber-700 hover:text-amber-800 hover:underline w-fit"
+                              title="Click to dial"
+                            >
+                              <Phone className="size-3 text-amber-600" />
+                              <span>{phone}</span>
+                            </a>
+                          )}
+                          {address && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 truncate max-w-[200px]" title={address}>
+                              <MapPin className="size-2.5 text-slate-400 shrink-0" />
+                              <span className="truncate">{address}</span>
+                            </span>
+                          )}
+                          {order.notes && (
+                            <span className="italic text-slate-500 max-w-[200px] truncate text-[11px]">
+                              &ldquo;{order.notes}&rdquo;
+                            </span>
+                          )}
+>>>>>>> Stashed changes
                         </div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="font-bold text-slate-900">{prod?.name ?? "—"}</p>
-                    <p className="text-xs text-slate-400">{money(rate)} / {prod?.unit ?? "kg"}</p>
+                    <div className="space-y-1 max-w-xs">
+                      {items.map((item, idx) => {
+                        const prod = products.find((p) => p.id === item.productId);
+                        const r = item.rate ?? prod?.price ?? 0;
+                        return (
+                          <div key={idx} className="flex items-center justify-between text-xs gap-3">
+                            <span className="font-semibold text-slate-800 truncate">{prod?.name ?? "Sweet Item"}</span>
+                            <span className="text-slate-500 shrink-0">{item.qty} {prod?.unit ?? "kg"} ({money(r)})</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-base font-bold text-amber-600">{order.qty}</span>
-                    <span className="ml-1 text-xs text-slate-500">{prod?.unit ?? "kg"}</span>
+                    <span className="text-base font-bold text-amber-600">{totalKg.toFixed(2)}</span>
+                    <span className="ml-1 text-xs text-slate-500">kg</span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1">
@@ -1092,8 +1625,15 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
   const activeFilteredProduct = useMemo(() => (filterProductId !== "All" ? products.find((p) => p.id === Number(filterProductId)) : null), [filterProductId, products]);
 
   const filtered = useMemo(() => orders.filter((o) => {
-    const matchProduct = filterProductId === "All" || o.productId === Number(filterProductId);
-    const matchQuery = o.customer.toLowerCase().includes(query.toLowerCase()) || o.id.toLowerCase().includes(query.toLowerCase()) || (o.notes && o.notes.toLowerCase().includes(query.toLowerCase())) || (products.find((p) => p.id === o.productId)?.name ?? "").toLowerCase().includes(query.toLowerCase());
+    const items = getOrderItems(o);
+    const matchProduct = filterProductId === "All" || items.some((it) => it.productId === Number(filterProductId));
+    const matchQuery =
+      o.customer.toLowerCase().includes(query.toLowerCase()) ||
+      (o.notes && o.notes.toLowerCase().includes(query.toLowerCase())) ||
+      items.some((it) => {
+        const p = products.find((prod) => prod.id === it.productId);
+        return (p?.name ?? "").toLowerCase().includes(query.toLowerCase());
+      });
     const matchStatus = filterStatus === "All" || o.status === filterStatus;
     const matchDate = !filterDate || o.date === filterDate || o.deliveryDate === filterDate;
     return matchProduct && matchQuery && matchStatus && matchDate;
@@ -1115,7 +1655,7 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
     return true;
   }), [filtered, quickTab, todayStr]);
 
-  const totalFilteredKg = useMemo(() => displayedOrders.reduce((sum, o) => sum + o.qty, 0), [displayedOrders]);
+  const totalFilteredKg = useMemo(() => displayedOrders.reduce((sum, o) => sum + getOrderTotalKg(o), 0), [displayedOrders]);
   const getProduct = (id: number) => products.find((p) => p.id === id);
 
   const groupedOrders = useMemo(() => {
@@ -1138,7 +1678,16 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
     }
     if (groupBy === "product") {
       const map = new Map<number, Order[]>();
-      displayedOrders.forEach((o) => { const list = map.get(o.productId) ?? []; list.push(o); map.set(o.productId, list); });
+      displayedOrders.forEach((o) => {
+        const items = getOrderItems(o);
+        items.forEach((it) => {
+          const list = map.get(it.productId) ?? [];
+          if (!list.some((existing) => existing.id === o.id)) {
+            list.push(o);
+          }
+          map.set(it.productId, list);
+        });
+      });
       return Array.from(map.entries()).map(([productId, ords]) => {
         const prod = products.find((p) => p.id === productId);
         return { key: `prod-${productId}`, title: prod?.name ?? `Product #${productId}`, orders: ords };
@@ -1251,7 +1800,7 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
         ) : (
           <div className="mt-6 space-y-7">
             {groupedOrders.map((group) => {
-              const groupKg = group.orders.reduce((sum, o) => sum + o.qty, 0);
+              const groupKg = group.orders.reduce((sum, o) => sum + getOrderTotalKg(o), 0);
               return (
                 <section key={group.key} className="space-y-3">
                   {groupBy !== "none" && (
@@ -1266,12 +1815,21 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
                   )}
                   <div className="block sm:hidden space-y-3.5">
                     {group.orders.map((order) => {
+<<<<<<< Updated upstream
                       const prod = getProduct(order.productId);
                       return <OrderCard key={order.id} order={order} product={prod} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} />;
                     })}
                   </div>
                   <div className="hidden sm:block">
                     <OrdersTable orders={group.orders} getProduct={getProduct} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} />
+=======
+                      // multi-product ready
+                      return <OrderCard key={order.id} order={order} products={products} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} />;
+                    })}
+                  </div>
+                  <div className="hidden sm:block">
+                    <OrdersTable orders={group.orders} products={products} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} />
+>>>>>>> Stashed changes
                   </div>
                 </section>
               );
@@ -1287,7 +1845,7 @@ function OrdersPage({ orders, products, onAdd, onEdit, onDelete, onStatusChange,
         />
       )}
       {deleteId !== null && (
-        <ConfirmDialog title="Delete Customer Order?" message={`Order ${deleteId} will be permanently removed.`}
+        <ConfirmDialog title="Delete Customer Order?" message="This customer order will be permanently removed."
           onConfirm={() => { onDelete(deleteId); setDeleteId(null); }} onCancel={() => setDeleteId(null)}
         />
       )}
@@ -1301,12 +1859,17 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
   const [expandCustomers, setExpandCustomers] = useState(false);
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
   const activeOrders = orders.filter((o) => !["Completed", "Cancelled"].includes(o.status));
-  const totalKg = activeOrders.reduce((sum, o) => sum + o.qty, 0);
+  const totalKg = activeOrders.reduce((sum, o) => sum + getOrderTotalKg(o), 0);
   const activeProductCount = products.filter((p) => p.active).length;
 
   const productBreakdown = products.map((p) => {
-    const orderList = activeOrders.filter((o) => o.productId === p.id).sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate));
-    const kg = orderList.reduce((sum, o) => sum + o.qty, 0);
+    const orderList = activeOrders
+      .filter((o) => getOrderItems(o).some((it) => it.productId === p.id))
+      .sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate));
+    const kg = orderList.reduce((sum, o) => {
+      const it = getOrderItems(o).find((i) => i.productId === p.id);
+      return sum + (Number(it?.qty) || 0);
+    }, 0);
     return { product: p, kg, count: orderList.length, orders: orderList };
   }).filter((b) => b.count > 0);
 
@@ -1315,7 +1878,7 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
   const customerMap = new Map<string, { orders: number; kg: number }>();
   activeOrders.forEach((o) => {
     const existing = customerMap.get(o.customer) ?? { orders: 0, kg: 0 };
-    customerMap.set(o.customer, { orders: existing.orders + 1, kg: existing.kg + o.qty });
+    customerMap.set(o.customer, { orders: existing.orders + 1, kg: existing.kg + getOrderTotalKg(o) });
   });
   const customers = Array.from(customerMap.entries());
 
@@ -1419,7 +1982,7 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
                                     <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[11px] font-bold text-amber-800">{o.customer.charAt(0).toUpperCase()}</div>
                                     <div className="min-w-0">
                                       <p className="text-sm font-bold text-slate-900 truncate">{o.customer}</p>
-                                      <p className="text-[11px] font-mono text-slate-400">{o.id}</p>
+                                      
                                     </div>
                                   </div>
                                   <Badge status={o.status} />
@@ -1431,7 +1994,7 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
                                     <span className="font-semibold text-slate-800">{dateLabel(o.deliveryDate)}</span>
                                     {badge && (<span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-bold ${badge.style}`}>{badge.label}</span>)}
                                   </div>
-                                  <span className="text-sm font-extrabold text-amber-700">{o.qty} {product.unit}</span>
+                                  <span className="text-sm font-extrabold text-amber-700">{(getOrderItems(o).find(it => it.productId === product.id)?.qty ?? o.qty ?? 0)} {product.unit}</span>
                                 </div>
                               </div>
                             );
@@ -1451,10 +2014,10 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
                                     <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-800">{o.customer.charAt(0).toUpperCase()}</div>
                                     <div className="min-w-0">
                                       <p className="text-sm font-bold truncate text-slate-900">{o.customer}</p>
-                                      <p className="text-[11px] text-slate-400 font-mono truncate">{o.id}{o.notes ? ` · "${o.notes}"` : ""}</p>
+                                      <p className="text-[11px] text-slate-400 truncate">{o.notes ? `"${o.notes}"` : ""}</p>
                                     </div>
                                   </div>
-                                  <p className="text-sm font-bold text-right text-amber-600">{o.qty} {product.unit}</p>
+                                  <p className="text-sm font-bold text-right text-amber-600">{(getOrderItems(o).find(it => it.productId === product.id)?.qty ?? o.qty ?? 0)} {product.unit}</p>
                                   <div className="text-right">
                                     <div className="inline-flex items-center gap-1 text-sm justify-end"><Calendar className="size-3 text-amber-600" /><span className="font-bold text-slate-800">{dateLabel(o.deliveryDate)}</span></div>
                                     {badge && (<div className="mt-0.5"><span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-bold ${badge.style}`}>{badge.label}</span></div>)}
@@ -1552,6 +2115,472 @@ function Dashboard({ orders, products, setActive, onViewProductOrders, onOpenSid
   );
 }
 
+<<<<<<< Updated upstream
+=======
+function CustomerModal({ initial, onSave, onClose }: {
+  initial?: Customer;
+  onSave: (data: CustomerFormData) => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState<CustomerFormData>({
+    name: initial?.name ?? "",
+    phone: initial?.phone ?? "",
+    address: initial?.address ?? "",
+    notes: initial?.notes ?? "",
+  });
+  const [errors, setErrors] = useState<Partial<CustomerFormData>>({});
+
+  const validate = () => {
+    const e: Partial<CustomerFormData> = {};
+    if (!form.name.trim()) e.name = "Customer name is required";
+    return e;
+  };
+
+  const submit = () => {
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    onSave(form);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center">
+      <div className="my-auto w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-4 py-3.5 sm:px-6 sm:py-5 bg-slate-50">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-600">{initial ? "Edit" : "New"} Customer</p>
+            <h3 className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{initial ? "Update Customer Details" : "Add New Customer"}</h3>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200"><X className="size-4" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">Customer Name *</label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Grand Banquets, Deen Sweets"
+              className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.name ? "border-rose-400 bg-rose-50/30" : "border-slate-300"}`}
+            />
+            {errors.name && <p className="mt-1 text-xs text-rose-600">{errors.name}</p>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">Phone Number</label>
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="e.g. 0756656135"
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">Address / Location</label>
+            <input
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              placeholder="e.g. 138 France City, Maruthamunai"
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">Customer Notes / Preferences</label>
+            <textarea
+              rows={2}
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="e.g. Regular wholesale buyer, prefers delivery in mornings"
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all"
+            />
+          </div>
+        </div>
+
+        <div className="shrink-0 flex items-center justify-end gap-3 border-t border-slate-200 px-4 py-3 sm:px-6 sm:py-4 bg-slate-50">
+          <button onClick={onClose} className="rounded-xl border border-slate-300 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors">
+            Cancel
+          </button>
+          <button onClick={submit} className="rounded-xl bg-amber-600 px-5 py-2 text-xs sm:text-sm font-semibold text-white hover:bg-amber-700 shadow-sm transition-colors">
+            {initial ? "Save Changes" : "Add Customer"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CustomersPage({
+  customers,
+  orders,
+  onAdd,
+  onEdit,
+  onDelete,
+  onCreateOrder,
+  onOpenSidebar,
+}: {
+  customers: Customer[];
+  orders: Order[];
+  onAdd: (data: CustomerFormData) => void;
+  onEdit: (id: number | string, data: CustomerFormData) => void;
+  onDelete: (id: number | string, name: string) => void;
+  onCreateOrder: (customerName: string) => void;
+  onOpenSidebar?: () => void;
+}) {
+  const [showModal, setShowModal] = useState(false);
+  const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [query, setQuery] = useState("");
+
+  // Customer order stats
+  const customerStats = useMemo(() => {
+    const map = new Map<string, { totalOrders: number; activeOrders: number; totalKg: number; lastDate: string }>();
+    for (const o of orders) {
+      const name = o.customer?.trim();
+      if (!name) continue;
+      const cur = map.get(name) ?? { totalOrders: 0, activeOrders: 0, totalKg: 0, lastDate: "" };
+      cur.totalOrders += 1;
+      if (!["Completed", "Cancelled"].includes(o.status)) {
+        cur.activeOrders += 1;
+      }
+      cur.totalKg += getOrderTotalKg(o);
+      if (!cur.lastDate || o.date > cur.lastDate) {
+        cur.lastDate = o.date;
+      }
+      map.set(name, cur);
+    }
+    return map;
+  }, [orders]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return customers;
+    return customers.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.phone && c.phone.toLowerCase().includes(q)) ||
+        (c.address && c.address.toLowerCase().includes(q)) ||
+        (c.notes && c.notes.toLowerCase().includes(q))
+    );
+  }, [customers, query]);
+
+  const totalActiveCustomers = Array.from(customerStats.values()).filter((s) => s.activeOrders > 0).length;
+
+  return (
+    <>
+      <PageHeader
+        title="Customers"
+        onMenu={onOpenSidebar}
+        action={
+          <button
+            onClick={() => { setEditCustomer(null); setShowModal(true); }}
+            className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-700 transition-colors"
+          >
+            <Plus className="size-4" />
+            <span>Add Customer</span>
+          </button>
+        }
+      />
+
+      <div className="mx-auto max-w-[1250px] px-3.5 py-5 sm:px-6 sm:py-8 lg:px-10">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-600">
+              <Users className="size-4" /> Customer Directory
+            </div>
+            <h2 className="mt-1 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+              Customer Accounts & Contacts
+            </h2>
+            <p className="mt-1 text-xs sm:text-sm text-slate-500">
+              Manage saved customer profiles, phone numbers, delivery locations, and order history.
+            </p>
+          </div>
+
+          <button
+            onClick={() => { setEditCustomer(null); setShowModal(true); }}
+            className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-amber-700 hover:shadow-md transition-all self-start sm:self-auto"
+          >
+            <Plus className="size-4" />
+            <span>Add Customer</span>
+          </button>
+        </div>
+
+        {/* Stats Row */}
+        <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-4">
+          <div className="rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-xs">
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Total Registered</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1">{customers.length}</p>
+            <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Saved in database</p>
+          </div>
+          <div className="rounded-xl sm:rounded-2xl border border-emerald-200/90 bg-emerald-50/40 p-3 sm:p-4 shadow-xs">
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-700">Active Buyers</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1">{totalActiveCustomers}</p>
+            <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Waiting for sweet orders</p>
+          </div>
+          <div className="col-span-2 sm:col-span-1 rounded-xl sm:rounded-2xl border border-amber-200/90 bg-amber-50/40 p-3 sm:p-4 shadow-xs">
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-700">Order Reuse</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1">100%</p>
+            <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Auto-suggests in order form</p>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="mt-5 sm:mt-6">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search customers by name, phone, or location..."
+              className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 shadow-xs"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 hover:text-slate-600"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Customer Cards & Table */}
+        {filtered.length === 0 ? (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center sm:p-12">
+            <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+              <Users className="size-6" />
+            </div>
+            <h3 className="mt-4 text-base font-bold text-slate-900">
+              {query ? "No matching customers found" : "No customers yet"}
+            </h3>
+            <p className="mt-1 text-xs sm:text-sm text-slate-500 max-w-sm mx-auto">
+              {query ? "Try clearing your search query" : "Add your first customer to quickly pick them whenever placing sweet production orders."}
+            </p>
+            {!query && (
+              <button
+                onClick={() => { setEditCustomer(null); setShowModal(true); }}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700"
+              >
+                <Plus className="size-4" /> Add First Customer
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Mobile Cards (Visible on mobile screens) */}
+            <div className="mt-4 block sm:hidden space-y-3">
+              {filtered.map((c) => {
+                const stats = customerStats.get(c.name.trim());
+                const initials = c.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+                return (
+                  <div key={c.id ?? c.name} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-100 to-amber-100 text-amber-900 font-bold text-xs border border-amber-300/40">
+                          {initials}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 text-sm truncate">{c.name}</p>
+                          {c.address && (
+                            <p className="text-[11px] text-slate-500 flex items-center gap-1 truncate mt-0.5">
+                              <MapPin className="size-3 text-slate-400 shrink-0" />
+                              <span className="truncate">{c.address}</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Orders badge */}
+                      {stats && stats.totalOrders > 0 ? (
+                        <span className="shrink-0 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                          {stats.totalOrders} order{stats.totalOrders !== 1 ? "s" : ""}
+                        </span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                          New
+                        </span>
+                      )}
+                    </div>
+
+                    {c.phone && (
+                      <div className="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2 text-xs">
+                        <span className="text-slate-500 font-medium">Contact:</span>
+                        <a href={`tel:${c.phone}`} className="font-bold text-amber-700 hover:underline flex items-center gap-1">
+                          <Phone className="size-3" />
+                          <span>{c.phone}</span>
+                        </a>
+                      </div>
+                    )}
+
+                    {c.notes && (
+                      <p className="text-xs text-slate-500 italic bg-amber-50/40 border border-amber-100 rounded-lg p-2">
+                        &ldquo;{c.notes}&rdquo;
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                      <button
+                        onClick={() => onCreateOrder(c.name)}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 hover:text-amber-700"
+                      >
+                        <Plus className="size-3.5" />
+                        <span>Place Order</span>
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => { setEditCustomer(c); setShowModal(true); }}
+                          className="rounded-lg p-1.5 text-slate-400 hover:text-amber-700 hover:bg-slate-100"
+                          title="Edit Customer"
+                        >
+                          <Edit2 className="size-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(c)}
+                          className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          title="Delete Customer"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table (Visible on sm and larger) */}
+            <div className="mt-5 hidden sm:block overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
+              <table className="w-full text-left text-sm text-slate-600">
+                <thead className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-6 py-3.5">Customer</th>
+                    <th className="px-6 py-3.5">Contact Phone</th>
+                    <th className="px-6 py-3.5">Address / Location</th>
+                    <th className="px-6 py-3.5">Order History</th>
+                    <th className="px-6 py-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map((c) => {
+                    const stats = customerStats.get(c.name.trim());
+                    const initials = c.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+                    return (
+                      <tr key={c.id ?? c.name} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-100 to-amber-100 text-amber-900 font-bold text-xs border border-amber-300/40">
+                              {initials}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-bold text-slate-900 block truncate">{c.name}</span>
+                              {c.notes && (
+                                <span className="text-xs text-slate-400 block truncate mt-0.5 italic">{c.notes}</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {c.phone ? (
+                            <a href={`tel:${c.phone}`} className="inline-flex items-center gap-1.5 font-semibold text-slate-800 hover:text-amber-700 hover:underline">
+                              <Phone className="size-3.5 text-slate-400" />
+                              <span>{c.phone}</span>
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">— No phone</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {c.address ? (
+                            <span className="inline-flex items-center gap-1.5 text-slate-700">
+                              <MapPin className="size-3.5 text-slate-400 shrink-0" />
+                              <span className="truncate max-w-[200px]">{c.address}</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">— No location</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {stats && stats.totalOrders > 0 ? (
+                            <div>
+                              <span className="font-bold text-slate-900">{stats.totalOrders} order{stats.totalOrders !== 1 ? "s" : ""}</span>
+                              <span className="text-xs text-slate-500 block">({stats.totalKg.toFixed(1)} kg total)</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-medium text-slate-400">No orders yet</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              onClick={() => onCreateOrder(c.name)}
+                              className="rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors"
+                              title="Create order for this customer"
+                            >
+                              + Order
+                            </button>
+                            <button
+                              onClick={() => { setEditCustomer(c); setShowModal(true); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:text-amber-700 hover:bg-slate-100 transition-colors"
+                              title="Edit Customer"
+                            >
+                              <Edit2 className="size-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteTarget(c)}
+                              className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                              title="Delete Customer"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+
+      {showModal && (
+        <CustomerModal
+          initial={editCustomer ?? undefined}
+          onSave={(data) => {
+            if (editCustomer && editCustomer.id !== undefined) {
+              onEdit(editCustomer.id, data);
+            } else {
+              onAdd(data);
+            }
+            setShowModal(false);
+            setEditCustomer(null);
+          }}
+          onClose={() => { setShowModal(false); setEditCustomer(null); }}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete Customer?"
+          message={`Are you sure you want to delete "${deleteTarget.name}"? This removes them from your saved directory.`}
+          onConfirm={() => {
+            if (deleteTarget.id !== undefined) {
+              onDelete(deleteTarget.id, deleteTarget.name);
+            }
+            setDeleteTarget(null);
+          }}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+    </>
+  );
+}
+
+>>>>>>> Stashed changes
 // ============================================================
 // ADMIN WORKSPACE COMPONENT
 // ============================================================
@@ -1608,7 +2637,46 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         const { data: ordData, error: ordErr } = await client.from("orders").select("*").order("created_at", { ascending: false });
         if (ordErr) throw ordErr;
         if (ordData && ordData.length > 0) {
+<<<<<<< Updated upstream
           const loadedOrders: Order[] = ordData.map((o: any) => ({ id: o.id, date: o.date, deliveryDate: o.delivery_date, customer: o.customer, productId: Number(o.product_id), qty: Number(o.qty), rate: o.rate ? Number(o.rate) : undefined, status: o.status, notes: o.notes || undefined }));
+=======
+          loadedOrders = ordData.map((o: any) => {
+            let parsedItems: OrderItem[] = [];
+            if (o.items) {
+              try {
+                const raw = typeof o.items === "string" ? JSON.parse(o.items) : o.items;
+                if (Array.isArray(raw)) {
+                  parsedItems = raw.map((it: any) => ({
+                    productId: Number(it.productId ?? it.product_id),
+                    qty: Number(it.qty),
+                    rate: it.rate ? Number(it.rate) : undefined,
+                  })).filter((it: OrderItem) => Boolean(it.productId && it.qty));
+                }
+              } catch {}
+            }
+            if (parsedItems.length === 0 && o.product_id) {
+              parsedItems = [{
+                productId: Number(o.product_id),
+                qty: Number(o.qty ?? 0),
+                rate: o.rate ? Number(o.rate) : undefined,
+              }];
+            }
+            return {
+              id: o.id,
+              date: o.date,
+              deliveryDate: o.delivery_date,
+              customer: o.customer,
+              items: parsedItems,
+              productId: parsedItems[0]?.productId ?? Number(o.product_id),
+              qty: parsedItems.reduce((s, it) => s + it.qty, 0),
+              rate: parsedItems[0]?.rate ?? (o.rate ? Number(o.rate) : undefined),
+              status: o.status,
+              notes: o.notes || undefined,
+              phone: o.phone || undefined,
+              address: o.address || undefined,
+            };
+          });
+>>>>>>> Stashed changes
           setOrders(loadedOrders);
           try { localStorage.setItem("dhuniya_orders", JSON.stringify(loadedOrders)); } catch { }
         } else {
@@ -1676,6 +2744,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
   const addOrder = async (data: OrderFormData) => {
     const newOrderId = genOrderId(orders);
+<<<<<<< Updated upstream
     const newOrder: Order = { id: newOrderId, date: getTodayStr(), deliveryDate: data.deliveryDate, customer: data.customer.trim(), productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined, status: "Pending", notes: data.notes?.trim() || undefined };
     setOrders((prev) => { const updated = [newOrder, ...prev]; try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
     addToast("success", `Order ${newOrderId} created for ${newOrder.customer}`);
@@ -1683,6 +2752,136 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     if (client) {
       try {
         const { error } = await client.from("orders").insert({ id: newOrder.id, date: newOrder.date, delivery_date: newOrder.deliveryDate, customer: newOrder.customer, product_id: newOrder.productId, qty: newOrder.qty, rate: newOrder.rate ?? null, status: newOrder.status, notes: newOrder.notes ?? null });
+=======
+    const parsedItems: OrderItem[] = (data.items && data.items.length > 0)
+      ? data.items.map((it) => ({
+          productId: Number(it.productId),
+          qty: Number(it.qty),
+          rate: it.rate ? Number(it.rate) : undefined,
+        }))
+      : (data.productId ? [{ productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined }] : []);
+
+    const primaryItem = parsedItems[0];
+    const totalQty = parsedItems.reduce((sum, it) => sum + it.qty, 0);
+
+    const newOrder: Order = {
+      id: newOrderId,
+      date: getTodayStr(),
+      deliveryDate: data.deliveryDate,
+      customer: data.customer.trim(),
+      items: parsedItems,
+      productId: primaryItem?.productId ?? 0,
+      qty: totalQty,
+      rate: primaryItem?.rate,
+      status: "Pending",
+      notes: data.notes?.trim() || undefined,
+      phone: data.phone?.trim() || undefined,
+      address: data.address?.trim() || undefined,
+    };
+    setOrders((prev) => { const updated = [newOrder, ...prev]; try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
+    
+    // Auto-save customer name, phone, address for dropdown & directory reuse
+    const custName = data.customer.trim();
+    const custPhone = data.phone?.trim() || undefined;
+    const custAddress = data.address?.trim() || undefined;
+
+    if (custName) {
+      setCustomers((prev) => {
+        const existing = prev.find((c) => c.name.toLowerCase() === custName.toLowerCase());
+        let updated: Customer[];
+        if (existing) {
+          updated = prev.map((c) =>
+            c.name.toLowerCase() === custName.toLowerCase()
+              ? {
+                  ...c,
+                  phone: custPhone || c.phone,
+                  address: custAddress || c.address,
+                }
+              : c
+          );
+        } else {
+          const newC: Customer = {
+            id: Date.now(),
+            name: custName,
+            phone: custPhone,
+            address: custAddress,
+          };
+          updated = [...prev, newC].sort((a, b) => a.name.localeCompare(b.name));
+        }
+        try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
+        return updated;
+      });
+
+      const client = getSupabase();
+      if (client) {
+        client.from("customers").upsert(
+          {
+            name: custName,
+            phone: custPhone || null,
+            address: custAddress || null,
+          },
+          { onConflict: "name" }
+        ).then(() => {}, () => {
+          client.from("customers").insert({ name: custName, phone: custPhone || null }).then(() => {}, () => {});
+        });
+      }
+    }
+
+    addToast("success", `Order placed for ${newOrder.customer}`);
+    const client = getSupabase();
+    if (client) {
+      try {
+        // Try inserting with items JSON
+        let { error } = await client.from("orders").insert({
+          id: newOrder.id,
+          date: newOrder.date,
+          delivery_date: newOrder.deliveryDate,
+          customer: newOrder.customer,
+          items: newOrder.items,
+          product_id: newOrder.productId || null,
+          qty: newOrder.qty,
+          rate: newOrder.rate ?? null,
+          status: newOrder.status,
+          notes: newOrder.notes ?? null,
+          phone: newOrder.phone ?? null,
+          address: newOrder.address ?? null,
+        });
+
+        // Fallback 1: table might not have items column yet
+        if (error && (error.message?.includes("items") || error.code === "PGRST204")) {
+          const fb = await client.from("orders").insert({
+            id: newOrder.id,
+            date: newOrder.date,
+            delivery_date: newOrder.deliveryDate,
+            customer: newOrder.customer,
+            product_id: newOrder.productId || null,
+            qty: newOrder.qty,
+            rate: newOrder.rate ?? null,
+            status: newOrder.status,
+            notes: newOrder.notes ?? null,
+            phone: newOrder.phone ?? null,
+            address: newOrder.address ?? null,
+          });
+          error = fb.error;
+        }
+
+        // Fallback 2: table might not have phone/address
+        if (error && (error.message?.includes("phone") || error.message?.includes("address") || error.code === "PGRST204")) {
+          const fb2 = await client.from("orders").insert({
+            id: newOrder.id,
+            date: newOrder.date,
+            delivery_date: newOrder.deliveryDate,
+            customer: newOrder.customer,
+            product_id: newOrder.productId || null,
+            qty: newOrder.qty,
+            rate: newOrder.rate ?? null,
+            status: newOrder.status,
+            notes: newOrder.notes ?? null,
+          });
+          error = fb2.error;
+        }
+
+>>>>>>> Stashed changes
         if (error) throw error;
       } catch (err: any) { addToast("error", `Supabase error: ${err.message}`); setOrders((prev) => prev.filter((o) => o.id !== newOrderId)); }
     }
@@ -1691,6 +2890,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
   const editOrder = async (id: string, data: OrderFormData) => {
     const prevOrders = [...orders];
     const current = orders.find((o) => o.id === id);
+<<<<<<< Updated upstream
     const updatedOrder: Order = { id, date: current?.date ?? getTodayStr(), customer: data.customer.trim(), productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined, deliveryDate: data.deliveryDate, notes: data.notes?.trim() || undefined, status: current?.status ?? "Pending" };
     setOrders((prev) => { const updated = prev.map((o) => (o.id === id ? updatedOrder : o)); try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
     addToast("success", `Order ${id} updated`);
@@ -1698,6 +2898,124 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     if (client) {
       try {
         const { error } = await client.from("orders").update({ customer: data.customer.trim(), product_id: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : null, delivery_date: data.deliveryDate, notes: data.notes?.trim() || null }).eq("id", id);
+=======
+    const parsedItems: OrderItem[] = (data.items && data.items.length > 0)
+      ? data.items.map((it) => ({
+          productId: Number(it.productId),
+          qty: Number(it.qty),
+          rate: it.rate ? Number(it.rate) : undefined,
+        }))
+      : (data.productId ? [{ productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined }] : []);
+
+    const primaryItem = parsedItems[0];
+    const totalQty = parsedItems.reduce((sum, it) => sum + it.qty, 0);
+
+    const updatedOrder: Order = {
+      id,
+      date: current?.date ?? getTodayStr(),
+      customer: data.customer.trim(),
+      items: parsedItems,
+      productId: primaryItem?.productId ?? current?.productId ?? 0,
+      qty: totalQty,
+      rate: primaryItem?.rate,
+      deliveryDate: data.deliveryDate,
+      notes: data.notes?.trim() || undefined,
+      phone: data.phone?.trim() || current?.phone || undefined,
+      address: data.address?.trim() || current?.address || undefined,
+      status: current?.status ?? "Pending",
+    };
+    setOrders((prev) => { const updated = prev.map((o) => (o.id === id ? updatedOrder : o)); try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
+    
+    // Auto-save customer name, phone, address for dropdown reuse
+    const custName = data.customer.trim();
+    const custPhone = data.phone?.trim() || undefined;
+    const custAddress = data.address?.trim() || undefined;
+
+    if (custName) {
+      setCustomers((prev) => {
+        const existing = prev.find((c) => c.name.toLowerCase() === custName.toLowerCase());
+        let updated: Customer[];
+        if (existing) {
+          updated = prev.map((c) =>
+            c.name.toLowerCase() === custName.toLowerCase()
+              ? {
+                  ...c,
+                  phone: custPhone || c.phone,
+                  address: custAddress || c.address,
+                }
+              : c
+          );
+        } else {
+          const newC: Customer = {
+            id: Date.now(),
+            name: custName,
+            phone: custPhone,
+            address: custAddress,
+          };
+          updated = [...prev, newC].sort((a, b) => a.name.localeCompare(b.name));
+        }
+        try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
+        return updated;
+      });
+
+      const client = getSupabase();
+      if (client) {
+        client.from("customers").upsert(
+          {
+            name: custName,
+            phone: custPhone || null,
+            address: custAddress || null,
+          },
+          { onConflict: "name" }
+        ).then(() => {}, () => {
+          client.from("customers").insert({ name: custName, phone: custPhone || null }).then(() => {}, () => {});
+        });
+      }
+    }
+
+    addToast("success", `Order updated`);
+    const client = getSupabase();
+    if (client) {
+      try {
+        let { error } = await client.from("orders").update({
+          customer: data.customer.trim(),
+          items: updatedOrder.items,
+          product_id: updatedOrder.productId || null,
+          qty: updatedOrder.qty,
+          rate: updatedOrder.rate ?? null,
+          delivery_date: data.deliveryDate,
+          notes: data.notes?.trim() || null,
+          phone: updatedOrder.phone ?? null,
+          address: updatedOrder.address ?? null,
+        }).eq("id", id);
+
+        if (error && (error.message?.includes("items") || error.code === "PGRST204")) {
+          const fb = await client.from("orders").update({
+            customer: data.customer.trim(),
+            product_id: updatedOrder.productId || null,
+            qty: updatedOrder.qty,
+            rate: updatedOrder.rate ?? null,
+            delivery_date: data.deliveryDate,
+            notes: data.notes?.trim() || null,
+            phone: updatedOrder.phone ?? null,
+            address: updatedOrder.address ?? null,
+          }).eq("id", id);
+          error = fb.error;
+        }
+
+        if (error && (error.message?.includes("phone") || error.message?.includes("address") || error.code === "PGRST204")) {
+          const fb2 = await client.from("orders").update({
+            customer: data.customer.trim(),
+            product_id: updatedOrder.productId || null,
+            qty: updatedOrder.qty,
+            rate: updatedOrder.rate ?? null,
+            delivery_date: data.deliveryDate,
+            notes: data.notes?.trim() || null,
+          }).eq("id", id);
+          error = fb2.error;
+        }
+
+>>>>>>> Stashed changes
         if (error) throw error;
       } catch (err: any) { addToast("error", `Supabase update failed: ${err.message}`); setOrders(prevOrders); }
     }
@@ -1706,7 +3024,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
   const deleteOrder = async (id: string) => {
     const prevOrders = [...orders];
     setOrders((prev) => { const updated = prev.filter((o) => o.id !== id); try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
-    addToast("info", `Deleted order ${id}`);
+    addToast("info", "Order deleted");
     const client = getSupabase();
     if (client) {
       try { const { error } = await client.from("orders").delete().eq("id", id); if (error) throw error; }
@@ -1726,8 +3044,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
   };
 
   const generateInvoice = (order: Order) => setInvoiceOrder(order);
-  const invoiceProduct = invoiceOrder ? (products.find((p) => p.id === invoiceOrder.productId) ?? { id: invoiceOrder.productId, name: "Sweet Item", unit: "kg", price: invoiceOrder.rate ?? 0, active: true }) : null;
-  const invoiceRate = invoiceOrder ? (invoiceOrder.rate ?? invoiceProduct?.price ?? 0) : 0;
+  
   const activeOrderCount = orders.filter((o) => !["Completed", "Cancelled"].includes(o.status)).length;
 
   return (
@@ -1768,7 +3085,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         </button>
       </nav>
 
-      {invoiceOrder && (<Invoice order={invoiceOrder} product={invoiceProduct} rate={invoiceRate} onClose={() => setInvoiceOrder(null)} />)}
+      {invoiceOrder && (<Invoice order={invoiceOrder} products={products} onClose={() => setInvoiceOrder(null)} />)}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
