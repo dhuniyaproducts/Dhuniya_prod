@@ -551,7 +551,17 @@ function Invoice({ order, products, onClose }: {
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Handover Schedule</p>
               <p className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{dateLabel(order.deliveryDate)}</p>
               <p className="text-xs text-slate-500">Order Status: <span className="font-semibold text-slate-800">{order.status}</span></p>
-              <p className="text-xs text-slate-400">Payment Due on Receipt</p>
+              {(() => {
+                const amtPaid = order.amountPaid ?? 0;
+                const isFullyPaid = amtPaid >= total && total > 0;
+                return isFullyPaid ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">✓ PAID IN FULL</span>
+                ) : amtPaid > 0 ? (
+                  <p className="text-xs text-amber-700 font-semibold">Partial: Rs.{amtPaid.toLocaleString('en-LK')} paid</p>
+                ) : (
+                  <p className="text-xs text-slate-400">Payment Due on Receipt</p>
+                );
+              })()}
             </div>
           </div>
 
@@ -595,13 +605,36 @@ function Invoice({ order, products, onClose }: {
             </table>
           </div>
 
-          {/* Grand Total */}
+          {/* Grand Total + Payment Summary */}
           <div className="mt-4 print:mt-3 flex justify-end">
-            <div className="w-full sm:max-w-[260px] border-t-2 border-slate-900 pt-2.5">
+            <div className="w-full sm:max-w-[280px] border-t-2 border-slate-900 pt-2.5 space-y-1.5">
               <div className="flex items-center justify-between text-sm sm:text-base font-bold text-slate-900">
                 <span>Grand Total:</span>
                 <span className="text-xl sm:text-2xl text-amber-600">{money(total)}</span>
               </div>
+              {(() => {
+                const amtPaid = order.amountPaid ?? 0;
+                const balance = Math.max(0, total - amtPaid);
+                const isFullyPaid = amtPaid >= total && total > 0;
+                return isFullyPaid ? (
+                  <div className="mt-1 rounded-xl bg-emerald-50 border border-emerald-300 px-3 py-2 text-center">
+                    <p className="text-sm font-black text-emerald-800 tracking-wider">✓ PAID IN FULL</p>
+                  </div>
+                ) : amtPaid > 0 ? (
+                  <>
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                      <span>Amount Paid:</span>
+                      <span className="font-bold text-emerald-700">{money(amtPaid)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs font-bold border-t border-slate-200 pt-1.5">
+                      <span className="text-rose-700">Balance Due:</span>
+                      <span className="text-rose-700 text-sm">{money(balance)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-500 text-right">Payment Due on Receipt</p>
+                );
+              })()}
             </div>
           </div>
 
@@ -1315,6 +1348,7 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
   const [customer, setCustomer] = useState(targetInitialCustomer);
   const [phone, setPhone] = useState(initial?.phone ?? (matchedInitial?.phone ?? ""));
   const [address, setAddress] = useState(initial?.address ?? (matchedInitial?.address ?? ""));
+  const [showContactFields, setShowContactFields] = useState(!!(initial?.phone || initial?.address || matchedInitial?.phone || matchedInitial?.address));
   const [deliveryDate, setDeliveryDate] = useState(initial?.deliveryDate ?? getTodayStr());
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [items, setItems] = useState<OrderItemFormData[]>(initialItems);
@@ -1325,8 +1359,8 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
   const selectCustomer = (name: string) => {
     const matched = normalizedCustomers.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
     setCustomer(name);
-    if (matched?.phone) setPhone(matched.phone);
-    if (matched?.address) setAddress(matched.address);
+    if (matched?.phone) { setPhone(matched.phone); setShowContactFields(true); }
+    if (matched?.address) { setAddress(matched.address); setShowContactFields(true); }
     if (errors.customer) setErrors((prev) => ({ ...prev, customer: undefined }));
   };
 
@@ -1466,38 +1500,48 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
                 </div>
               )}
 
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Mobile Number <span className="font-normal text-slate-400">(Optional)</span>
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="e.g. 0756656135"
-                      className="w-full rounded-xl border border-slate-300 pl-9 pr-3.5 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
-                    />
+              {/* Toggle for contact details */}
+              <button
+                type="button"
+                onClick={() => setShowContactFields((v) => !v)}
+                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800 transition-colors"
+              >
+                <ChevronDown className={`size-3.5 transition-transform duration-200 ${showContactFields ? "rotate-180" : ""}`} />
+                {showContactFields ? "Hide contact details" : "+ Add mobile / address"}
+              </button>
+              {showContactFields && (
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Mobile Number <span className="font-normal text-slate-400">(Optional)</span>
+                    </label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="e.g. 0756656135"
+                        className="w-full rounded-xl border border-slate-300 pl-9 pr-3.5 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Delivery Address <span className="font-normal text-slate-400">(Optional)</span>
+                    </label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+                      <input
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="e.g. 138 France City"
+                        className="w-full rounded-xl border border-slate-300 pl-9 pr-3.5 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Delivery Address <span className="font-normal text-slate-400">(Optional)</span>
-                  </label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
-                    <input
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      placeholder="e.g. 138 France City"
-                      className="w-full rounded-xl border border-slate-300 pl-9 pr-3.5 py-2 text-xs sm:text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+              )}</div>
 
             {/* Handover Date */}
             <div>
@@ -1526,9 +1570,9 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
                     setEditingItemIdx(null);
                     setShowItemDialog(true);
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-2xs"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors whitespace-nowrap"
                 >
-                  <Plus className="size-3.5" />
+                  <Plus className="size-3" />
                   <span>Add Product</span>
                 </button>
               </div>
@@ -1712,15 +1756,7 @@ function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate
           );
         })}
         <div className="flex items-center justify-between pt-1 border-t border-amber-100/60">
-          <button
-            type="button"
-            onClick={() => onManagePayment(order)}
-            className="cursor-pointer group flex items-center gap-1"
-            title="Click to manage payment"
-          >
-            <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
-            <span className="text-[10px] text-amber-700 font-semibold underline group-hover:text-amber-800">Edit Pay</span>
-          </button>
+          <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
           <span className="text-xs font-black text-amber-800">{money(total)}</span>
         </div>
       </div>
@@ -1818,15 +1854,7 @@ function OrdersTable({ orders, products, customerLookup, onStatusChange, onGener
                   </td>
                   <td className="px-4 py-2.5 font-bold text-sm text-slate-900">{money(total)}</td>
                   <td className="px-4 py-2.5">
-                    <button
-                      type="button"
-                      onClick={() => onManagePayment(order)}
-                      className="cursor-pointer group flex items-center gap-1 hover:opacity-80 transition-opacity"
-                      title="Click to manage payment"
-                    >
-                      <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
-                      <span className="text-[10px] text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">Edit</span>
-                    </button>
+                    <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
                   </td>
                   <td className="px-4 py-2.5"><StatusDropdown value={order.status} onChange={(v) => onStatusChange(order.id, v)} /></td>
                   <td className="px-4 py-2.5 text-right">
