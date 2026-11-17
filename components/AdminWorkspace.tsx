@@ -836,6 +836,21 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
   const [showModal, setShowModal] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [query, setQuery] = useState("");
+
+  const sortedProducts = useMemo(() => {
+    let list = [...products].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    );
+
+    if (query.trim()) {
+      const q = query.toLowerCase().trim();
+      list = list.filter((p) =>
+        p.name.toLowerCase().includes(q) || (p.description && p.description.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [products, query]);
 
   return (
     <>
@@ -851,76 +866,122 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
           </Button>
         }
       />
-      <div className="mx-auto max-w-[1250px] px-3.5 py-5 sm:px-6 sm:py-8 lg:px-10">
-        <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-amber-600">Sweet Catalog</span>
-          <h2 className="mt-1 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Products & Production Demand</h2>
-          <p className="mt-1 text-xs sm:text-sm text-slate-500">Manage sweet catalog, standard rates, and live customer orders in production.</p>
+      <div className="mx-auto max-w-[1250px] px-3.5 py-4 sm:px-6 sm:py-6 lg:px-10">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 border-b border-slate-200/80 pb-4">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-600">Sweet Catalog</span>
+            <h2 className="mt-0.5 text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">Products & Production Demand</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Manage sweet catalog, standard rates, and live customer orders in production.</p>
+          </div>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-xs font-bold text-amber-800">
+              A → Z Alphabetical
+            </span>
+            <span className="text-xs font-semibold text-slate-500">
+              {sortedProducts.length} product{sortedProducts.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+        </div>
+
+        {/* Search Toolbar */}
+        <div className="mt-3.5 flex items-center gap-2">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search sweet name or description..."
+              className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 py-2 text-xs sm:text-sm font-medium outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 shadow-2xs"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {products.length === 0 ? (
-          <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white py-16 sm:py-20 text-center p-4">
-            <PackagePlus className="size-12 text-amber-600" />
-            <p className="mt-4 text-base sm:text-lg font-bold text-slate-800">No sweet products in catalog</p>
-            <p className="mt-1 text-xs sm:text-sm text-slate-500">Add your first sweet to start taking orders.</p>
-            <button onClick={() => setShowModal(true)} className="mt-5 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 shadow-sm">
+          <div className="mt-6 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white py-14 text-center p-4">
+            <PackagePlus className="size-10 text-amber-600" />
+            <p className="mt-3 text-base font-bold text-slate-800">No sweet products in catalog</p>
+            <p className="mt-1 text-xs text-slate-500">Add your first sweet to start taking orders.</p>
+            <button onClick={() => setShowModal(true)} className="mt-4 rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-700 shadow-sm">
               Add Sweet Product
             </button>
           </div>
+        ) : sortedProducts.length === 0 ? (
+          <div className="mt-6 flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white py-12 text-center p-4">
+            <p className="text-sm font-bold text-slate-800">No sweets matching &ldquo;{query}&rdquo;</p>
+            <button onClick={() => setQuery("")} className="mt-2 text-xs font-semibold text-amber-700 hover:underline">
+              Clear search filter
+            </button>
+          </div>
         ) : (
-          <div className="mt-6">
-            <div className="block sm:hidden space-y-3">
-              {products.map((p) => {
+          <div className="mt-4">
+            {/* Mobile Line-by-Line List View */}
+            <div className="block sm:hidden space-y-2">
+              {sortedProducts.map((p) => {
                 const activeOrders = orders.filter((o) => getOrderItems(o).some((it) => it.productId === p.id) && !["Completed", "Cancelled"].includes(o.status));
-                const totalOrderedKg = activeOrders.reduce((sum, o) => {
+                const isWhole = isWholeNumberUnit(p.unit);
+                const totalOrdered = activeOrders.reduce((sum, o) => {
                   const it = getOrderItems(o).find((i) => i.productId === p.id);
                   return sum + (Number(it?.qty) || 0);
                 }, 0);
+                const displayDemand = isWhole ? Math.round(totalOrdered) : totalOrdered.toFixed(1);
+
                 return (
-                  <div key={p.id} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm hover:border-amber-300 transition-all space-y-3">
-                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {p.imageUrl ? (
-                          <img src={optimizeImageUrl(p.imageUrl, 100)} alt={p.name} loading="lazy" decoding="async" className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40 shadow-2xs" />
-                        ) : (
-                          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40 shadow-2xs">
-                            {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
-                          </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="font-bold text-slate-900 text-base truncate">{p.name}</p>
-                          {p.description && (
-                            <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{p.description}</p>
+                  <div key={p.id} className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs hover:border-amber-300 transition-all flex items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      {p.imageUrl ? (
+                        <img src={optimizeImageUrl(p.imageUrl, 80)} alt={p.name} loading="lazy" decoding="async" className="size-11 shrink-0 rounded-lg object-cover border border-amber-300/40" />
+                      ) : (
+                        <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40">
+                          {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-900 text-sm truncate leading-tight">{p.name}</span>
+                          <span className={`inline-flex items-center rounded-md px-1.5 py-0.2 text-[9px] font-bold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"}`}>
+                            {p.active ? "Active" : "Archived"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 text-xs flex-wrap">
+                          <span className="font-bold text-amber-700">{money(p.price)} <span className="font-normal text-slate-400">/ {p.unit}</span></span>
+                          {activeOrders.length > 0 ? (
+                            <button
+                              onClick={() => onViewProductOrders(p.id)}
+                              className="inline-flex items-center gap-0.5 text-[11px] font-bold text-amber-600 hover:text-amber-800 hover:underline"
+                            >
+                              <span>• {displayDemand} {p.unit} ({activeOrders.length} ord)</span>
+                              <ChevronRight className="size-3" />
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-slate-400">• 0 demand</span>
                           )}
-                          <p className="text-xs font-semibold text-amber-700 mt-0.5">{money(p.price)} / {p.unit}</p>
                         </div>
                       </div>
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
-                        <span className={`size-1.5 rounded-full ${p.active ? "bg-emerald-500" : "bg-slate-400"}`} />
-                        {p.active ? "Active" : "Archived"}
-                      </span>
                     </div>
-                    <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Production Demand</p>
-                        {activeOrders.length > 0 ? (
-                          <p className="text-sm font-extrabold text-slate-900 mt-0.5">{totalOrderedKg.toFixed(2)} {p.unit} <span className="text-xs font-normal text-slate-500">({activeOrders.length} orders)</span></p>
-                        ) : (
-                          <p className="text-xs text-slate-400 mt-0.5">No active orders</p>
-                        )}
-                      </div>
-                      {activeOrders.length > 0 && (
-                        <button onClick={() => onViewProductOrders(p.id)} className="text-xs font-bold text-amber-600 hover:text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
-                          View orders →
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <button onClick={() => setEditProduct(p)} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
-                        <Edit2 className="size-3.5" /> Edit
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => setEditProduct(p)}
+                        className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                        title="Edit sweet"
+                      >
+                        <Edit2 className="size-3.5" />
                       </button>
-                      <button onClick={() => setDeleteId(p.id)} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors">
-                        <Trash2 className="size-3.5" /> Delete
+                      <button
+                        onClick={() => setDeleteId(p.id)}
+                        className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors"
+                        title="Delete sweet"
+                      >
+                        <Trash2 className="size-3.5" />
                       </button>
                     </div>
                   </div>
@@ -928,71 +989,79 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
               })}
             </div>
 
+            {/* Desktop Line-by-Line Table View */}
             <div className="hidden sm:block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
+                <table className="w-full min-w-[720px] text-left text-sm">
                   <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     <tr>
-                      <th className="px-6 py-4">Sweet Product</th>
-                      <th className="px-6 py-4">Unit</th>
-                      <th className="px-6 py-4">Standard Rate</th>
-                      <th className="px-6 py-4">Active Production Demand</th>
-                      <th className="px-6 py-4">Catalog Status</th>
-                      <th className="px-6 py-4 text-right">Actions</th>
+                      <th className="px-4 py-3">Sweet Product (A → Z)</th>
+                      <th className="px-4 py-3">Unit</th>
+                      <th className="px-4 py-3">Standard Rate</th>
+                      <th className="px-4 py-3">Active Production Demand</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {products.map((p) => {
+                    {sortedProducts.map((p) => {
                       const activeOrders = orders.filter((o) => getOrderItems(o).some((it) => it.productId === p.id) && !["Completed", "Cancelled"].includes(o.status));
-                      const totalOrderedKg = activeOrders.reduce((sum, o) => {
+                      const isWhole = isWholeNumberUnit(p.unit);
+                      const totalOrdered = activeOrders.reduce((sum, o) => {
                         const it = getOrderItems(o).find((i) => i.productId === p.id);
                         return sum + (Number(it?.qty) || 0);
                       }, 0);
+                      const displayDemand = isWhole ? Math.round(totalOrdered) : totalOrdered.toFixed(2);
+
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-2.5">
                             <div className="flex items-center gap-3">
                               {p.imageUrl ? (
-                                <img src={optimizeImageUrl(p.imageUrl, 100)} alt={p.name} loading="lazy" decoding="async" className="size-10 shrink-0 rounded-xl object-cover border border-amber-300/40" />
+                                <img src={optimizeImageUrl(p.imageUrl, 80)} alt={p.name} loading="lazy" decoding="async" className="size-9 shrink-0 rounded-lg object-cover border border-amber-300/40" />
                               ) : (
-                                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 font-bold text-xs">
-                                  {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
+                                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800 font-bold text-xs">
+                                  {p.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
                                 </div>
                               )}
                               <div className="min-w-0 max-w-xs">
-                                <span className="font-bold text-slate-900 block truncate">{p.name}</span>
+                                <span className="font-bold text-slate-900 block truncate text-sm">{p.name}</span>
                                 {p.description && (
-                                  <span className="text-xs text-slate-400 block truncate mt-0.5">{p.description}</span>
+                                  <span className="text-[11px] text-slate-400 block truncate">{p.description}</span>
                                 )}
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 font-medium text-slate-600">{p.unit}</td>
-                          <td className="px-6 py-4 font-bold text-slate-900">{money(p.price)}<span className="ml-1 text-xs font-normal text-slate-400">/ {p.unit}</span></td>
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-2.5 font-medium text-slate-600 text-xs">{p.unit}</td>
+                          <td className="px-4 py-2.5 font-bold text-slate-900 text-sm">
+                            {money(p.price)}
+                            <span className="ml-1 text-[11px] font-normal text-slate-400">/ {p.unit}</span>
+                          </td>
+                          <td className="px-4 py-2.5">
                             {activeOrders.length > 0 ? (
                               <div>
-                                <p className="font-bold text-slate-900">{totalOrderedKg.toFixed(2)} {p.unit}</p>
-                                <button onClick={() => onViewProductOrders(p.id)} className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-700 hover:underline">
-                                  {activeOrders.length} order{activeOrders.length !== 1 ? "s" : ""} · See who ordered & handover →
+                                <p className="font-bold text-slate-900 text-xs">{displayDemand} {p.unit}</p>
+                                <button onClick={() => onViewProductOrders(p.id)} className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-amber-600 hover:text-amber-800 hover:underline">
+                                  <span>{activeOrders.length} order{activeOrders.length !== 1 ? "s" : ""}</span>
+                                  <ChevronRight className="size-3" />
                                 </button>
                               </div>
                             ) : (
                               <span className="text-xs text-slate-400">No active orders</span>
                             )}
                           </td>
-                          <td className="px-6 py-4">
-                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                          <td className="px-4 py-2.5">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"}`}>
                               <span className={`size-1.5 rounded-full ${p.active ? "bg-emerald-500" : "bg-slate-400"}`} />
-                              {p.active ? "Active" : "Inactive"}
+                              {p.active ? "Active" : "Archived"}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <button onClick={() => setEditProduct(p)} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors" title="Edit sweet">
+                          <td className="px-4 py-2.5 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button onClick={() => setEditProduct(p)} className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors" title="Edit sweet">
                                 <Edit2 className="size-3.5" />
                               </button>
-                              <button onClick={() => setDeleteId(p.id)} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors" title="Delete sweet">
+                              <button onClick={() => setDeleteId(p.id)} className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors" title="Delete sweet">
                                 <Trash2 className="size-3.5" />
                               </button>
                             </div>
@@ -3066,7 +3135,9 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
               mapByName.set(key, { ...existing, ...p });
             }
           }
-          const deduplicatedProducts = Array.from(mapByName.values());
+          const deduplicatedProducts = Array.from(mapByName.values()).sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+          );
           setProducts(deduplicatedProducts);
           try { localStorage.setItem("dhuniya_products", JSON.stringify(deduplicatedProducts)); } catch { }
         } else {
