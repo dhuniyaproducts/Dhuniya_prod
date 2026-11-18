@@ -128,6 +128,7 @@
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
   }
 }
 
@@ -158,4 +159,33 @@
 
 .animate-float-gentle {
   animation: floatGentle 4s ease-in-out infinite;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  opacity: 0;
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes amberPulseGlow {
+  0%, 100% {
+    box-shadow: 0 4px 20px -2px rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow: 0 6px 28px 2px rgba(245, 158, 11, 0.55);
+  }
+}
+
+.animate-pulse-glow {
+  animation: amberPulseGlow 3s ease-in-out infinite;
 }

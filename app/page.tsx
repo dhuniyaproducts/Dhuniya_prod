@@ -15,11 +15,6 @@ import {
   Clock,
   Sparkle,
   ZoomIn,
-  MessageCircle,
-  Plus,
-  Minus,
-  Check,
-  ShoppingBag,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -232,9 +227,10 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
       onMouseLeave={handleMouseLeave}
       style={{
         transform: `perspective(1000px) rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) translateZ(${rotate.x || rotate.y ? "6px" : "0px"})`,
-        transition: rotate.x === 0 && rotate.y === 0 ? "transform 0.5s ease-out, box-shadow 0.5s ease-out" : "none",
+        transition: rotate.x === 0 && rotate.y === 0 ? "transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease-out" : "none",
+        animationDelay: `${Math.min(index * 0.08, 0.6)}s`,
       }}
-      className="group relative flex flex-col rounded-2xl sm:rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-transparent backdrop-blur-md hover:border-amber-400/60 hover:shadow-2xl hover:shadow-amber-500/25 text-left w-full cursor-pointer transition-colors"
+      className="animate-fade-in-up group relative flex flex-col rounded-2xl sm:rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-transparent backdrop-blur-md hover:border-amber-400/60 hover:shadow-2xl hover:shadow-amber-500/25 hover:-translate-y-1.5 text-left w-full cursor-pointer transition-all duration-300"
     >
       {/* Specular glare overlay that tracks cursor */}
       <div
@@ -249,14 +245,14 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
           <img
             src={optimizedSrc}
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
             onError={() => setImgErr(true)}
             loading={index < 4 ? "eager" : "lazy"}
             decoding="async"
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 text-center">
-            <div className="size-12 sm:size-20 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform">
+            <div className="size-12 sm:size-20 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform duration-500">
               <span className="text-lg sm:text-3xl font-black text-amber-300">{initials}</span>
             </div>
             <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-amber-400/80">Dhuniya</p>
@@ -265,8 +261,8 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent pointer-events-none" />
 
-        {/* Price badge */}
-        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-2.5 sm:px-3.5 py-0.5 sm:py-1 text-[11px] sm:text-xs font-black text-white shadow-md shadow-black/50">
+        {/* Price badge with subtle hover transition */}
+        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-2.5 sm:px-3.5 py-0.5 sm:py-1 text-[11px] sm:text-xs font-black text-white shadow-md shadow-black/50 group-hover:scale-105 transition-transform duration-300">
           {money(product.price)} <span className="font-normal text-[9px] sm:text-[11px] text-amber-100">/ {product.unit}</span>
         </div>
 
@@ -282,9 +278,9 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
           </div>
         </div>
 
-        {/* View Details hover indicator */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 pointer-events-none">
-          <div className="bg-black/65 backdrop-blur-md rounded-full px-4 py-2 text-xs font-bold text-white border border-amber-400/40 flex items-center gap-1.5 shadow-2xl">
+        {/* View Details hover indicator with smooth transition */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-300 z-10 pointer-events-none">
+          <div className="bg-black/75 backdrop-blur-md rounded-full px-4 py-2 text-xs font-bold text-white border border-amber-400/40 flex items-center gap-1.5 shadow-2xl">
             <ZoomIn className="size-3.5 text-amber-400" /> View Details &amp; Photos
           </div>
         </div>
@@ -292,7 +288,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
 
       <div className="flex flex-col flex-1 p-3.5 sm:p-5">
         {/* Sweet Name in English */}
-        <h3 className="text-sm sm:text-lg font-bold text-white group-hover:text-amber-300 transition-colors leading-snug line-clamp-1">
+        <h3 className="text-sm sm:text-lg font-bold text-white group-hover:text-amber-300 transition-colors duration-300 leading-snug line-clamp-1">
           {product.name}
         </h3>
 
@@ -325,165 +321,12 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
               <Star key={s} className="size-2.5 sm:size-3 fill-amber-400 text-amber-400" />
             ))}
           </div>
-          <span className="text-amber-400 font-bold text-[10px] sm:text-xs flex items-center gap-0.5 group-hover:translate-x-1.5 transition-transform">
+          <span className="text-amber-400 font-bold text-[10px] sm:text-xs flex items-center gap-0.5 group-hover:translate-x-1.5 transition-transform duration-300">
             View Sweet →
           </span>
         </div>
       </div>
     </Link>
-  );
-}
-
-// ── Interactive Sweet Order Estimator / Calculator Widget ─────────────────────
-function SweetOrderEstimator({ products }: { products: Product[] }) {
-  if (products.length === 0) return null;
-
-  const [selectedId, setSelectedId] = useState<number>(products[0]?.id || 0);
-  const [qty, setQty] = useState<number>(2);
-
-  const selectedProduct = products.find((p) => p.id === selectedId) || products[0];
-
-  const unit = selectedProduct?.unit || "kg";
-  const unitPrice = selectedProduct?.price || 0;
-  const totalPrice = qty * unitPrice;
-
-  const presets = unit === "box" ? [1, 2, 5, 10] : unit === "pcs" ? [10, 25, 50, 100] : [1, 2, 5, 10];
-
-  const whatsappMessage = encodeURIComponent(
-    `Hello Dhuniya Products! 👋\nI would like to place an order for:\n• ${selectedProduct?.name}: ${qty} ${unit} (Total: ${money(totalPrice)})\n\nPlease let me know the availability and handover schedule. Thank you!`
-  );
-
-  return (
-    <section className="py-12 sm:py-20 px-3 sm:px-6 relative bg-gradient-to-b from-[#0a0600] via-[#150a01] to-[#0a0600]">
-      <div className="max-w-4xl mx-auto">
-        <div className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-[#1b0d01] via-[#120800] to-[#0a0600] p-5 sm:p-10 shadow-2xl shadow-amber-950/40 relative overflow-hidden">
-          {/* Subtle background glow */}
-          <div className="absolute -top-24 -right-24 size-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="relative z-10">
-            <div className="text-center mb-8">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-1 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-300 mb-2">
-                <Sparkles className="size-3 text-amber-400" />
-                <span>Live Sweet Estimator</span>
-              </span>
-              <h3 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-                Calculate &amp; Order in 1 Tap
-              </h3>
-              <p className="mt-1 text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
-                Select your favourite sweet and quantity to check your total and order instantly on WhatsApp.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-              {/* Controls */}
-              <div className="space-y-4">
-                {/* Select Sweet */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                    Choose Sweet Item
-                  </label>
-                  <select
-                    value={selectedId}
-                    onChange={(e) => {
-                      setSelectedId(Number(e.target.value));
-                      setQty(unit === "pcs" ? 25 : 2);
-                    }}
-                    className="w-full rounded-2xl border border-white/20 bg-black/60 px-4 py-3 text-sm font-bold text-white outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
-                  >
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id} className="bg-slate-900 text-white">
-                        {p.name} ({money(p.price)} / {p.unit})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Quantity Stepper */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                    Select Quantity ({unit})
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setQty((q) => Math.max(1, q - (unit === "pcs" ? 5 : 1)))}
-                      className="flex size-11 items-center justify-center rounded-xl border border-white/20 bg-white/5 text-white hover:bg-white/10 hover:border-amber-400 active:scale-95 transition-all cursor-pointer"
-                      title="Decrease"
-                    >
-                      <Minus className="size-4" />
-                    </button>
-                    <div className="flex-1 rounded-xl border border-white/20 bg-black/50 py-2.5 text-center">
-                      <span className="text-xl sm:text-2xl font-black text-amber-300">
-                        {qty} <span className="text-sm font-bold text-slate-400">{unit}</span>
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setQty((q) => q + (unit === "pcs" ? 5 : 1))}
-                      className="flex size-11 items-center justify-center rounded-xl border border-white/20 bg-white/5 text-white hover:bg-white/10 hover:border-amber-400 active:scale-95 transition-all cursor-pointer"
-                      title="Increase"
-                    >
-                      <Plus className="size-4" />
-                    </button>
-                  </div>
-
-                  {/* Preset Quick Chips */}
-                  <div className="flex gap-2 mt-3 flex-wrap">
-                    {presets.map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => setQty(preset)}
-                        className={`rounded-lg px-3 py-1 text-xs font-bold border transition-all cursor-pointer ${
-                          qty === preset
-                            ? "border-amber-400 bg-amber-500 text-black shadow-md shadow-amber-500/30 font-black"
-                            : "border-white/15 bg-white/5 text-slate-300 hover:border-white/30 hover:bg-white/10"
-                        }`}
-                      >
-                        {preset} {unit}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Live Price Summary Box */}
-              <div className="rounded-2xl border border-amber-500/40 bg-gradient-to-br from-black/80 to-amber-950/30 p-5 sm:p-6 text-center space-y-4 shadow-xl">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Estimated Total</p>
-                  <div className="text-3xl sm:text-4xl font-black text-white mt-1">
-                    <span className="text-amber-400">{money(totalPrice)}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    {qty} {unit} of {selectedProduct?.name} @ {money(unitPrice)}
-                  </p>
-                </div>
-
-                <div className="pt-2 border-t border-white/10 flex flex-col gap-2.5">
-                  <a
-                    href={`https://wa.me/94756656135?text=${whatsappMessage}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 py-3 px-4 text-sm font-bold text-white shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
-                  >
-                    <MessageCircle className="size-4 text-white" />
-                    <span>Order this on WhatsApp →</span>
-                  </a>
-
-                  <a
-                    href="tel:0756656135"
-                    className="flex items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-white/5 py-2.5 px-4 text-xs font-bold text-slate-300 hover:bg-white/10 hover:border-amber-400 hover:text-amber-300 transition-all"
-                  >
-                    <Phone className="size-3.5" />
-                    <span>Call Directly: 0756656135</span>
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -506,13 +349,19 @@ function HeroSection() {
         }}
       />
 
-      <div className="relative z-10 text-center px-4 max-w-5xl mx-auto hero-fade-in">
-        <div className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 sm:px-4 sm:py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider sm:tracking-[0.2em] text-amber-300 mb-4 sm:mb-8 backdrop-blur-md animate-float-gentle">
+      <div className="relative z-10 text-center px-4 max-w-5xl mx-auto">
+        <div
+          style={{ animationDelay: "0.1s" }}
+          className="animate-fade-in-up inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 sm:px-4 sm:py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider sm:tracking-[0.2em] text-amber-300 mb-4 sm:mb-8 backdrop-blur-md animate-float-gentle"
+        >
           <Sparkles className="size-3 sm:size-3.5 text-amber-400" />
           <span>Authentic Eastern Heritage · Maruthamunai</span>
         </div>
 
-        <h1 className="text-3xl sm:text-6xl md:text-8xl font-black tracking-tight text-white leading-[1.08] sm:leading-[1.02] mb-3 sm:mb-6">
+        <h1
+          style={{ animationDelay: "0.2s" }}
+          className="animate-fade-in-up text-3xl sm:text-6xl md:text-8xl font-black tracking-tight text-white leading-[1.08] sm:leading-[1.02] mb-3 sm:mb-6"
+        >
           <span>Dhuniya</span>{" "}
           <span className="gold-shimmer-text">
             Products
@@ -520,36 +369,48 @@ function HeroSection() {
         </h1>
 
         {/* Clean subtitle */}
-        <div className="inline-block mb-3 sm:mb-5">
+        <div
+          style={{ animationDelay: "0.3s" }}
+          className="animate-fade-in-up inline-block mb-3 sm:mb-5"
+        >
           <p className="text-xs sm:text-2xl md:text-3xl font-extrabold uppercase tracking-[0.16em] sm:tracking-[0.25em] text-amber-200">
             Eastern Traditional Sweet
           </p>
           <div className="h-0.5 w-16 sm:w-28 bg-gradient-to-r from-amber-400 to-orange-500 mx-auto mt-2 sm:mt-3 rounded-full" />
         </div>
 
-        <p className="text-slate-300 text-xs sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-10 px-2 sm:px-0">
+        <p
+          style={{ animationDelay: "0.4s" }}
+          className="animate-fade-in-up text-slate-300 text-xs sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-10 px-2 sm:px-0"
+        >
           Experience handcrafted heritage sweets made with authentic eastern Sri Lankan recipes,
           pure ingredients, and time-honoured artistry.
         </p>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-4 mb-8 sm:mb-16">
+        <div
+          style={{ animationDelay: "0.5s" }}
+          className="animate-fade-in-up flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-4 mb-8 sm:mb-16"
+        >
           <a
             href="#sweets"
-            className="group flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-2.5 sm:px-8 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-105 transition-all duration-300 w-full sm:w-auto"
+            className="group flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-2.5 sm:px-8 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-105 active:scale-95 transition-all duration-300 animate-pulse-glow w-full sm:w-auto"
           >
             <span>Explore Sweet Catalog</span>
-            <ArrowRight className="size-3.5 sm:size-4 group-hover:translate-x-1.5 transition-transform" />
+            <ArrowRight className="size-3.5 sm:size-4 group-hover:translate-x-1.5 transition-transform duration-300" />
           </a>
           <a
             href="tel:0756656135"
-            className="flex items-center justify-center gap-2 rounded-full border border-amber-500/40 bg-white/5 px-6 py-2.5 sm:px-8 sm:py-3.5 text-xs sm:text-sm font-bold text-amber-300 hover:bg-white/10 hover:border-amber-400 transition-all duration-300 backdrop-blur-sm w-full sm:w-auto"
+            className="flex items-center justify-center gap-2 rounded-full border border-amber-500/40 bg-white/5 px-6 py-2.5 sm:px-8 sm:py-3.5 text-xs sm:text-sm font-bold text-amber-300 hover:bg-white/10 hover:border-amber-400 hover:text-amber-200 hover:scale-105 active:scale-95 transition-all duration-300 backdrop-blur-sm w-full sm:w-auto"
           >
             <Phone className="size-3.5 sm:size-4" />
             <span>Order by Phone: 0756656135</span>
           </a>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 max-w-3xl mx-auto">
+        <div
+          style={{ animationDelay: "0.6s" }}
+          className="animate-fade-in-up grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 max-w-3xl mx-auto"
+        >
           {[
             { label: "100% Pure Recipe", icon: Award },
             { label: "Handcrafted Daily", icon: Heart },
@@ -558,9 +419,9 @@ function HeroSection() {
           ].map(({ label, icon: Icon }) => (
             <div
               key={label}
-              className="flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl border border-white/10 bg-white/5 py-2 px-2 sm:py-3 sm:px-3 backdrop-blur-sm hover:border-amber-400/40 transition-colors"
+              className="group flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl border border-white/10 bg-white/5 py-2 px-2 sm:py-3 sm:px-3 backdrop-blur-sm hover:border-amber-400/40 hover:bg-white/10 hover:-translate-y-1 transition-all duration-300"
             >
-              <Icon className="size-3.5 sm:size-4 text-amber-400 shrink-0" />
+              <Icon className="size-3.5 sm:size-4 text-amber-400 shrink-0 group-hover:scale-110 transition-transform duration-300" />
               <span className="text-[11px] sm:text-xs font-semibold text-slate-300 truncate">{label}</span>
             </div>
           ))}
@@ -585,45 +446,48 @@ function ContactSection() {
           We cater for weddings, functions, and everyday celebrations. Contact us directly for bulk sweets and custom orders.
         </p>
 
-        <div className="grid grid-cols-3 gap-2 sm:gap-6 max-w-4xl mx-auto text-left">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 max-w-4xl mx-auto text-left">
           <a
             href="tel:0756656135"
-            className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-2.5 sm:p-6 hover:border-amber-400/50 hover:bg-white/10 transition-all duration-300 flex flex-col justify-between"
+            className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 hover:border-amber-400/60 hover:bg-white/10 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-amber-500/20 transition-all duration-300 flex flex-col justify-between"
           >
             <div>
-              <div className="size-8 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2 sm:mb-4 group-hover:scale-110 transition-transform">
+              <div className="size-9 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 sm:mb-4 group-hover:scale-110 group-hover:bg-amber-500/25 transition-all duration-300">
                 <Phone className="size-4 sm:size-5" />
               </div>
-              <p className="text-[9px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Direct Mobile</p>
-              <p className="text-xs sm:text-xl font-bold sm:font-black text-white mt-0.5 sm:mt-1 group-hover:text-amber-300 transition-colors truncate">
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Direct Mobile</p>
+              <p className="text-sm sm:text-xl font-bold sm:font-black text-white mt-0.5 sm:mt-1 group-hover:text-amber-300 transition-colors truncate">
                 0756656135
               </p>
             </div>
-            <p className="text-[8px] sm:text-xs text-amber-400/90 font-semibold mt-2 sm:mt-4 truncate">Tap to Call →</p>
+            <p className="text-[10px] sm:text-xs text-amber-400 font-bold mt-3 sm:mt-4 flex items-center gap-1 group-hover:translate-x-1.5 transition-transform duration-300">
+              <span>Tap to Call</span>
+              <ArrowRight className="size-3" />
+            </p>
           </a>
 
-          <div className="rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-2.5 sm:p-6 flex flex-col justify-between">
+          <div className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 hover:border-amber-400/40 hover:bg-white/10 hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between">
             <div>
-              <div className="size-8 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2 sm:mb-4">
+              <div className="size-9 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300">
                 <MapPin className="size-4 sm:size-5" />
               </div>
-              <p className="text-[9px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Kitchen Address</p>
-              <p className="text-xs sm:text-lg font-bold text-white mt-0.5 sm:mt-1 leading-snug truncate">138, France City</p>
-              <p className="text-[9px] sm:text-sm text-slate-300 truncate">Maruthamunai</p>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Kitchen Address</p>
+              <p className="text-sm sm:text-lg font-bold text-white mt-0.5 sm:mt-1 leading-snug">138, France City</p>
+              <p className="text-xs sm:text-sm text-slate-300">Maruthamunai</p>
             </div>
-            <p className="text-[8px] sm:text-xs text-slate-500 mt-2 sm:mt-4 truncate">Daily fresh</p>
+            <p className="text-[10px] sm:text-xs text-slate-400 mt-3 sm:mt-4">Daily fresh handover</p>
           </div>
 
-          <div className="rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-2.5 sm:p-6 flex flex-col justify-between">
+          <div className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 hover:border-amber-400/40 hover:bg-white/10 hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between">
             <div>
-              <div className="size-8 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2 sm:mb-4">
+              <div className="size-9 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300">
                 <Award className="size-4 sm:size-5" />
               </div>
-              <p className="text-[9px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Craftsmanship</p>
-              <p className="text-xs sm:text-lg font-bold text-white mt-0.5 sm:mt-1 truncate">100% Traditional</p>
-              <p className="text-[9px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-none">Pure ghee &amp; nuts</p>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Craftsmanship</p>
+              <p className="text-sm sm:text-lg font-bold text-white mt-0.5 sm:mt-1">100% Traditional</p>
+              <p className="text-xs text-slate-400 mt-0.5 sm:mt-1">Pure ghee, nuts &amp; milk</p>
             </div>
-            <p className="text-[8px] sm:text-xs text-slate-500 mt-2 sm:mt-4 truncate">Fresh Batches</p>
+            <p className="text-[10px] sm:text-xs text-amber-400/90 font-medium mt-3 sm:mt-4">Fresh batches</p>
           </div>
         </div>
       </div>
@@ -840,10 +704,10 @@ export default function PublicPage() {
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveFilter(tab.id)}
-                    className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                    className={`rounded-full px-4 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 cursor-pointer ${
                       activeFilter === tab.id
-                        ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 scale-105"
-                        : "border border-white/15 bg-white/5 text-slate-300 hover:border-white/30 hover:bg-white/10"
+                        ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/35 scale-105 border-transparent"
+                        : "border border-white/15 bg-white/5 text-slate-300 hover:border-amber-400/40 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     {tab.label}
@@ -875,7 +739,7 @@ export default function PublicPage() {
                 <button
                   type="button"
                   onClick={() => loadProducts()}
-                  className="rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-2.5 text-xs font-bold text-white shadow-lg hover:scale-105 transition-all cursor-pointer"
+                  className="rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-2.5 text-xs font-bold text-white shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
                 >
                   Tap to Retry
                 </button>
@@ -890,9 +754,6 @@ export default function PublicPage() {
           )}
         </div>
       </section>
-
-      {/* Interactive Quick Sweet Estimator Widget */}
-      {products.length > 0 && <SweetOrderEstimator products={products} />}
 
       <ContactSection />
       <Footer />
