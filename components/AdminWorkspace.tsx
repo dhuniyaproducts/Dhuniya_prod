@@ -90,10 +90,30 @@ export type Order = {
 
 // --- Constants ---
 
+export const consolidateOrderItems = (raw: OrderItem[]): OrderItem[] => {
+  if (!Array.isArray(raw) || raw.length <= 1) return raw || [];
+  const map = new Map<number, OrderItem>();
+  for (const it of raw) {
+    const pid = Number(it.productId);
+    if (!pid) continue;
+    const existing = map.get(pid);
+    if (existing) {
+      existing.qty = (Number(existing.qty) || 0) + (Number(it.qty) || 0);
+      if (it.rate != null && existing.rate == null) {
+        existing.rate = it.rate;
+      }
+    } else {
+      map.set(pid, { ...it, productId: pid, qty: Number(it.qty) || 0 });
+    }
+  }
+  return Array.from(map.values());
+};
+
 export const getOrderItems = (o: Order): OrderItem[] => {
-  if (Array.isArray(o.items) && o.items.length > 0) return o.items;
-  if (o.productId) return [{ productId: o.productId, qty: o.qty ?? 0, rate: o.rate }];
-  return [];
+  let raw: OrderItem[] = [];
+  if (Array.isArray(o.items) && o.items.length > 0) raw = o.items;
+  else if (o.productId) raw = [{ productId: o.productId, qty: o.qty ?? 0, rate: o.rate }];
+  return consolidateOrderItems(raw);
 };
 
 export const getOrderTotal = (o: Order, products: Product[]): number => {
@@ -1989,13 +2009,27 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
       setErrors(e);
       return;
     }
+    // Consolidate duplicates by productId before saving
+    const consolidatedMap = new Map<string, OrderItemFormData>();
+    for (const it of items) {
+      if (!it.productId) continue;
+      const key = String(it.productId);
+      const existing = consolidatedMap.get(key);
+      if (existing) {
+        existing.qty = String((Number(existing.qty) || 0) + (Number(it.qty) || 0));
+        if (it.rate && !existing.rate) existing.rate = it.rate;
+      } else {
+        consolidatedMap.set(key, { ...it });
+      }
+    }
+    const finalItems = Array.from(consolidatedMap.values());
     onSave({
       customer: customer.trim(),
       phone: phone.trim() || undefined,
       address: address.trim() || undefined,
       deliveryDate,
       notes: notes.trim(),
-      items: items.map((it) => ({
+      items: finalItems.map((it) => ({
         productId: it.productId,
         qty: it.qty,
         rate: it.rate,
@@ -4004,15 +4038,17 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
               || cached?.paymentStatus
               || (amountPaid > 0 ? "Partial" : "Unpaid")) as Order["paymentStatus"];
 
+            const consolidatedItems = consolidateOrderItems(parsedItems);
+
             return {
               id: o.id,
               date: o.date,
               deliveryDate: o.delivery_date,
               customer: o.customer,
-              items: parsedItems,
-              productId: parsedItems[0]?.productId ?? Number(o.product_id),
-              qty: parsedItems.reduce((s, it) => s + it.qty, 0),
-              rate: parsedItems[0]?.rate ?? (o.rate ? Number(o.rate) : undefined),
+              items: consolidatedItems,
+              productId: consolidatedItems[0]?.productId ?? Number(o.product_id),
+              qty: consolidatedItems.reduce((s, it) => s + it.qty, 0),
+              rate: consolidatedItems[0]?.rate ?? (o.rate ? Number(o.rate) : undefined),
               status: o.status,
               notes: parsedMeta.cleanNotes,
               phone: o.phone || cached?.phone || undefined,
@@ -4028,6 +4064,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
             if (!remoteIds.has(id)) {
               loadedOrders.push({
                 ...cached,
+                items: consolidateOrderItems(getOrderItems(cached)),
                 notes: parseDhuniyaData(cached.notes).cleanNotes,
               });
             }
@@ -4041,6 +4078,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
             if (lo) {
               loadedOrders = JSON.parse(lo).map((o: Order) => ({
                 ...o,
+                items: consolidateOrderItems(getOrderItems(o)),
                 notes: parseDhuniyaData(o.notes).cleanNotes,
               }));
               setOrders(loadedOrders);
@@ -4233,13 +4271,13 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
   const addOrder = async (data: OrderFormData) => {
     const newOrderId = genOrderId(orders);
-    const parsedItems: OrderItem[] = (data.items && data.items.length > 0)
+    const parsedItems: OrderItem[] = consolidateOrderItems((data.items && data.items.length > 0)
       ? data.items.map((it) => ({
         productId: Number(it.productId),
         qty: Number(it.qty),
         rate: it.rate ? Number(it.rate) : undefined,
       }))
-      : (data.productId ? [{ productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined }] : []);
+      : (data.productId ? [{ productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined }] : []));
 
     const primaryItem = parsedItems[0];
     const totalQty = parsedItems.reduce((sum, it) => sum + it.qty, 0);
@@ -4378,13 +4416,13 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
   const editOrder = async (id: string, data: OrderFormData) => {
     const prevOrders = [...orders];
     const current = orders.find((o) => o.id === id);
-    const parsedItems: OrderItem[] = (data.items && data.items.length > 0)
+    const parsedItems: OrderItem[] = consolidateOrderItems((data.items && data.items.length > 0)
       ? data.items.map((it) => ({
         productId: Number(it.productId),
         qty: Number(it.qty),
         rate: it.rate ? Number(it.rate) : undefined,
       }))
-      : (data.productId ? [{ productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined }] : []);
+      : (data.productId ? [{ productId: Number(data.productId), qty: Number(data.qty), rate: data.rate ? Number(data.rate) : undefined }] : []));
 
     const primaryItem = parsedItems[0];
     const totalQty = parsedItems.reduce((sum, it) => sum + it.qty, 0);
