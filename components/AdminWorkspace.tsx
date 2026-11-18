@@ -2982,11 +2982,30 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
       const todayOrders: Order[] = [], tomorrowOrders: Order[] = [], upcomingOrders: Order[] = [], pastOrders: Order[] = [];
       displayedOrders.forEach((o) => {
         const badge = getHandoverBadge(o.deliveryDate);
-        if (badge?.label === "Today" || o.deliveryDate === todayStr) todayOrders.push(o);
+        if (badge?.label === "Handover Today" || badge?.label === "Today" || o.deliveryDate === todayStr) todayOrders.push(o);
         else if (badge?.label === "Tomorrow") tomorrowOrders.push(o);
         else if (badge?.label?.startsWith("In") || o.deliveryDate > todayStr) upcomingOrders.push(o);
         else pastOrders.push(o);
       });
+
+      // Sort upcoming orders chronologically by handover date ascending (earliest handover first)
+      upcomingOrders.sort((a, b) => {
+        const dateA = a.deliveryDate || "";
+        const dateB = b.deliveryDate || "";
+        const diff = dateA.localeCompare(dateB);
+        if (diff !== 0) return diff;
+        return (a.id || "").localeCompare(b.id || "");
+      });
+
+      // Sort past orders by handover date descending (most recent past date first)
+      pastOrders.sort((a, b) => {
+        const dateA = a.deliveryDate || "";
+        const dateB = b.deliveryDate || "";
+        const diff = dateB.localeCompare(dateA);
+        if (diff !== 0) return diff;
+        return (b.id || "").localeCompare(a.id || "");
+      });
+
       const groups: { key: string; title: string; badge?: string; orders: Order[] }[] = [];
       if (todayOrders.length > 0) groups.push({ key: "today", title: "Handover Today", badge: "Today", orders: todayOrders });
       if (tomorrowOrders.length > 0) groups.push({ key: "tomorrow", title: "Handover Tomorrow", badge: "Tomorrow", orders: tomorrowOrders });
