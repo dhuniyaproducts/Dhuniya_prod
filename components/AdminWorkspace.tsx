@@ -4175,8 +4175,17 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
             const existing = mapByName.get(key);
             if (!existing) {
               mapByName.set(key, p);
-            } else if ((!existing.imageUrl && p.imageUrl) || (!existing.description && p.description)) {
-              mapByName.set(key, { ...existing, ...p });
+            } else {
+              mapByName.set(key, {
+                ...existing,
+                ...p,
+                imageUrl: p.imageUrl || existing.imageUrl,
+                images: (p.images && p.images.length > 0) ? p.images : existing.images,
+                description: p.description || existing.description,
+                contents: p.contents || existing.contents,
+                nameTamil: p.nameTamil || existing.nameTamil,
+                nameSinhala: p.nameSinhala || existing.nameSinhala,
+              });
             }
           }
           const deduplicatedProducts = Array.from(mapByName.values()).sort((a, b) =>

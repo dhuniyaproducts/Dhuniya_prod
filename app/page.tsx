@@ -378,8 +378,17 @@ export default function PublicPage() {
           const existing = mapByName.get(key);
           if (!existing) {
             mapByName.set(key, item);
-          } else if ((!existing.imageUrl && item.imageUrl) || (!existing.description && item.description)) {
-            mapByName.set(key, { ...existing, ...item });
+          } else {
+            mapByName.set(key, {
+              ...existing,
+              ...item,
+              imageUrl: item.imageUrl || existing.imageUrl,
+              images: (item.images && item.images.length > 0) ? item.images : existing.images,
+              description: item.description || existing.description,
+              contents: item.contents || existing.contents,
+              nameTamil: item.nameTamil || existing.nameTamil,
+              nameSinhala: item.nameSinhala || existing.nameSinhala,
+            });
           }
         }
         const cleanProducts = Array.from(mapByName.values());
