@@ -1446,12 +1446,12 @@ function CustomerDropdown({ value, customers, onChange, hasError }: {
 }) {
   const [open, setOpen] = useState(false);
   const filtered = customers.filter((c) =>
-    !value || c.name.toLowerCase().includes(value.toLowerCase())
+    !value || c.name.toLowerCase().includes(value.toLowerCase()) || (c.phone && c.phone.includes(value))
   );
 
   return (
     <div className="relative">
-      <div className="relative">
+      <div className="relative flex items-center">
         <input
           value={value}
           onChange={(e) => {
@@ -1459,33 +1459,67 @@ function CustomerDropdown({ value, customers, onChange, hasError }: {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onBlur={() => setTimeout(() => setOpen(false), 200)}
           placeholder="Type customer name or choose existing..."
           autoComplete="off"
-          className={`w-full rounded-xl border px-3.5 py-2.5 pr-9 text-sm font-semibold outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${hasError ? "border-rose-400 bg-rose-50/30 text-rose-900" : "border-slate-300 text-slate-900 bg-white"}`}
+          className={`w-full rounded-xl border px-3.5 py-2.5 pr-10 text-sm font-semibold outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${
+            hasError ? "border-rose-400 bg-rose-50/30 text-rose-900" : "border-slate-300 text-slate-900 bg-white"
+          }`}
         />
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => setOpen((prev) => !prev)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          <ChevronDown className={`size-4 transition-transform duration-200 ${open ? "rotate-180 text-amber-600" : ""}`} />
+        </button>
       </div>
+
       {open && (
-        <div className="absolute top-full left-0 right-0 z-[55] mt-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-900 shadow-2xl max-h-56 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 z-[60] mt-1.5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 max-h-60 overflow-y-auto">
           {filtered.length === 0 ? (
-            <div className="px-4 py-3 text-xs text-slate-400 italic">No matching customers — type to add new</div>
+            <div className="px-4 py-3 text-xs text-slate-500 bg-slate-50/60">
+              No existing customer matches &ldquo;{value}&rdquo; — will save as new customer.
+            </div>
           ) : (
-            filtered.map((c) => (
-              <button
-                key={c.name}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onChange(c.name, c.phone, c.address);
-                  setOpen(false);
-                }}
-                className={`w-full text-left px-4 py-2.5 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0 ${value.toLowerCase() === c.name.toLowerCase() ? "bg-amber-700/30" : ""}`}
-              >
-                <p className="text-sm font-bold text-white">{c.name}</p>
-                {c.phone && <p className="text-xs text-amber-400 mt-0.5">{c.phone}</p>}
-              </button>
-            ))
+            <div className="divide-y divide-slate-100">
+              {filtered.map((c) => {
+                const isSelected = value.trim().toLowerCase() === c.name.toLowerCase();
+                return (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onChange(c.name, c.phone, c.address);
+                      setOpen(false);
+                    }}
+                    className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between gap-2 transition-colors ${
+                      isSelected ? "bg-amber-50 text-amber-900" : "hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800 font-bold text-xs">
+                        {c.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900 truncate leading-tight">{c.name}</p>
+                        {c.address && <p className="text-[11px] text-slate-400 truncate mt-0.5">{c.address}</p>}
+                      </div>
+                    </div>
+                    {c.phone ? (
+                      <span className="shrink-0 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <Phone className="size-2.5" />
+                        {c.phone}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-[10px] text-slate-400 italic">Saved</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
@@ -2388,6 +2422,7 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
   const activeOrders = orders.filter((o) => !["Completed", "Cancelled"].includes(o.status));
   const totalKg = activeOrders.reduce((sum, o) => sum + getOrderTotalKg(o, products), 0);
+  const totalPcs = activeOrders.reduce((sum, o) => sum + getOrderTotalPcs(o, products), 0);
   const activeProductCount = products.filter((p) => p.active).length;
 
   const productBreakdown = products.map((p) => {
@@ -2427,9 +2462,14 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
               <p className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-700 truncate">Total Demand</p>
               <div className="size-6 sm:size-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 shrink-0"><Factory className="size-3.5 sm:size-4" /></div>
             </div>
-            <div className="mt-2 sm:mt-2.5 flex items-baseline gap-1">
+            <div className="mt-2 sm:mt-2.5 flex items-baseline gap-1.5 flex-wrap">
               <span className="text-xl sm:text-3xl font-black text-slate-900">{totalKg.toFixed(2)}</span>
               <span className="text-[10px] sm:text-xs font-bold text-amber-600">kg active</span>
+              {totalPcs > 0 && (
+                <span className="text-xs sm:text-sm font-bold text-slate-500">
+                  + {totalPcs} pcs
+                </span>
+              )}
             </div>
             <p className="mt-1 sm:mt-1.5 text-[10px] sm:text-xs text-slate-500 truncate">{activeOrders.length} orders in pipeline</p>
           </div>
@@ -2505,7 +2545,9 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
                       </div>
                       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                         <div className="text-right">
-                          <p className="text-base sm:text-xl font-extrabold text-slate-950">{kg.toFixed(2)}</p>
+                          <p className="text-base sm:text-xl font-extrabold text-slate-950">
+                            {isWholeNumberUnit(product.unit) ? Math.round(kg) : kg.toFixed(2)}
+                          </p>
                           <p className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase">{product.unit}</p>
                         </div>
                         <button onClick={(e) => { e.stopPropagation(); onViewProductOrders(product.id); }}
@@ -2521,6 +2563,8 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
                         <div className="block sm:hidden p-3 space-y-2.5">
                           {productOrders.map((o) => {
                             const badge = getHandoverBadge(o.deliveryDate);
+                            const rawQty = getOrderItems(o).find(it => it.productId === product.id)?.qty ?? o.qty ?? 0;
+                            const displayQty = isWholeNumberUnit(product.unit) ? Math.round(Number(rawQty)) : rawQty;
                             return (
                               <div key={o.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs space-y-2">
                                 <div className="flex items-center justify-between gap-2">
@@ -2540,7 +2584,7 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
                                     <span className="font-semibold text-slate-800">{dateLabel(o.deliveryDate)}</span>
                                     {badge && (<span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-bold ${badge.style}`}>{badge.label}</span>)}
                                   </div>
-                                  <span className="text-sm font-extrabold text-amber-700">{(getOrderItems(o).find(it => it.productId === product.id)?.qty ?? o.qty ?? 0)} {product.unit}</span>
+                                  <span className="text-sm font-extrabold text-amber-700">{displayQty} {product.unit}</span>
                                 </div>
                               </div>
                             );
@@ -2554,6 +2598,8 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
                           <div className="divide-y divide-slate-100">
                             {productOrders.map((o) => {
                               const badge = getHandoverBadge(o.deliveryDate);
+                              const rawQty = getOrderItems(o).find(it => it.productId === product.id)?.qty ?? o.qty ?? 0;
+                              const displayQty = isWholeNumberUnit(product.unit) ? Math.round(Number(rawQty)) : rawQty;
                               return (
                                 <div key={o.id} className="grid grid-cols-[1fr_90px_140px_110px] gap-2 items-center px-6 py-3 hover:bg-amber-50/40 transition-colors">
                                   <div className="flex items-center gap-2.5 min-w-0">
@@ -2563,7 +2609,7 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
                                       <p className="text-[11px] text-slate-400 truncate">{o.notes ? `"${o.notes}"` : ""}</p>
                                     </div>
                                   </div>
-                                  <p className="text-sm font-bold text-right text-amber-600">{(getOrderItems(o).find(it => it.productId === product.id)?.qty ?? o.qty ?? 0)} {product.unit}</p>
+                                  <p className="text-sm font-bold text-right text-amber-600">{displayQty} {product.unit}</p>
                                   <div className="text-right">
                                     <div className="inline-flex items-center gap-1 text-sm justify-end"><Calendar className="size-3 text-amber-600" /><span className="font-bold text-slate-800">{dateLabel(o.deliveryDate)}</span></div>
                                     {badge && (<div className="mt-0.5"><span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-bold ${badge.style}`}>{badge.label}</span></div>)}
@@ -2577,7 +2623,7 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
 
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-200 bg-white p-3.5 sm:px-6 sm:py-3">
                           <p className="text-xs text-slate-600 text-center sm:text-left">
-                            Total for {product.name}: <strong className="text-slate-900 font-bold">{kg.toFixed(2)} {product.unit}</strong> across {count} customer order{count !== 1 ? "s" : ""}
+                            Total for {product.name}: <strong className="text-slate-900 font-bold">{isWholeNumberUnit(product.unit) ? Math.round(kg) : kg.toFixed(2)} {product.unit}</strong> across {count} customer order{count !== 1 ? "s" : ""}
                           </p>
                           <button onClick={(e) => { e.stopPropagation(); onViewProductOrders(product.id); }}
                             className="flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-sm">
@@ -2758,6 +2804,7 @@ function CustomerModal({ initial, onSave, onClose }: {
 function CustomersPage({
   customers,
   orders,
+  products,
   onAdd,
   onEdit,
   onDelete,
@@ -2766,6 +2813,7 @@ function CustomersPage({
 }: {
   customers: Customer[];
   orders: Order[];
+  products?: Product[];
   onAdd: (data: CustomerFormData) => void;
   onEdit: (id: number | string, data: CustomerFormData) => void;
   onDelete: (id: number | string, name: string) => void;
@@ -2788,14 +2836,14 @@ function CustomersPage({
       if (!["Completed", "Cancelled"].includes(o.status)) {
         cur.activeOrders += 1;
       }
-      cur.totalKg += getOrderTotalKg(o);
+      cur.totalKg += getOrderTotalKg(o, products);
       if (!cur.lastDate || o.date > cur.lastDate) {
         cur.lastDate = o.date;
       }
       map.set(name, cur);
     }
     return map;
-  }, [orders]);
+  }, [orders, products]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -3966,7 +4014,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         {active === "Dashboard" && (<Dashboard orders={orders} products={products} customers={customers} setActive={setActive} onViewProductOrders={viewProductOrders} onOpenSidebar={() => setSidebarOpen(true)} />)}
         {active === "Orders" && (<OrdersPage orders={orders} products={products} customers={customers} initialCustomer={newOrderInitialCustomer} onClearInitialCustomer={() => setNewOrderInitialCustomer(null)} onAdd={addOrder} onEdit={editOrder} onDelete={deleteOrder} onStatusChange={updateStatus} onGenerate={generateInvoice} onUpdatePayment={updatePayment} initialProductFilter={initialProductFilter} onClearProductFilter={() => setInitialProductFilter(null)} onOpenSidebar={() => setSidebarOpen(true)} />)}
         {active === "Products" && (<ProductsPage products={products} orders={orders} onAdd={addProduct} onEdit={editProduct} onDelete={deleteProduct} onViewProductOrders={viewProductOrders} onOpenSidebar={() => setSidebarOpen(true)} />)}
-        {active === "Customers" && (<CustomersPage customers={customers} orders={orders} onAdd={addCustomer} onEdit={editCustomer} onDelete={deleteCustomer} onCreateOrder={(name) => { setNewOrderInitialCustomer(name); setActive("Orders"); }} onOpenSidebar={() => setSidebarOpen(true)} />)}
+        {active === "Customers" && (<CustomersPage customers={customers} orders={orders} products={products} onAdd={addCustomer} onEdit={editCustomer} onDelete={deleteCustomer} onCreateOrder={(name) => { setNewOrderInitialCustomer(name); setActive("Orders"); }} onOpenSidebar={() => setSidebarOpen(true)} />)}
       </main>
 
       {/* Mobile Bottom Nav */}
