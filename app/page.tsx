@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { optimizeImageUrl } from "@/lib/cloudinary";
 import {
@@ -15,10 +15,6 @@ import {
   Clock,
   Sparkle,
   ZoomIn,
-  ChevronLeft,
-  ChevronRight,
-  LayoutGrid,
-  Columns3,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -244,7 +240,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
         }}
       />
 
-      <div className="relative aspect-[4/3] sm:h-56 md:h-60 overflow-hidden bg-gradient-to-br from-amber-950/80 to-[#120800]">
+      <div className="relative h-28 sm:h-56 md:h-60 overflow-hidden bg-gradient-to-br from-amber-950/80 to-[#120800]">
         {optimizedSrc && !imgErr ? (
           <img
             src={optimizedSrc}
@@ -290,9 +286,9 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
         </div>
       </div>
 
-      <div className="flex flex-col flex-1 p-3.5 sm:p-5">
+      <div className="flex flex-col flex-1 p-2.5 sm:p-5">
         {/* Sweet Name in English */}
-        <h3 className="text-sm sm:text-lg font-bold text-white group-hover:text-amber-300 transition-colors duration-300 leading-snug line-clamp-1">
+        <h3 className="text-xs sm:text-lg font-bold text-white group-hover:text-amber-300 transition-colors duration-300 leading-snug line-clamp-1">
           {product.name}
         </h3>
 
@@ -380,107 +376,6 @@ function SlideInView({
       className={`transition-all duration-700 ease-out ${getTransform()} ${className}`}
     >
       {children}
-    </div>
-  );
-}
-
-// ── Mobile & Desktop Touch Swipeable Sweet Slider ─────────────────────────────
-function SweetSlider({ products }: { products: Product[] }) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  const handleScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const scrollLeft = el.scrollLeft;
-    const firstCard = el.firstElementChild as HTMLElement | null;
-    const cardWidth = firstCard ? firstCard.offsetWidth + 14 : 320;
-    const index = Math.round(scrollLeft / cardWidth);
-    setActiveIndex(Math.min(Math.max(0, index), products.length - 1));
-  };
-
-  const scrollToIndex = (idx: number) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const firstCard = el.firstElementChild as HTMLElement | null;
-    const cardWidth = firstCard ? firstCard.offsetWidth + 14 : 320;
-    el.scrollTo({
-      left: idx * cardWidth,
-      behavior: "smooth",
-    });
-    setActiveIndex(idx);
-  };
-
-  return (
-    <div className="relative w-full">
-      {/* Swipe Hint for Mobile Users */}
-      <div className="flex items-center justify-center gap-2 mb-2 text-[11px] font-bold text-amber-300/80 uppercase tracking-wider animate-pulse sm:hidden">
-        <span>👈</span>
-        <span>Swipe sweets left &amp; right</span>
-        <span>👉</span>
-      </div>
-
-      {/* Touch-Snapping Carousel Track */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="flex gap-3.5 overflow-x-auto snap-x snap-mandatory scroll-smooth px-1 py-3 -mx-2 sm:mx-0 sm:px-0 scrollbar-none"
-        style={{ WebkitOverflowScrolling: "touch" }}
-      >
-        {products.map((product, i) => (
-          <div
-            key={product.id}
-            className="w-[82vw] max-w-[340px] shrink-0 snap-center transition-transform duration-300"
-          >
-            <ProductCard product={product} index={i} />
-          </div>
-        ))}
-      </div>
-
-      {/* Navigation Controls & Animated Indicator Dots */}
-      <div className="flex items-center justify-between mt-4 px-1">
-        {/* Previous & Next Arrows */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => scrollToIndex(Math.max(0, activeIndex - 1))}
-            disabled={activeIndex === 0}
-            className="flex size-9 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/10 hover:border-amber-400 active:scale-90 transition-all cursor-pointer"
-            aria-label="Previous Sweet"
-          >
-            <ChevronLeft className="size-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => scrollToIndex(Math.min(products.length - 1, activeIndex + 1))}
-            disabled={activeIndex === products.length - 1}
-            className="flex size-9 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/10 hover:border-amber-400 active:scale-90 transition-all cursor-pointer"
-            aria-label="Next Sweet"
-          >
-            <ChevronRight className="size-4" />
-          </button>
-          <span className="text-xs font-bold text-amber-400/90 ml-1">
-            {activeIndex + 1} / {products.length}
-          </span>
-        </div>
-
-        {/* Sliding Dot Indicators */}
-        <div className="flex items-center gap-1.5 overflow-x-auto max-w-[160px] py-1">
-          {products.map((p, i) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => scrollToIndex(i)}
-              className={`rounded-full transition-all duration-300 cursor-pointer ${
-                activeIndex === i
-                  ? "w-6 h-2 bg-gradient-to-r from-amber-400 to-orange-500 shadow-sm shadow-amber-500/50"
-                  : "w-2 h-2 bg-white/25 hover:bg-white/50"
-              }`}
-              aria-label={`Go to sweet ${i + 1}`}
-            />
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
@@ -697,15 +592,6 @@ export default function PublicPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<string>("All");
-  const [viewMode, setViewMode] = useState<"slider" | "grid">("slider");
-
-  // On larger screens (desktop), default to grid view, but allow toggling
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.innerWidth >= 768) {
-      setViewMode("grid");
-    }
-  }, []);
 
   const loadProducts = async () => {
     setLoading(true);
@@ -795,20 +681,6 @@ export default function PublicPage() {
     loadProducts();
   }, []);
 
-  // Filter products by category
-  const filteredProducts = useMemo(() => {
-    if (activeFilter === "All") return products;
-    if (activeFilter === "Musket") {
-      return products.filter((p) => p.name.toLowerCase().includes("musket") || p.name.toLowerCase().includes("halwa"));
-    }
-    if (activeFilter === "Boxes & Packs") {
-      return products.filter((p) => p.unit === "box" || p.unit === "pcs" || p.name.toLowerCase().includes("box"));
-    }
-    if (activeFilter === "By kg") {
-      return products.filter((p) => p.unit === "kg");
-    }
-    return products;
-  }, [products, activeFilter]);
 
   return (
     <div className="bg-[#0a0600] text-white min-h-screen selection:bg-amber-500 selection:text-black">
@@ -844,7 +716,7 @@ export default function PublicPage() {
       <HeroSection />
 
       {/* Sweet Catalog Section */}
-      <section id="sweets" className="py-14 sm:py-28 px-3 sm:px-6 relative bg-[#0a0600]">
+      <section id="sweets" className="py-10 sm:py-28 px-3 sm:px-6 relative bg-[#0a0600]">
         <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
 
         <div className="max-w-6xl mx-auto">
@@ -863,65 +735,11 @@ export default function PublicPage() {
                 Prepared to order with pure ghee, whole milk, and eastern culinary traditions. Tap any sweet to see full details and photos.
               </p>
 
-              {/* Interactive Category Filter Tabs */}
+              {/* Count badge */}
               {products.length > 0 && (
-                <div className="flex items-center justify-center gap-2 mt-6 sm:mt-8 flex-wrap">
-                  {[
-                    { id: "All", label: "All Sweets" },
-                    { id: "Musket", label: "Musket Halwas" },
-                    { id: "By kg", label: "By Weight (kg)" },
-                    { id: "Boxes & Packs", label: "Boxes & Packs" },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setActiveFilter(tab.id)}
-                      className={`rounded-full px-4 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 cursor-pointer ${
-                        activeFilter === tab.id
-                          ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/35 scale-105 border-transparent"
-                          : "border border-white/15 bg-white/5 text-slate-300 hover:border-amber-400/40 hover:bg-white/10 hover:text-white"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Mobile View Toggle: Swipe vs Grid */}
-              {products.length > 0 && (
-                <div className="flex items-center justify-between mt-6 px-1 max-w-2xl mx-auto">
-                  <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-slate-400">
-                    <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>{filteredProducts.length} Traditional Sweet{filteredProducts.length !== 1 ? "s" : ""}</span>
-                  </div>
-
-                  <div className="inline-flex items-center rounded-full bg-white/10 p-0.5 border border-white/15 backdrop-blur-md">
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("slider")}
-                      className={`flex items-center gap-1 rounded-full px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-bold transition-all duration-300 cursor-pointer ${
-                        viewMode === "slider"
-                          ? "bg-amber-500 text-black shadow-md shadow-amber-500/30"
-                          : "text-slate-300 hover:text-white"
-                      }`}
-                    >
-                      <Columns3 className="size-3" />
-                      <span>Swipe</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("grid")}
-                      className={`flex items-center gap-1 rounded-full px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-bold transition-all duration-300 cursor-pointer ${
-                        viewMode === "grid"
-                          ? "bg-amber-500 text-black shadow-md shadow-amber-500/30"
-                          : "text-slate-300 hover:text-white"
-                      }`}
-                    >
-                      <LayoutGrid className="size-3" />
-                      <span>Grid</span>
-                    </button>
-                  </div>
+                <div className="flex items-center justify-center gap-1.5 mt-4 text-[11px] sm:text-xs font-bold text-slate-400">
+                  <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>{products.length} Traditional Sweet{products.length !== 1 ? "s" : ""}</span>
                 </div>
               )}
             </div>
@@ -955,11 +773,9 @@ export default function PublicPage() {
                 </button>
               )}
             </div>
-          ) : viewMode === "slider" ? (
-            <SweetSlider products={filteredProducts} />
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredProducts.map((product, i) => (
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {products.map((product, i) => (
                 <ProductCard key={product.id} product={product} index={i} />
               ))}
             </div>
