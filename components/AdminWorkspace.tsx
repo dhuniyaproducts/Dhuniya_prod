@@ -1871,25 +1871,44 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
   );
 }
 
-function OrderItemsModal({ order, products, onClose }: {
+function OrderItemsModal({ order, products, customerLookup, onClose }: {
   order: Order;
   products: Product[];
+  customerLookup?: Map<string, Customer>;
   onClose: () => void;
 }) {
   const items = getOrderItems(order);
   const total = getOrderTotal(order, products);
+  const info = customerLookup?.get(order.customer.trim().toLowerCase());
+  const phone = order.phone || info?.phone;
+  const address = info?.address;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-3 sm:p-4" onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 bg-slate-50">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Ordered Sweets ({items.length})</p>
-            <h3 className="text-sm font-bold text-slate-900 truncate">{order.customer}</h3>
+        <div className="border-b border-slate-200 px-4 py-3 bg-slate-50">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Ordered Sweets ({items.length})</p>
+                <span className="text-[10px] text-slate-400">· {dateLabel(order.deliveryDate)}</span>
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 truncate mt-0.5">{order.customer}</h3>
+              {phone ? (
+                <div className="mt-1 flex items-center gap-2 text-xs text-slate-600 flex-wrap">
+                  <a href={`tel:${phone}`} className="inline-flex items-center gap-1 font-bold text-amber-700 hover:underline">
+                    <Phone className="size-3 text-amber-600" /> {phone}
+                  </a>
+                  {address && <span className="text-[11px] text-slate-400 truncate">· {address}</span>}
+                </div>
+              ) : address ? (
+                <p className="text-[11px] text-slate-400 truncate mt-0.5">{address}</p>
+              ) : null}
+            </div>
+            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 transition-colors shrink-0">
+              <X className="size-4" />
+            </button>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 transition-colors">
-            <X className="size-4" />
-          </button>
         </div>
         <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
           {items.map((item, idx) => {
@@ -1936,93 +1955,88 @@ function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate
   const items = getOrderItems(order);
   const total = getOrderTotal(order, products);
   const badge = getHandoverBadge(order.deliveryDate);
-  const info = customerLookup?.get(order.customer.trim().toLowerCase());
-  const phone = order.phone || info?.phone;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs hover:border-amber-300 transition-all space-y-2.5">
-      {/* Row 1: Avatar + Customer info + Amount & Payment Badge */}
-      <div className="flex items-center justify-between gap-2">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-amber-300 transition-all space-y-3">
+      {/* Row 1: Avatar + Customer info on Left; Status Dropdown on Top Right (above price) */}
+      <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-extrabold text-sm border border-amber-300/40">
             {order.customer.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <h4 className="font-bold text-slate-900 text-sm truncate leading-tight">{order.customer}</h4>
+              <h4 className="font-extrabold text-slate-900 text-sm truncate leading-tight">{order.customer}</h4>
               {badge && (
                 <span className={`inline-flex items-center rounded-md border px-1.5 py-0.2 text-[9px] font-bold ${badge.style}`}>
                   {badge.label}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 flex-wrap">
-              <span>{dateLabel(order.deliveryDate)}</span>
-              {phone && (
-                <a href={`tel:${phone}`} className="font-semibold text-amber-700 hover:underline flex items-center gap-0.5">
-                  <Phone className="size-2.5" />{phone}
-                </a>
-              )}
-            </div>
+            <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+              {dateLabel(order.deliveryDate)}
+            </p>
           </div>
         </div>
 
-        <div className="text-right shrink-0">
-          <p className="text-sm font-extrabold text-slate-900 leading-tight">{money(total)}</p>
-          <div className="mt-0.5">
-            <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
-          </div>
+        {/* Status Dropdown at top right directly above price */}
+        <div className="shrink-0">
+          <StatusDropdown value={order.status} onChange={(v) => onStatusChange(order.id, v)} />
         </div>
       </div>
 
-      {/* Row 2: Items button + Status dropdown + Action buttons */}
-      <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-slate-100 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => onViewItems(order)}
-            className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200/80 px-2 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors shrink-0 whitespace-nowrap"
-          >
-            <Package className="size-3 text-amber-600" />
-            <span>{items.length} item{items.length !== 1 ? "s" : ""}</span>
-          </button>
-          <StatusDropdown value={order.status} onChange={(v) => onStatusChange(order.id, v)} />
-        </div>
+      {/* Row 2: Ordered Sweets button on Left; Price & Payment Badge on Right */}
+      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+        <button
+          type="button"
+          onClick={() => onViewItems(order)}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 active:bg-amber-200 transition-colors shrink-0"
+        >
+          <Package className="size-3.5 text-amber-600" />
+          <span>{items.length} {items.length === 1 ? "item" : "items"}</span>
+          <ChevronDown className="size-3 text-amber-600/70" />
+        </button>
 
-        <div className="flex items-center gap-1 shrink-0 ml-auto">
-          <button
-            type="button"
-            onClick={() => onManagePayment(order)}
-            className="h-7 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-bold px-2 flex items-center gap-1 transition-colors whitespace-nowrap"
-            title="Manage payment"
-          >
-            💳 Pay
-          </button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onGenerate(order)}
-            className="h-7 border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold px-2 gap-1 whitespace-nowrap"
-          >
-            <FileText className="size-3" /> Bill
-          </Button>
-          <button
-            type="button"
-            onClick={() => onEdit(order)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
-            title="Edit order"
-          >
-            <Edit2 className="size-3" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(order.id)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors"
-            title="Delete order"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
+          <span className="text-sm sm:text-base font-black text-slate-900 leading-tight">{money(total)}</span>
         </div>
+      </div>
+
+      {/* Row 3: Action Buttons */}
+      <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-100">
+        <button
+          type="button"
+          onClick={() => onManagePayment(order)}
+          className="h-7.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 active:bg-amber-200 text-xs font-bold px-2.5 flex items-center gap-1 transition-colors whitespace-nowrap"
+          title="Manage payment"
+        >
+          💳 Pay
+        </button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => onGenerate(order)}
+          className="h-7.5 border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold px-2.5 gap-1 whitespace-nowrap"
+        >
+          <FileText className="size-3" /> Bill
+        </Button>
+        <button
+          type="button"
+          onClick={() => onEdit(order)}
+          className="flex h-7.5 w-7.5 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+          title="Edit order"
+        >
+          <Edit2 className="size-3" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onDelete(order.id)}
+          className="flex h-7.5 w-7.5 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors"
+          title="Delete order"
+        >
+          <Trash2 className="size-3.5" />
+        </button>
       </div>
     </div>
   );
@@ -2136,6 +2150,47 @@ function OrdersTable({ orders, products, customerLookup, onStatusChange, onGener
   );
 }
 
+function getGroupHeaderStyle(key: string) {
+  if (key === "today") {
+    return {
+      bar: "bg-gradient-to-r from-rose-100/90 via-rose-50/70 to-amber-50/40 border-rose-300/80 text-rose-950 shadow-2xs",
+      badge: "bg-rose-600 text-white border-rose-600",
+      pill: "bg-rose-600 text-white",
+      totalKg: "text-rose-700",
+    };
+  }
+  if (key === "tomorrow") {
+    return {
+      bar: "bg-gradient-to-r from-amber-100/90 via-orange-50/70 to-amber-50/40 border-amber-300/80 text-amber-950 shadow-2xs",
+      badge: "bg-amber-600 text-white border-amber-600",
+      pill: "bg-amber-600 text-white",
+      totalKg: "text-amber-700",
+    };
+  }
+  if (key === "upcoming") {
+    return {
+      bar: "bg-gradient-to-r from-blue-100/90 via-sky-50/70 to-indigo-50/40 border-blue-300/80 text-blue-950 shadow-2xs",
+      badge: "bg-blue-600 text-white border-blue-600",
+      pill: "bg-blue-600 text-white",
+      totalKg: "text-blue-700",
+    };
+  }
+  if (key === "past" || key === "status-Completed") {
+    return {
+      bar: "bg-slate-100/90 border-slate-300/80 text-slate-800 shadow-2xs",
+      badge: "bg-slate-600 text-white border-slate-600",
+      pill: "bg-slate-500 text-white",
+      totalKg: "text-slate-600",
+    };
+  }
+  return {
+    bar: "bg-slate-50 border-slate-200/90 text-slate-900 shadow-2xs",
+    badge: "bg-amber-600 text-white border-amber-600",
+    pill: "bg-amber-600 text-white",
+    totalKg: "text-amber-700",
+  };
+}
+
 function OrdersPage({ orders, products, customers = [], initialCustomer = null, onClearInitialCustomer, onAdd, onEdit, onDelete, onStatusChange, onGenerate, onUpdatePayment, initialProductFilter = null, onClearProductFilter, onOpenSidebar }: {
   orders: Order[]; products: Product[]; customers?: (Customer | string)[]; initialCustomer?: string | null; onClearInitialCustomer?: () => void; onAdd: (data: OrderFormData) => void; onEdit: (id: string, data: OrderFormData) => void;
   onDelete: (id: string) => void; onStatusChange: (id: string, status: string) => void; onGenerate: (order: Order) => void; onUpdatePayment: (orderId: string, amount: number) => void;
@@ -2153,6 +2208,17 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
   const [filterDate, setFilterDate] = useState("");
   const [quickTab, setQuickTab] = useState<"all" | "today" | "ready" | "kitchen" | "completed">("all");
   const [groupBy, setGroupBy] = useState<"date" | "product" | "status" | "none">("date");
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
+    past: true,
+    "status-Completed": true,
+  });
+
+  const toggleGroup = (key: string, currentlyCollapsed: boolean) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [key]: !currentlyCollapsed,
+    }));
+  };
   const todayStr = getTodayStr();
 
   // Combine customers passed in with all distinct customer names currently in orders
@@ -2375,38 +2441,90 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
             {groupedOrders.map((group) => {
               const groupKg = group.orders.reduce((sum, o) => sum + getOrderTotalKg(o, products), 0);
               const groupPcs = group.orders.reduce((sum, o) => sum + getOrderTotalPcs(o, products), 0);
+              const isPastOrCompleted = group.key === "past" || group.key === "status-Completed";
+              const isCollapsed = quickTab === "completed" ? false : (collapsedGroups[group.key] ?? isPastOrCompleted);
+              const style = getGroupHeaderStyle(group.key);
+
               return (
                 <section key={group.key} className="space-y-3">
                   {groupBy !== "none" && (
-                    <div className="flex items-center justify-between px-1">
-                      <div className="flex items-center gap-2">
-                        <span className="flex size-6 items-center justify-center rounded-lg bg-amber-100 text-amber-800 text-xs font-extrabold shadow-2xs">{group.orders.length}</span>
-                        <h3 className="text-sm sm:text-base font-extrabold text-slate-900">{group.title}</h3>
-                        {(group as any).badge && (<span className="rounded-md bg-amber-100 border border-amber-300/60 px-2 py-0.5 text-[10px] font-bold text-amber-800">{(group as any).badge}</span>)}
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(group.key, isCollapsed)}
+                      className={`w-full flex flex-wrap items-center justify-between gap-2.5 rounded-xl border px-3.5 py-2.5 sm:px-4 sm:py-3 transition-all hover:brightness-98 text-left ${style.bar}`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`flex size-6 shrink-0 items-center justify-center rounded-lg text-xs font-black shadow-2xs ${style.pill}`}>
+                          {group.orders.length}
+                        </span>
+                        <h3 className="text-sm sm:text-base font-extrabold truncate">{group.title}</h3>
+                        {(group as any).badge && (
+                          <span className={`rounded-md border px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${style.badge}`}>
+                            {(group as any).badge}
+                          </span>
+                        )}
+                        {isCollapsed && (
+                          <span className="rounded-md bg-white/70 border border-slate-300/60 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                            Hidden · Tap to view
+                          </span>
+                        )}
                       </div>
-                      <span className="text-xs font-bold text-slate-500">
-                        Total:{" "}
-                        {groupKg > 0 && (
-                          <strong className="text-amber-600 font-extrabold mr-1.5">{groupKg.toFixed(2)} kg</strong>
-                        )}
-                        {groupPcs > 0 && (
-                          <strong className="text-blue-700 font-extrabold">{groupPcs} pcs</strong>
-                        )}
-                        {groupKg === 0 && groupPcs === 0 && (
-                          <strong className="text-slate-400 font-semibold">0 kg</strong>
-                        )}
-                      </span>
-                    </div>
+
+                      <div className="flex items-center gap-3 shrink-0 ml-auto">
+                        <span className="text-xs font-bold text-slate-500">
+                          Total:{" "}
+                          {groupKg > 0 && (
+                            <strong className={`font-extrabold mr-1.5 ${style.totalKg}`}>{groupKg.toFixed(2)} kg</strong>
+                          )}
+                          {groupPcs > 0 && (
+                            <strong className="text-blue-700 font-extrabold">{groupPcs} pcs</strong>
+                          )}
+                          {groupKg === 0 && groupPcs === 0 && (
+                            <strong className="text-slate-400 font-semibold">0 kg</strong>
+                          )}
+                        </span>
+                        <div className="flex items-center justify-center size-6 rounded-lg bg-white/60 border border-slate-300/40 text-slate-700">
+                          <ChevronDown className={`size-4 transition-transform duration-200 ${isCollapsed ? "-rotate-90" : "rotate-0"}`} />
+                        </div>
+                      </div>
+                    </button>
                   )}
-                  <div className="block sm:hidden space-y-3.5">
-                    {group.orders.map((order) => {
-                      // multi-product ready
-                      return <OrderCard key={order.id} order={order} products={products} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} onManagePayment={setPaymentOrder} onViewItems={setViewingItemsOrder} />;
-                    })}
-                  </div>
-                  <div className="hidden sm:block">
-                    <OrdersTable orders={group.orders} products={products} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} onManagePayment={setPaymentOrder} onViewItems={setViewingItemsOrder} />
-                  </div>
+
+                  {!isCollapsed && (
+                    <>
+                      <div className="block sm:hidden space-y-3.5">
+                        {group.orders.map((order) => {
+                          return (
+                            <OrderCard
+                              key={order.id}
+                              order={order}
+                              products={products}
+                              customerLookup={customerLookup}
+                              onStatusChange={onStatusChange}
+                              onGenerate={onGenerate}
+                              onEdit={setEditOrder}
+                              onDelete={setDeleteId}
+                              onManagePayment={setPaymentOrder}
+                              onViewItems={setViewingItemsOrder}
+                            />
+                          );
+                        })}
+                      </div>
+                      <div className="hidden sm:block">
+                        <OrdersTable
+                          orders={group.orders}
+                          products={products}
+                          customerLookup={customerLookup}
+                          onStatusChange={onStatusChange}
+                          onGenerate={onGenerate}
+                          onEdit={setEditOrder}
+                          onDelete={setDeleteId}
+                          onManagePayment={setPaymentOrder}
+                          onViewItems={setViewingItemsOrder}
+                        />
+                      </div>
+                    </>
+                  )}
                 </section>
               );
             })}
@@ -2418,6 +2536,7 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
         <OrderItemsModal
           order={viewingItemsOrder}
           products={products}
+          customerLookup={customerLookup}
           onClose={() => setViewingItemsOrder(null)}
         />
       )}
