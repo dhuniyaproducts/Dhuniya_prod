@@ -484,66 +484,76 @@ function HeroSection() {
 // ── Contact Section ────────────────────────────────────────────────────────────
 function ContactSection() {
   return (
-    <section id="contact" className="py-12 sm:py-28 px-2.5 sm:px-4 bg-gradient-to-b from-[#0a0600] to-[#120800] relative">
+    <section id="contact" className="py-8 sm:py-20 px-3 sm:px-6 bg-gradient-to-b from-[#0a0600] to-[#120800] relative">
       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
 
       <SlideInView direction="up">
-        <div className="max-w-5xl mx-auto text-center">
-          <span className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] sm:tracking-[0.3em] text-amber-400">Authentic Taste</span>
-          <h2 className="mt-1.5 sm:mt-3 text-2xl sm:text-4xl md:text-5xl font-black text-white mb-2 sm:mb-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <span className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] text-amber-400">Authentic Taste</span>
+          <h2 className="mt-1 sm:mt-2 text-xl sm:text-3xl md:text-4xl font-black text-white mb-1 sm:mb-2">
             Visit Us or Place Orders
           </h2>
-          <p className="text-slate-400 text-xs sm:text-base max-w-xl mx-auto mb-8 sm:mb-14 px-2 sm:px-0">
-            We cater for weddings, functions, and everyday celebrations. Contact us directly for bulk sweets and custom orders.
+          <p className="text-slate-400 text-xs sm:text-sm max-w-md mx-auto mb-5 sm:mb-8 px-2 sm:px-0">
+            Handcrafted for celebrations and bulk orders. Contact us directly or visit our Maruthamunai kitchen.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 max-w-4xl mx-auto text-left">
-            <SlideInView direction="up" delay={100}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-5 text-left">
+            <SlideInView direction="up" delay={80}>
               <a
                 href="tel:0756656135"
-                className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 hover:border-amber-400/60 hover:bg-white/10 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-amber-500/20 active:scale-95 transition-all duration-300 flex flex-col justify-between h-full"
+                className="group flex sm:flex-col items-center sm:items-start justify-between rounded-xl sm:rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-5 hover:border-amber-400/60 hover:bg-white/10 hover:-translate-y-1 active:scale-98 transition-all duration-300 h-full"
               >
-                <div>
-                  <div className="size-9 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 sm:mb-4 group-hover:scale-110 group-hover:bg-amber-500/25 transition-all duration-300">
+                <div className="flex sm:flex-col items-center sm:items-start gap-2.5 sm:gap-3 min-w-0">
+                  <div className="size-8 sm:size-10 rounded-lg sm:rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-105 transition-transform">
                     <Phone className="size-4 sm:size-5" />
                   </div>
-                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Direct Mobile</p>
-                  <p className="text-sm sm:text-xl font-bold sm:font-black text-white mt-0.5 sm:mt-1 group-hover:text-amber-300 transition-colors truncate">
-                    0756656135
-                  </p>
+                  <div className="min-w-0">
+                    <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">Direct Mobile</p>
+                    <p className="text-xs sm:text-lg font-black text-white group-hover:text-amber-300 transition-colors truncate">
+                      0756656135
+                    </p>
+                  </div>
                 </div>
-                <p className="text-[10px] sm:text-xs text-amber-400 font-bold mt-3 sm:mt-4 flex items-center gap-1 group-hover:translate-x-1.5 transition-transform duration-300">
-                  <span>Tap to Call</span>
+                <span className="text-[10px] sm:text-xs text-amber-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform shrink-0 ml-2 sm:ml-0 sm:mt-3">
+                  <span>Call Now</span>
                   <ArrowRight className="size-3" />
-                </p>
+                </span>
               </a>
             </SlideInView>
 
-            <SlideInView direction="up" delay={200}>
-              <div className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 hover:border-amber-400/40 hover:bg-white/10 hover:-translate-y-1.5 active:scale-95 transition-all duration-300 flex flex-col justify-between h-full">
-                <div>
-                  <div className="size-9 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300">
+            <SlideInView direction="up" delay={160}>
+              <div className="group flex sm:flex-col items-center sm:items-start justify-between rounded-xl sm:rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-5 hover:border-amber-400/40 hover:bg-white/10 transition-all duration-300 h-full">
+                <div className="flex sm:flex-col items-center sm:items-start gap-2.5 sm:gap-3 min-w-0">
+                  <div className="size-8 sm:size-10 rounded-lg sm:rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
                     <MapPin className="size-4 sm:size-5" />
                   </div>
-                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Kitchen Address</p>
-                  <p className="text-sm sm:text-lg font-bold text-white mt-0.5 sm:mt-1 leading-snug">138, France City</p>
-                  <p className="text-xs sm:text-sm text-slate-300">Maruthamunai</p>
+                  <div className="min-w-0">
+                    <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">Kitchen Address</p>
+                    <p className="text-xs sm:text-base font-bold text-white truncate">138, France City</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400 truncate">Maruthamunai</p>
+                  </div>
                 </div>
-                <p className="text-[10px] sm:text-xs text-slate-400 mt-3 sm:mt-4">Daily fresh handover</p>
+                <span className="text-[9px] sm:text-[10px] text-slate-400 shrink-0 ml-2 sm:ml-0 sm:mt-3">
+                  Daily handover
+                </span>
               </div>
             </SlideInView>
 
-            <SlideInView direction="up" delay={300}>
-              <div className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 hover:border-amber-400/40 hover:bg-white/10 hover:-translate-y-1.5 active:scale-95 transition-all duration-300 flex flex-col justify-between h-full">
-                <div>
-                  <div className="size-9 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300">
+            <SlideInView direction="up" delay={240}>
+              <div className="group flex sm:flex-col items-center sm:items-start justify-between rounded-xl sm:rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-5 hover:border-amber-400/40 hover:bg-white/10 transition-all duration-300 h-full">
+                <div className="flex sm:flex-col items-center sm:items-start gap-2.5 sm:gap-3 min-w-0">
+                  <div className="size-8 sm:size-10 rounded-lg sm:rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
                     <Award className="size-4 sm:size-5" />
                   </div>
-                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Craftsmanship</p>
-                  <p className="text-sm sm:text-lg font-bold text-white mt-0.5 sm:mt-1">100% Traditional</p>
-                  <p className="text-xs text-slate-400 mt-0.5 sm:mt-1">Pure ghee, nuts &amp; milk</p>
+                  <div className="min-w-0">
+                    <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">Craftsmanship</p>
+                    <p className="text-xs sm:text-base font-bold text-white truncate">100% Traditional</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400 truncate">Pure ghee &amp; milk</p>
+                  </div>
                 </div>
-                <p className="text-[10px] sm:text-xs text-amber-400/90 font-medium mt-3 sm:mt-4">Fresh batches</p>
+                <span className="text-[9px] sm:text-[10px] text-amber-400/90 shrink-0 ml-2 sm:ml-0 sm:mt-3">
+                  Fresh daily
+                </span>
               </div>
             </SlideInView>
           </div>

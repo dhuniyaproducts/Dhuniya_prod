@@ -4160,11 +4160,27 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       setIsLoading(true);
       const client = getSupabase();
       if (!client) {
-        try {
-          const lp = localStorage.getItem("dhuniya_products"); if (lp) setProducts(JSON.parse(lp));
-          const lo = localStorage.getItem("dhuniya_orders"); if (lo) setOrders(JSON.parse(lo));
-        } catch { }
-        setIsLoading(false); return;
+        router.replace("/login");
+        setIsLoading(false);
+        return;
+      }
+
+      // Strictly verify authentication before querying business data
+      try {
+        const {
+          data: { user },
+          error: authErr,
+        } = await client.auth.getUser();
+
+        if (authErr || !user) {
+          router.replace("/login");
+          setIsLoading(false);
+          return;
+        }
+      } catch {
+        router.replace("/login");
+        setIsLoading(false);
+        return;
       }
       try {
         const { data: prodData, error: prodErr } = await client

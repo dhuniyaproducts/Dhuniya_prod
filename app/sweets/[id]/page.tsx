@@ -17,6 +17,8 @@ import {
   Clock,
   Heart,
   Lock,
+  Maximize2,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -46,6 +48,7 @@ export default function SweetDetailPage() {
   const [loading, setLoading] = useState(true);
   const [selectedImgIdx, setSelectedImgIdx] = useState(0);
   const [imgErr, setImgErr] = useState<Record<number, boolean>>({});
+  const [isZoomed, setIsZoomed] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -193,14 +196,38 @@ export default function SweetDetailPage() {
       <main className="max-w-4xl mx-auto px-3 sm:px-6 py-6 sm:py-12">
         <div className="rounded-2xl sm:rounded-3xl border border-white/15 bg-gradient-to-b from-[#180d01] via-[#120800] to-[#0a0600] overflow-hidden shadow-2xl shadow-black/80">
           {/* Main Visual Showcase / Gallery */}
-          <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full bg-[#070400] overflow-hidden">
+          <div className="relative h-[360px] sm:h-[480px] w-full bg-[#050300] overflow-hidden flex items-center justify-center group/img">
             {currentImg && !imgErr[selectedImgIdx] ? (
-              <img
-                src={currentImg}
-                alt={product.name}
-                className="w-full h-full object-cover"
-                onError={() => setImgErr((prev) => ({ ...prev, [selectedImgIdx]: true }))}
-              />
+              <>
+                {/* Ambient glow matching image */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                  <img
+                    src={currentImg}
+                    alt=""
+                    className="w-full h-full object-cover blur-2xl opacity-25 scale-110"
+                    aria-hidden="true"
+                  />
+                </div>
+
+                {/* Uncropped, full image */}
+                <img
+                  src={currentImg}
+                  alt={product.name}
+                  onClick={() => setIsZoomed(true)}
+                  className="relative z-10 w-full h-full object-contain cursor-zoom-in transition-transform duration-300 hover:scale-[1.01]"
+                  onError={() => setImgErr((prev) => ({ ...prev, [selectedImgIdx]: true }))}
+                />
+
+                {/* Tap to View Full Screen Indicator */}
+                <button
+                  type="button"
+                  onClick={() => setIsZoomed(true)}
+                  className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 rounded-full bg-black/75 border border-white/20 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md hover:bg-black/90 hover:border-amber-400 transition-all cursor-pointer shadow-lg"
+                >
+                  <Maximize2 className="size-3.5 text-amber-400" />
+                  <span>Full View</span>
+                </button>
+              </>
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
                 <div className="size-24 rounded-3xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center mb-3">
@@ -210,23 +237,21 @@ export default function SweetDetailPage() {
               </div>
             )}
 
-            <div className="absolute inset-0 bg-gradient-to-t from-[#120800] via-black/20 to-transparent pointer-events-none" />
-
             {/* Price Badge */}
-            <div className="absolute bottom-3 left-3 sm:bottom-5 sm:left-5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-3.5 sm:px-5 py-1 sm:py-1.5 text-sm sm:text-base font-black text-white shadow-xl shadow-black/60">
+            <div className="absolute bottom-3 left-3 sm:bottom-5 sm:left-5 z-20 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-3.5 sm:px-5 py-1 sm:py-1.5 text-sm sm:text-base font-black text-white shadow-xl shadow-black/60">
               {money(product.price)} <span className="text-xs sm:text-sm font-normal text-amber-100">/ {product.unit}</span>
             </div>
 
             {/* Image Counter & Nav */}
             {gallery.length > 1 && (
               <>
-                <div className="absolute top-3 right-3 rounded-full bg-black/70 border border-white/20 px-2.5 py-1 text-[11px] font-bold text-amber-300 backdrop-blur-md">
+                <div className="absolute top-3 right-3 z-20 rounded-full bg-black/75 border border-white/20 px-2.5 py-1 text-[11px] font-bold text-amber-300 backdrop-blur-md">
                   {selectedImgIdx + 1} / {gallery.length} photos
                 </div>
 
                 <button
                   onClick={() => setSelectedImgIdx((i) => (i - 1 + gallery.length) % gallery.length)}
-                  className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 flex size-9 sm:size-11 items-center justify-center rounded-full bg-black/60 border border-white/20 text-white hover:bg-black/85 transition-colors cursor-pointer"
+                  className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 flex size-9 sm:size-11 items-center justify-center rounded-full bg-black/60 border border-white/20 text-white hover:bg-black/85 transition-colors cursor-pointer"
                   title="Previous image"
                 >
                   <ChevronLeft className="size-5" />
@@ -234,7 +259,7 @@ export default function SweetDetailPage() {
 
                 <button
                   onClick={() => setSelectedImgIdx((i) => (i + 1) % gallery.length)}
-                  className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 flex size-9 sm:size-11 items-center justify-center rounded-full bg-black/60 border border-white/20 text-white hover:bg-black/85 transition-colors cursor-pointer"
+                  className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 flex size-9 sm:size-11 items-center justify-center rounded-full bg-black/60 border border-white/20 text-white hover:bg-black/85 transition-colors cursor-pointer"
                   title="Next image"
                 >
                   <ChevronRight className="size-5" />
@@ -402,6 +427,76 @@ export default function SweetDetailPage() {
           </div>
         )}
       </main>
+
+      {/* Fullscreen Zoom Lightbox Modal */}
+      {isZoomed && currentImg && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-between p-3 sm:p-6 animate-fade-in-up"
+          onClick={() => setIsZoomed(false)}
+        >
+          {/* Top Bar with counter & close */}
+          <div
+            className="w-full flex items-center justify-between z-10 max-w-5xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm text-white">{product.name}</span>
+              {gallery.length > 1 && (
+                <span className="text-xs text-amber-400 font-semibold">
+                  ({selectedImgIdx + 1} of {gallery.length})
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsZoomed(false)}
+              className="flex size-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors cursor-pointer"
+              aria-label="Close Fullscreen View"
+            >
+              <X className="size-5" />
+            </button>
+          </div>
+
+          {/* Centered 100% Uncropped Image */}
+          <div
+            className="relative flex-1 flex items-center justify-center w-full max-w-5xl my-2 overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={gallery[selectedImgIdx]}
+              alt={product.name}
+              className="max-h-[82vh] max-w-full object-contain rounded-xl shadow-2xl"
+            />
+
+            {/* Prev / Next within modal if multiple */}
+            {gallery.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSelectedImgIdx((i) => (i - 1 + gallery.length) % gallery.length)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 flex size-11 items-center justify-center rounded-full bg-black/70 border border-white/20 text-white hover:bg-black/90 cursor-pointer"
+                >
+                  <ChevronLeft className="size-6" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedImgIdx((i) => (i + 1) % gallery.length)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 flex size-11 items-center justify-center rounded-full bg-black/70 border border-white/20 text-white hover:bg-black/90 cursor-pointer"
+                >
+                  <ChevronRight className="size-6" />
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Bottom hint */}
+          <p className="text-xs text-slate-400">
+            Tap anywhere to close · Full resolution preview
+          </p>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="mt-16 border-t border-white/10 bg-black px-4 py-8 text-center text-xs text-slate-500">
