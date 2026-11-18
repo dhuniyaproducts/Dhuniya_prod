@@ -15,6 +15,10 @@ import {
   Clock,
   Sparkle,
   ZoomIn,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  Columns3,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -330,6 +334,157 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
   );
 }
 
+// ── Scroll-Triggered Slide In Component (Mobile & Desktop) ─────────────────────
+function SlideInView({
+  children,
+  className = "",
+  direction = "up",
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  direction?: "up" | "left" | "right";
+  delay?: number;
+}) {
+  const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.unobserve(el);
+        }
+      },
+      { threshold: 0.15, rootMargin: "0px 0px -30px 0px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const getTransform = () => {
+    if (isVisible) return "translate-x-0 translate-y-0 opacity-100";
+    if (direction === "up") return "translate-y-8 opacity-0";
+    if (direction === "left") return "-translate-x-8 opacity-0";
+    if (direction === "right") return "translate-x-8 opacity-0";
+    return "translate-y-8 opacity-0";
+  };
+
+  return (
+    <div
+      ref={ref}
+      style={{ transitionDelay: `${delay}ms` }}
+      className={`transition-all duration-700 ease-out ${getTransform()} ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ── Mobile & Desktop Touch Swipeable Sweet Slider ─────────────────────────────
+function SweetSlider({ products }: { products: Product[] }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const scrollLeft = el.scrollLeft;
+    const firstCard = el.firstElementChild as HTMLElement | null;
+    const cardWidth = firstCard ? firstCard.offsetWidth + 14 : 320;
+    const index = Math.round(scrollLeft / cardWidth);
+    setActiveIndex(Math.min(Math.max(0, index), products.length - 1));
+  };
+
+  const scrollToIndex = (idx: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const firstCard = el.firstElementChild as HTMLElement | null;
+    const cardWidth = firstCard ? firstCard.offsetWidth + 14 : 320;
+    el.scrollTo({
+      left: idx * cardWidth,
+      behavior: "smooth",
+    });
+    setActiveIndex(idx);
+  };
+
+  return (
+    <div className="relative w-full">
+      {/* Swipe Hint for Mobile Users */}
+      <div className="flex items-center justify-center gap-2 mb-2 text-[11px] font-bold text-amber-300/80 uppercase tracking-wider animate-pulse sm:hidden">
+        <span>👈</span>
+        <span>Swipe sweets left &amp; right</span>
+        <span>👉</span>
+      </div>
+
+      {/* Touch-Snapping Carousel Track */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex gap-3.5 overflow-x-auto snap-x snap-mandatory scroll-smooth px-1 py-3 -mx-2 sm:mx-0 sm:px-0 scrollbar-none"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
+        {products.map((product, i) => (
+          <div
+            key={product.id}
+            className="w-[82vw] max-w-[340px] shrink-0 snap-center transition-transform duration-300"
+          >
+            <ProductCard product={product} index={i} />
+          </div>
+        ))}
+      </div>
+
+      {/* Navigation Controls & Animated Indicator Dots */}
+      <div className="flex items-center justify-between mt-4 px-1">
+        {/* Previous & Next Arrows */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => scrollToIndex(Math.max(0, activeIndex - 1))}
+            disabled={activeIndex === 0}
+            className="flex size-9 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/10 hover:border-amber-400 active:scale-90 transition-all cursor-pointer"
+            aria-label="Previous Sweet"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToIndex(Math.min(products.length - 1, activeIndex + 1))}
+            disabled={activeIndex === products.length - 1}
+            className="flex size-9 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/10 hover:border-amber-400 active:scale-90 transition-all cursor-pointer"
+            aria-label="Next Sweet"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+          <span className="text-xs font-bold text-amber-400/90 ml-1">
+            {activeIndex + 1} / {products.length}
+          </span>
+        </div>
+
+        {/* Sliding Dot Indicators */}
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-[160px] py-1">
+          {products.map((p, i) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => scrollToIndex(i)}
+              className={`rounded-full transition-all duration-300 cursor-pointer ${
+                activeIndex === i
+                  ? "w-6 h-2 bg-gradient-to-r from-amber-400 to-orange-500 shadow-sm shadow-amber-500/50"
+                  : "w-2 h-2 bg-white/25 hover:bg-white/50"
+              }`}
+              aria-label={`Go to sweet ${i + 1}`}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Hero Section ───────────────────────────────────────────────────────────────
 function HeroSection() {
   return (
@@ -437,60 +592,68 @@ function ContactSection() {
     <section id="contact" className="py-12 sm:py-28 px-2.5 sm:px-4 bg-gradient-to-b from-[#0a0600] to-[#120800] relative">
       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
 
-      <div className="max-w-5xl mx-auto text-center">
-        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] sm:tracking-[0.3em] text-amber-400">Authentic Taste</span>
-        <h2 className="mt-1.5 sm:mt-3 text-2xl sm:text-4xl md:text-5xl font-black text-white mb-2 sm:mb-4">
-          Visit Us or Place Orders
-        </h2>
-        <p className="text-slate-400 text-xs sm:text-base max-w-xl mx-auto mb-8 sm:mb-14 px-2 sm:px-0">
-          We cater for weddings, functions, and everyday celebrations. Contact us directly for bulk sweets and custom orders.
-        </p>
+      <SlideInView direction="up">
+        <div className="max-w-5xl mx-auto text-center">
+          <span className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] sm:tracking-[0.3em] text-amber-400">Authentic Taste</span>
+          <h2 className="mt-1.5 sm:mt-3 text-2xl sm:text-4xl md:text-5xl font-black text-white mb-2 sm:mb-4">
+            Visit Us or Place Orders
+          </h2>
+          <p className="text-slate-400 text-xs sm:text-base max-w-xl mx-auto mb-8 sm:mb-14 px-2 sm:px-0">
+            We cater for weddings, functions, and everyday celebrations. Contact us directly for bulk sweets and custom orders.
+          </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 max-w-4xl mx-auto text-left">
-          <a
-            href="tel:0756656135"
-            className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 hover:border-amber-400/60 hover:bg-white/10 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-amber-500/20 transition-all duration-300 flex flex-col justify-between"
-          >
-            <div>
-              <div className="size-9 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 sm:mb-4 group-hover:scale-110 group-hover:bg-amber-500/25 transition-all duration-300">
-                <Phone className="size-4 sm:size-5" />
-              </div>
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Direct Mobile</p>
-              <p className="text-sm sm:text-xl font-bold sm:font-black text-white mt-0.5 sm:mt-1 group-hover:text-amber-300 transition-colors truncate">
-                0756656135
-              </p>
-            </div>
-            <p className="text-[10px] sm:text-xs text-amber-400 font-bold mt-3 sm:mt-4 flex items-center gap-1 group-hover:translate-x-1.5 transition-transform duration-300">
-              <span>Tap to Call</span>
-              <ArrowRight className="size-3" />
-            </p>
-          </a>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 max-w-4xl mx-auto text-left">
+            <SlideInView direction="up" delay={100}>
+              <a
+                href="tel:0756656135"
+                className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 hover:border-amber-400/60 hover:bg-white/10 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-amber-500/20 active:scale-95 transition-all duration-300 flex flex-col justify-between h-full"
+              >
+                <div>
+                  <div className="size-9 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 sm:mb-4 group-hover:scale-110 group-hover:bg-amber-500/25 transition-all duration-300">
+                    <Phone className="size-4 sm:size-5" />
+                  </div>
+                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Direct Mobile</p>
+                  <p className="text-sm sm:text-xl font-bold sm:font-black text-white mt-0.5 sm:mt-1 group-hover:text-amber-300 transition-colors truncate">
+                    0756656135
+                  </p>
+                </div>
+                <p className="text-[10px] sm:text-xs text-amber-400 font-bold mt-3 sm:mt-4 flex items-center gap-1 group-hover:translate-x-1.5 transition-transform duration-300">
+                  <span>Tap to Call</span>
+                  <ArrowRight className="size-3" />
+                </p>
+              </a>
+            </SlideInView>
 
-          <div className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 hover:border-amber-400/40 hover:bg-white/10 hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between">
-            <div>
-              <div className="size-9 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300">
-                <MapPin className="size-4 sm:size-5" />
+            <SlideInView direction="up" delay={200}>
+              <div className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 hover:border-amber-400/40 hover:bg-white/10 hover:-translate-y-1.5 active:scale-95 transition-all duration-300 flex flex-col justify-between h-full">
+                <div>
+                  <div className="size-9 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <MapPin className="size-4 sm:size-5" />
+                  </div>
+                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Kitchen Address</p>
+                  <p className="text-sm sm:text-lg font-bold text-white mt-0.5 sm:mt-1 leading-snug">138, France City</p>
+                  <p className="text-xs sm:text-sm text-slate-300">Maruthamunai</p>
+                </div>
+                <p className="text-[10px] sm:text-xs text-slate-400 mt-3 sm:mt-4">Daily fresh handover</p>
               </div>
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Kitchen Address</p>
-              <p className="text-sm sm:text-lg font-bold text-white mt-0.5 sm:mt-1 leading-snug">138, France City</p>
-              <p className="text-xs sm:text-sm text-slate-300">Maruthamunai</p>
-            </div>
-            <p className="text-[10px] sm:text-xs text-slate-400 mt-3 sm:mt-4">Daily fresh handover</p>
-          </div>
+            </SlideInView>
 
-          <div className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 hover:border-amber-400/40 hover:bg-white/10 hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between">
-            <div>
-              <div className="size-9 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300">
-                <Award className="size-4 sm:size-5" />
+            <SlideInView direction="up" delay={300}>
+              <div className="group rounded-2xl sm:rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6 hover:border-amber-400/40 hover:bg-white/10 hover:-translate-y-1.5 active:scale-95 transition-all duration-300 flex flex-col justify-between h-full">
+                <div>
+                  <div className="size-9 sm:size-12 rounded-xl sm:rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <Award className="size-4 sm:size-5" />
+                  </div>
+                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Craftsmanship</p>
+                  <p className="text-sm sm:text-lg font-bold text-white mt-0.5 sm:mt-1">100% Traditional</p>
+                  <p className="text-xs text-slate-400 mt-0.5 sm:mt-1">Pure ghee, nuts &amp; milk</p>
+                </div>
+                <p className="text-[10px] sm:text-xs text-amber-400/90 font-medium mt-3 sm:mt-4">Fresh batches</p>
               </div>
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">Craftsmanship</p>
-              <p className="text-sm sm:text-lg font-bold text-white mt-0.5 sm:mt-1">100% Traditional</p>
-              <p className="text-xs text-slate-400 mt-0.5 sm:mt-1">Pure ghee, nuts &amp; milk</p>
-            </div>
-            <p className="text-[10px] sm:text-xs text-amber-400/90 font-medium mt-3 sm:mt-4">Fresh batches</p>
+            </SlideInView>
           </div>
         </div>
-      </div>
+      </SlideInView>
     </section>
   );
 }
@@ -535,6 +698,14 @@ export default function PublicPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>("All");
+  const [viewMode, setViewMode] = useState<"slider" | "grid">("slider");
+
+  // On larger screens (desktop), default to grid view, but allow toggling
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      setViewMode("grid");
+    }
+  }, []);
 
   const loadProducts = async () => {
     setLoading(true);
@@ -677,45 +848,84 @@ export default function PublicPage() {
         <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
 
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-8 sm:mb-12">
-            <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-400">
-              Freshly Prepared Catalog
-            </span>
+          <SlideInView direction="up">
+            <div className="text-center mb-6 sm:mb-10">
+              <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-400">
+                Freshly Prepared Catalog
+              </span>
 
-            {/* Clean Section Heading */}
-            <h2 className="mt-2 sm:mt-3 text-2xl sm:text-5xl font-black text-white tracking-tight">
-              Our Traditional Sweets
-            </h2>
+              {/* Clean Section Heading */}
+              <h2 className="mt-2 sm:mt-3 text-2xl sm:text-5xl font-black text-white tracking-tight">
+                Our Traditional Sweets
+              </h2>
 
-            <p className="mt-2 sm:mt-4 text-slate-400 text-xs sm:text-base max-w-xl mx-auto">
-              Prepared to order with pure ghee, whole milk, and eastern culinary traditions. Tap any sweet to see full details and photos.
-            </p>
+              <p className="mt-2 sm:mt-4 text-slate-400 text-xs sm:text-base max-w-xl mx-auto">
+                Prepared to order with pure ghee, whole milk, and eastern culinary traditions. Tap any sweet to see full details and photos.
+              </p>
 
-            {/* Interactive Category Filter Tabs */}
-            {products.length > 0 && (
-              <div className="flex items-center justify-center gap-2 mt-6 sm:mt-8 flex-wrap">
-                {[
-                  { id: "All", label: "All Sweets" },
-                  { id: "Musket", label: "Musket Halwas" },
-                  { id: "By kg", label: "By Weight (kg)" },
-                  { id: "Boxes & Packs", label: "Boxes & Packs" },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveFilter(tab.id)}
-                    className={`rounded-full px-4 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 cursor-pointer ${
-                      activeFilter === tab.id
-                        ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/35 scale-105 border-transparent"
-                        : "border border-white/15 bg-white/5 text-slate-300 hover:border-amber-400/40 hover:bg-white/10 hover:text-white"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+              {/* Interactive Category Filter Tabs */}
+              {products.length > 0 && (
+                <div className="flex items-center justify-center gap-2 mt-6 sm:mt-8 flex-wrap">
+                  {[
+                    { id: "All", label: "All Sweets" },
+                    { id: "Musket", label: "Musket Halwas" },
+                    { id: "By kg", label: "By Weight (kg)" },
+                    { id: "Boxes & Packs", label: "Boxes & Packs" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveFilter(tab.id)}
+                      className={`rounded-full px-4 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 cursor-pointer ${
+                        activeFilter === tab.id
+                          ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/35 scale-105 border-transparent"
+                          : "border border-white/15 bg-white/5 text-slate-300 hover:border-amber-400/40 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Mobile View Toggle: Swipe vs Grid */}
+              {products.length > 0 && (
+                <div className="flex items-center justify-between mt-6 px-1 max-w-2xl mx-auto">
+                  <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-slate-400">
+                    <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>{filteredProducts.length} Traditional Sweet{filteredProducts.length !== 1 ? "s" : ""}</span>
+                  </div>
+
+                  <div className="inline-flex items-center rounded-full bg-white/10 p-0.5 border border-white/15 backdrop-blur-md">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("slider")}
+                      className={`flex items-center gap-1 rounded-full px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-bold transition-all duration-300 cursor-pointer ${
+                        viewMode === "slider"
+                          ? "bg-amber-500 text-black shadow-md shadow-amber-500/30"
+                          : "text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      <Columns3 className="size-3" />
+                      <span>Swipe</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("grid")}
+                      className={`flex items-center gap-1 rounded-full px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-bold transition-all duration-300 cursor-pointer ${
+                        viewMode === "grid"
+                          ? "bg-amber-500 text-black shadow-md shadow-amber-500/30"
+                          : "text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      <LayoutGrid className="size-3" />
+                      <span>Grid</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </SlideInView>
 
           {loading && products.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -745,6 +955,8 @@ export default function PublicPage() {
                 </button>
               )}
             </div>
+          ) : viewMode === "slider" ? (
+            <SweetSlider products={filteredProducts} />
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {filteredProducts.map((product, i) => (
