@@ -4168,11 +4168,10 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       // Strictly verify authentication before querying business data
       try {
         const {
-          data: { user },
-          error: authErr,
-        } = await client.auth.getUser();
+          data: { session },
+        } = await client.auth.getSession();
 
-        if (authErr || !user) {
+        if (!session?.user) {
           router.replace("/login");
           setIsLoading(false);
           return;

@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
-import { Lock, AlertCircle } from "lucide-react";
+import { Lock } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
   const [checking, setChecking] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -16,7 +15,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     let isMounted = true;
 
     async function checkAuth() {
-      setChecking(true);
       const client = getSupabase();
       if (!client) {
         if (isMounted) {
@@ -27,6 +25,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return;
       }
 
+      // 1. Fast local cache check: Instant response with zero UI flicker
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+
+      if (!session?.user) {
+        if (isMounted) {
+          setIsAuthenticated(false);
+          setChecking(false);
+          router.replace("/login");
+        }
+        return;
+      }
+
+      // Active authenticated session found locally
+      if (isMounted) {
+        setIsAuthenticated(true);
+        setChecking(false);
+      }
+
+      // 2. Validate token integrity in background
       try {
         const {
           data: { user },
@@ -36,37 +55,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (error || !user) {
           if (isMounted) {
             setIsAuthenticated(false);
-            setChecking(false);
             router.replace("/login");
           }
-          return;
         }
-
-        if (isMounted) {
-          setIsAuthenticated(true);
-          setChecking(false);
-        }
-
-        // Listen for realtime auth changes
-        const {
-          data: { subscription },
-        } = client.auth.onAuthStateChange((event, session) => {
-          if (event === "SIGNED_OUT" || !session) {
-            if (isMounted) {
-              setIsAuthenticated(false);
-              router.replace("/login");
-            }
-          }
-        });
-
-        return () => subscription.unsubscribe();
-      } catch (err) {
-        if (isMounted) {
-          setIsAuthenticated(false);
-          setChecking(false);
-          router.replace("/login");
-        }
+      } catch {
+        // Network glitch; keep local authenticated state
       }
+
+      // 3. Listen for logout or session expiry
+      const {
+        data: { subscription },
+      } = client.auth.onAuthStateChange((event, session) => {
+        if (event === "SIGNED_OUT" || !session) {
+          if (isMounted) {
+            setIsAuthenticated(false);
+            router.replace("/login");
+          }
+        } else if (session?.user) {
+          if (isMounted) {
+            setIsAuthenticated(true);
+          }
+        }
+      });
+
+      return () => subscription.unsubscribe();
     }
 
     checkAuth();
@@ -74,7 +86,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => {
       isMounted = false;
     };
-  }, [router, pathname]);
+  }, [router]);
 
   if (checking) {
     return (
