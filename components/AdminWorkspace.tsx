@@ -1438,6 +1438,61 @@ function PaymentModal({
   );
 }
 
+function CustomerDropdown({ value, customers, onChange, hasError }: {
+  value: string;
+  customers: Array<{ name: string; phone?: string; address?: string }>;
+  onChange: (name: string, phone?: string, address?: string) => void;
+  hasError?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const filtered = customers.filter((c) =>
+    !value || c.name.toLowerCase().includes(value.toLowerCase())
+  );
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <input
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder="Type customer name or choose existing..."
+          autoComplete="off"
+          className={`w-full rounded-xl border px-3.5 py-2.5 pr-9 text-sm font-semibold outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${hasError ? "border-rose-400 bg-rose-50/30 text-rose-900" : "border-slate-300 text-slate-900 bg-white"}`}
+        />
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+      </div>
+      {open && (
+        <div className="absolute top-full left-0 right-0 z-[55] mt-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-900 shadow-2xl max-h-56 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="px-4 py-3 text-xs text-slate-400 italic">No matching customers — type to add new</div>
+          ) : (
+            filtered.map((c) => (
+              <button
+                key={c.name}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(c.name, c.phone, c.address);
+                  setOpen(false);
+                }}
+                className={`w-full text-left px-4 py-2.5 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0 ${value.toLowerCase() === c.name.toLowerCase() ? "bg-amber-700/30" : ""}`}
+              >
+                <p className="text-sm font-bold text-white">{c.name}</p>
+                {c.phone && <p className="text-xs text-amber-400 mt-0.5">{c.phone}</p>}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OrderModal({ initial, products, customers = [], initialCustomer, onSave, onClose }: {
   initial?: Order; products: Product[]; customers?: (Customer | string)[]; initialCustomer?: string | null; onSave: (data: OrderFormData) => void; onClose: () => void;
 }) {
@@ -1474,7 +1529,6 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
   const [items, setItems] = useState<OrderItemFormData[]>(initialItems);
   const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
   const [showItemDialog, setShowItemDialog] = useState<boolean>(false);
-  const [showAllCustomers, setShowAllCustomers] = useState<boolean>(false);
   const [errors, setErrors] = useState<{ customer?: string; deliveryDate?: string; items?: string }>({});
 
   const selectCustomer = (name: string) => {
@@ -1566,59 +1620,18 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
                 )}
               </div>
 
-              <div className="relative">
-                <input
-                  type="text"
-                  value={customer}
-                  onChange={(e) => selectCustomer(e.target.value)}
-                  placeholder="e.g. Sharma Sweets, Grand Banquets"
-                  autoComplete="off"
-                  className={`w-full rounded-xl border px-3.5 py-2.5 text-sm font-semibold outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.customer ? "border-rose-400 bg-rose-50/30 text-rose-900" : "border-slate-300 text-slate-900 bg-white"}`}
-                />
-                {customer && (
-                  <button
-                    type="button"
-                    onClick={() => { setCustomer(""); setPhone(""); setAddress(""); }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
-                    title="Clear"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                )}
-              </div>
+              <CustomerDropdown
+                value={customer}
+                customers={normalizedCustomers}
+                onChange={(name, phone, address) => {
+                  setCustomer(name);
+                  if (phone) setPhone(phone);
+                  if (address) setAddress(address);
+                  if (errors.customer) setErrors((prev) => ({ ...prev, customer: undefined }));
+                }}
+                hasError={!!errors.customer}
+              />
               {errors.customer && <p className="mt-1 text-xs text-rose-600">{errors.customer}</p>}
-
-              {normalizedCustomers.length > 0 && (
-                <div className="mt-2.5">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Quick pick customer:</span>
-                    {normalizedCustomers.length > 6 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowAllCustomers((v) => !v)}
-                        className="text-[11px] font-bold text-amber-700 hover:underline"
-                      >
-                        {showAllCustomers ? "Show fewer" : `View all (${normalizedCustomers.length})`}
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {(showAllCustomers ? normalizedCustomers : normalizedCustomers.slice(0, 6)).map((c) => (
-                      <button
-                        key={c.name}
-                        type="button"
-                        onClick={() => selectCustomer(c.name)}
-                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all ${customer.toLowerCase() === c.name.toLowerCase()
-                          ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
-                          : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300"
-                          }`}
-                      >
-                        {c.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Toggle for contact details (hidden by default) */}
               <button
@@ -1829,79 +1842,111 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
 function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate, onEdit, onDelete, onManagePayment }: {
   order: Order; products: Product[]; customerLookup?: Map<string, Customer>; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void; onManagePayment: (o: Order) => void;
 }) {
+  const [showItemsPopup, setShowItemsPopup] = useState(false);
   const items = getOrderItems(order);
   const total = getOrderTotal(order, products);
-  const totalKg = getOrderTotalKg(order);
   const badge = getHandoverBadge(order.deliveryDate);
   const info = customerLookup?.get(order.customer.trim().toLowerCase());
   const phone = order.phone || info?.phone;
-  const address = order.address || info?.address;
 
   return (
-    <div className="rounded-xl border border-slate-200/90 bg-white shadow-sm hover:border-amber-300 transition-all overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-slate-100">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40">
-          {order.customer.charAt(0).toUpperCase()}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="font-bold text-slate-900 text-sm truncate leading-tight">{order.customer}</h4>
-            {badge && <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${badge.style}`}>{badge.label}</span>}
+    <>
+      <div className="rounded-xl border border-slate-200/90 bg-white shadow-sm hover:border-amber-300 transition-all overflow-hidden">
+        {/* Compact single-row header */}
+        <div className="flex items-center gap-2 px-3 py-2.5">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40">
+            {order.customer.charAt(0).toUpperCase()}
           </div>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <span className="text-[10px] text-slate-500">{items.length} item{items.length !== 1 ? "s" : ""} · {dateLabel(order.deliveryDate)}</span>
-            {phone && (
-              <a href={`tel:${phone}`} className="text-[10px] font-bold text-amber-700 hover:underline flex items-center gap-0.5">
-                <Phone className="size-2.5" />{phone}
-              </a>
-            )}
-          </div>
-        </div>
-        <div className="shrink-0">
-          <StatusDropdown value={order.status} onChange={(v) => onStatusChange(order.id, v)} />
-        </div>
-      </div>
-
-      {/* Sweets List */}
-      <div className="px-3 py-2 space-y-1 bg-amber-50/30 border-b border-amber-100/60">
-        {items.map((item, idx) => {
-          const prod = products.find((p) => p.id === item.productId);
-          const r = item.rate ?? prod?.price ?? 0;
-          const isWhole = isWholeNumberUnit(prod?.unit);
-          const displayQty = isWhole ? Math.round(Number(item.qty)) : item.qty;
-          return (
-            <div key={idx} className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-800 truncate">{prod?.name ?? "Sweet"}</span>
-              <span className="text-[11px] text-slate-500 shrink-0">{displayQty} {prod?.unit ?? "kg"} ({money(item.qty * r)})</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h4 className="font-bold text-slate-900 text-sm truncate leading-tight">{order.customer}</h4>
+              {badge && <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${badge.style}`}>{badge.label}</span>}
             </div>
-          );
-        })}
-        <div className="flex items-center justify-between pt-1 border-t border-amber-100/60">
-          <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
-          <span className="text-xs font-black text-amber-800">{money(total)}</span>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className="text-[10px] text-slate-500">{dateLabel(order.deliveryDate)}</span>
+              {phone && (
+                <a href={`tel:${phone}`} className="text-[10px] font-bold text-amber-700 hover:underline flex items-center gap-0.5">
+                  <Phone className="size-2.5" />{phone}
+                </a>
+              )}
+            </div>
+          </div>
+          <div className="shrink-0 flex items-center gap-1.5">
+            <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
+            <span className="text-xs font-black text-amber-800">{money(total)}</span>
+          </div>
+        </div>
+
+        {/* Items pill + actions row */}
+        <div className="flex items-center gap-1.5 px-3 pb-2.5 pt-0 border-t border-slate-100 mt-0 pt-2">
+          <button
+            onClick={() => setShowItemsPopup(true)}
+            className="inline-flex items-center gap-1 rounded-lg bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-800 transition-colors"
+          >
+            <Package className="size-3" />
+            {items.length} item{items.length !== 1 ? "s" : ""}
+          </button>
+          <StatusDropdown value={order.status} onChange={(v) => onStatusChange(order.id, v)} />
+          <div className="flex items-center gap-1 ml-auto">
+            <button
+              onClick={() => onManagePayment(order)}
+              className="h-7 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-[11px] font-bold px-2 transition-colors"
+              title="Manage payment"
+            >
+              💳 Pay
+            </button>
+            <Button size="sm" variant="outline" onClick={() => onGenerate(order)} className="h-7 border-slate-200 text-slate-700 hover:bg-slate-50 text-[11px] font-bold px-2 gap-1">
+              <FileText className="size-3" /> Bill
+            </Button>
+            <button onClick={() => onEdit(order)} className="flex h-7 items-center gap-1 rounded-lg border border-slate-200 px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+              <Edit2 className="size-3" />
+            </button>
+            <button onClick={() => onDelete(order.id)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors">
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-1.5 px-3 py-2">
-        <button
-          onClick={() => onManagePayment(order)}
-          className="h-7 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-[11px] font-bold px-2.5 transition-colors"
-        >
-          💳 Payment
-        </button>
-        <Button size="sm" variant="outline" onClick={() => onGenerate(order)} className="h-7 border-slate-200 text-slate-700 hover:bg-slate-50 text-[11px] font-bold px-2.5 gap-1">
-          <FileText className="size-3" /> Bill
-        </Button>
-        <button onClick={() => onEdit(order)} className="flex h-7 items-center gap-1 rounded-lg border border-slate-200 px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
-          <Edit2 className="size-3" /> Edit
-        </button>
-        <button onClick={() => onDelete(order.id)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors ml-auto">
-          <Trash2 className="size-3.5" />
-        </button>
-      </div>
-    </div>
+      {/* Items popup overlay */}
+      {showItemsPopup && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-950/50 backdrop-blur-xs p-4" onClick={() => setShowItemsPopup(false)}>
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 bg-slate-50">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-600">Order Items</p>
+                <h3 className="text-sm font-bold text-slate-900">{order.customer}</h3>
+              </div>
+              <button onClick={() => setShowItemsPopup(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200"><X className="size-4" /></button>
+            </div>
+            <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+              {items.map((item, idx) => {
+                const prod = products.find((p) => p.id === item.productId);
+                const r = item.rate ?? prod?.price ?? 0;
+                const isWhole = isWholeNumberUnit(prod?.unit);
+                const displayQty = isWhole ? Math.round(Number(item.qty)) : item.qty;
+                return (
+                  <div key={idx} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="size-5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
+                      <span className="text-sm font-semibold text-slate-900 truncate">{prod?.name ?? "Sweet"}</span>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-bold text-amber-700">{displayQty} {prod?.unit ?? "kg"}</span>
+                      <span className="text-xs text-slate-500 block">{money(item.qty * r)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="border-t border-slate-200 px-4 py-3 flex items-center justify-between bg-amber-50">
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-700">Total</span>
+              <span className="text-base font-black text-amber-900">{money(total)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -2342,7 +2387,7 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
   const [expandCustomers, setExpandCustomers] = useState(false);
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
   const activeOrders = orders.filter((o) => !["Completed", "Cancelled"].includes(o.status));
-  const totalKg = activeOrders.reduce((sum, o) => sum + getOrderTotalKg(o), 0);
+  const totalKg = activeOrders.reduce((sum, o) => sum + getOrderTotalKg(o, products), 0);
   const activeProductCount = products.filter((p) => p.active).length;
 
   const productBreakdown = products.map((p) => {
@@ -2361,7 +2406,7 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
   const customerMap = new Map<string, { orders: number; kg: number }>();
   activeOrders.forEach((o) => {
     const existing = customerMap.get(o.customer) ?? { orders: 0, kg: 0 };
-    customerMap.set(o.customer, { orders: existing.orders + 1, kg: existing.kg + getOrderTotalKg(o) });
+    customerMap.set(o.customer, { orders: existing.orders + 1, kg: existing.kg + getOrderTotalKg(o, products) });
   });
   const customers = Array.from(customerMap.entries());
   const totalCustomerCount = Math.max(allCustomersList.length, customerMap.size);
@@ -2868,82 +2913,55 @@ function CustomersPage({
           </div>
         ) : (
           <>
-            {/* Mobile Cards (Visible on mobile screens) */}
-            <div className="mt-4 block sm:hidden space-y-3">
+            {/* Mobile Line-by-Line (Visible on mobile screens) */}
+            <div className="mt-4 block sm:hidden overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs divide-y divide-slate-100">
               {filtered.map((c) => {
                 const stats = customerStats.get(c.name.trim());
                 const initials = c.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
                 return (
-                  <div key={c.id ?? c.name} className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-100 to-amber-100 text-amber-900 font-bold text-xs border border-amber-300/40">
-                          {initials}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-900 text-sm truncate">{c.name}</p>
-                          {c.address && (
-                            <p className="text-[11px] text-slate-500 flex items-center gap-1 truncate mt-0.5">
-                              <MapPin className="size-3 text-slate-400 shrink-0" />
-                              <span className="truncate">{c.address}</span>
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Orders badge */}
-                      {stats && stats.totalOrders > 0 ? (
-                        <span className="shrink-0 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                          {stats.totalOrders} order{stats.totalOrders !== 1 ? "s" : ""}
-                        </span>
-                      ) : (
-                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
-                          New
-                        </span>
-                      )}
+                  <div key={c.id ?? c.name} className="flex items-center gap-2.5 px-3 py-3 hover:bg-slate-50/80 transition-colors">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-100 to-amber-100 text-amber-900 font-bold text-xs border border-amber-300/40">
+                      {initials}
                     </div>
-
-                    {c.phone && (
-                      <div className="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2 text-xs">
-                        <span className="text-slate-500 font-medium">Contact:</span>
-                        <a href={`tel:${c.phone}`} className="font-bold text-amber-700 hover:underline flex items-center gap-1">
-                          <Phone className="size-3" />
-                          <span>{c.phone}</span>
-                        </a>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-slate-900 text-sm truncate leading-tight">{c.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {c.phone ? (
+                          <a href={`tel:${c.phone}`} className="text-[11px] font-semibold text-amber-700 hover:underline flex items-center gap-0.5">
+                            <Phone className="size-3" />{c.phone}
+                          </a>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic">No phone</span>
+                        )}
+                        {stats && stats.totalOrders > 0 && (
+                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                            {stats.totalOrders} order{stats.totalOrders !== 1 ? "s" : ""}
+                          </span>
+                        )}
                       </div>
-                    )}
-
-                    {c.notes && (
-                      <p className="text-xs text-slate-500 italic bg-amber-50/40 border border-amber-100 rounded-lg p-2">
-                        &ldquo;{c.notes}&rdquo;
-                      </p>
-                    )}
-
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => onCreateOrder(c.name)}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 hover:text-amber-700"
+                        className="rounded-lg bg-amber-50 border border-amber-200 px-2 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-100 transition-colors"
+                        title="Place order"
                       >
-                        <Plus className="size-3.5" />
-                        <span>Place Order</span>
+                        + Order
                       </button>
-
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => { setEditCustomer(c); setShowModal(true); }}
-                          className="rounded-lg p-1.5 text-slate-400 hover:text-amber-700 hover:bg-slate-100"
-                          title="Edit Customer"
-                        >
-                          <Edit2 className="size-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeleteTarget(c)}
-                          className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                          title="Delete Customer"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => { setEditCustomer(c); setShowModal(true); }}
+                        className="rounded-lg p-1.5 text-slate-400 hover:text-amber-700 hover:bg-slate-100"
+                        title="Edit"
+                      >
+                        <Edit2 className="size-4" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(c)}
+                        className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                        title="Delete"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
                     </div>
                   </div>
                 );
