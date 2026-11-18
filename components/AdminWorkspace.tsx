@@ -41,11 +41,15 @@ import { Button } from "@/components/ui/button";
 export type Product = {
   id: number;
   name: string;
+  nameTamil?: string;
+  nameSinhala?: string;
   unit: string;
   price: number;
   active: boolean;
   imageUrl?: string;
+  images?: string[];        // extra gallery images for public page
   description?: string;
+  contents?: string;        // ingredients / contents shown on public page
 };
 
 export type Customer = {
@@ -1079,7 +1083,18 @@ function Invoice({ order, products, onClose }: {
 }
 
 // --- Product Modal with Cloudinary Upload ---
-type ProductFormData = { name: string; unit: string; price: string; active: boolean; imageUrl?: string; description?: string };
+type ProductFormData = {
+  name: string;
+  nameTamil?: string;
+  nameSinhala?: string;
+  unit: string;
+  price: string;
+  active: boolean;
+  imageUrl?: string;
+  images?: string[];
+  description?: string;
+  contents?: string;
+};
 
 function ProductModal({ initial, onSave, onClose }: {
   initial?: Product;
@@ -1089,11 +1104,15 @@ function ProductModal({ initial, onSave, onClose }: {
   useModalBackHandler(true, onClose);
   const [form, setForm] = useState<ProductFormData>({
     name: initial?.name ?? "",
+    nameTamil: initial?.nameTamil ?? "",
+    nameSinhala: initial?.nameSinhala ?? "",
     unit: initial?.unit ?? "kg",
     price: initial?.price?.toString() ?? "",
     active: initial?.active ?? true,
     imageUrl: initial?.imageUrl ?? "",
+    images: initial?.images ?? [],
     description: initial?.description ?? "",
+    contents: initial?.contents ?? "",
   });
   const [errors, setErrors] = useState<Partial<ProductFormData>>({});
 
@@ -1110,6 +1129,14 @@ function ProductModal({ initial, onSave, onClose }: {
     onSave(form);
   };
 
+  const addGalleryImage = (url: string) => {
+    setForm((prev) => ({ ...prev, images: [...(prev.images ?? []), url] }));
+  };
+
+  const removeGalleryImage = (idx: number) => {
+    setForm((prev) => ({ ...prev, images: (prev.images ?? []).filter((_, i) => i !== idx) }));
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4">
       <div className="my-auto w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
@@ -1121,8 +1148,10 @@ function ProductModal({ initial, onSave, onClose }: {
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200"><X className="size-4" /></button>
         </div>
         <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+
+          {/* Core Fields */}
           <div>
-            <label className="mb-1.5 block text-xs font-bold text-slate-700">Sweet Name *</label>
+            <label className="mb-1.5 block text-xs font-bold text-slate-700">Sweet Name (English) *</label>
             <input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -1131,6 +1160,30 @@ function ProductModal({ initial, onSave, onClose }: {
             />
             {errors.name && <p className="mt-1 text-xs text-rose-600">{errors.name}</p>}
           </div>
+
+          {/* Multilanguage names — public page only */}
+          <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3 space-y-3">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Public Page · Multilanguage Names</p>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Tamil Name <span className="font-normal text-slate-400">(optional)</span></label>
+              <input
+                value={form.nameTamil}
+                onChange={(e) => setForm({ ...form, nameTamil: e.target.value })}
+                placeholder="e.g. ககோதம்"
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Sinhala Name <span className="font-normal text-slate-400">(optional)</span></label>
+              <input
+                value={form.nameSinhala}
+                onChange={(e) => setForm({ ...form, nameSinhala: e.target.value })}
+                placeholder="e.g. ගෝදම්"
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="mb-1.5 block text-xs font-bold text-slate-700">Unit of Measurement</label>
             <select
@@ -1144,6 +1197,7 @@ function ProductModal({ initial, onSave, onClose }: {
               <option value="box">box (Standard Box)</option>
             </select>
           </div>
+
           <div>
             <label className="mb-1.5 block text-xs font-bold text-slate-700">Selling Price (Rs. per {form.unit}) *</label>
             <input
@@ -1156,21 +1210,36 @@ function ProductModal({ initial, onSave, onClose }: {
             {errors.price && <p className="mt-1 text-xs text-rose-600">{errors.price}</p>}
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-bold text-slate-700">Description (Shown on Homepage)</label>
-            <textarea
-              rows={3}
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="e.g. Traditional slow-cooked musket halwa prepared with pure ghee, cashews, and aromatic spices."
-              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 resize-none placeholder:text-slate-400"
-            />
-            <p className="mt-1 text-[11px] text-slate-400">Describe the sweet recipe, ingredients, or specialty for public visitors.</p>
+          {/* Public page details */}
+          <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3 space-y-3">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">Public Page · Details (customers see these)</p>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">Description</label>
+              <textarea
+                rows={3}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="e.g. Traditional slow-cooked musket halwa prepared with pure ghee, cashews, and aromatic spices."
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 resize-none placeholder:text-slate-400"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">Ingredients / Contents</label>
+              <textarea
+                rows={2}
+                value={form.contents}
+                onChange={(e) => setForm({ ...form, contents: e.target.value })}
+                placeholder="e.g. Pure ghee, whole milk, sugar, cashews, cardamom, food colour."
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 resize-none placeholder:text-slate-400"
+              />
+            </div>
           </div>
 
-          {/* Cloudinary Image Upload */}
+          {/* Main image */}
           <div>
-            <label className="mb-1.5 block text-xs font-bold text-slate-700">Product Image (Cloudinary)</label>
+            <label className="mb-1.5 block text-xs font-bold text-slate-700">Main Product Image</label>
             <CloudinaryUpload
               value={form.imageUrl}
               onChange={(url) => setForm({ ...form, imageUrl: url })}
@@ -1178,6 +1247,38 @@ function ProductModal({ initial, onSave, onClose }: {
             />
           </div>
 
+          {/* Extra gallery images */}
+          <div>
+            <label className="mb-1.5 block text-xs font-bold text-slate-700">
+              Extra Gallery Images <span className="font-normal text-slate-400">({(form.images ?? []).length} added)</span>
+            </label>
+
+            {(form.images ?? []).length > 0 && (
+              <div className="mb-2 grid grid-cols-3 gap-2">
+                {(form.images ?? []).map((url, i) => (
+                  <div key={i} className="relative rounded-lg overflow-hidden border border-slate-200 aspect-square">
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeGalleryImage(i)}
+                      className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-rose-600 text-white text-[10px] hover:bg-rose-700 shadow-sm"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <CloudinaryUpload
+              value=""
+              onChange={(url) => { addGalleryImage(url); }}
+              onClear={() => {}}
+            />
+            <p className="mt-1 text-[11px] text-slate-400">Each upload adds to gallery. Click × on thumbnail to remove.</p>
+          </div>
+
+          {/* Active Status */}
           <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3.5 sm:p-4">
             <div>
               <p className="text-sm font-bold text-slate-800">Active Status</p>
@@ -3938,18 +4039,22 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       try {
         const { data: prodData, error: prodErr } = await client
           .from("products")
-          .select("id,name,unit,price,active,image_url,description")
+          .select("id,name,name_tamil,name_sinhala,unit,price,active,image_url,images,description,contents")
           .order("id", { ascending: true });
         if (prodErr) throw prodErr;
         if (prodData && prodData.length > 0) {
           const loadedProducts: Product[] = prodData.map((p: any) => ({
             id: Number(p.id),
             name: p.name,
+            nameTamil: p.name_tamil || undefined,
+            nameSinhala: p.name_sinhala || undefined,
             unit: p.unit,
             price: Number(p.price),
             active: Boolean(p.active),
             imageUrl: p.image_url || undefined,
+            images: Array.isArray(p.images) ? p.images : (p.images ? (() => { try { return JSON.parse(p.images); } catch { return []; } })() : []),
             description: p.description || undefined,
+            contents: p.contents || undefined,
           }));
 
           // Deduplicate products by lowercase name so duplicates in database never double up
@@ -4163,11 +4268,15 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const newProduct: Product = {
       id: tempId,
       name: data.name.trim(),
+      nameTamil: data.nameTamil?.trim() || undefined,
+      nameSinhala: data.nameSinhala?.trim() || undefined,
       unit: data.unit,
       price: Number(data.price),
       active: data.active,
       imageUrl: data.imageUrl?.trim() || undefined,
+      images: data.images ?? [],
       description: data.description?.trim() || undefined,
+      contents: data.contents?.trim() || undefined,
     };
     setProducts((prev) => { const updated = [...prev, newProduct]; try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { } return updated; });
     addToast("success", `Sweet "${data.name}" added`);
@@ -4176,21 +4285,26 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       try {
         let { data: inserted, error } = await client.from("products").insert({
           name: data.name.trim(),
+          name_tamil: data.nameTamil?.trim() || null,
+          name_sinhala: data.nameSinhala?.trim() || null,
           unit: data.unit,
           price: Number(data.price),
           active: data.active,
           image_url: data.imageUrl?.trim() || null,
+          images: data.images && data.images.length > 0 ? data.images : null,
           description: data.description?.trim() || null,
+          contents: data.contents?.trim() || null,
         }).select().single();
 
-        // Fallback: If Supabase table does not yet have 'description' column, save without it
-        if (error && (error.message?.includes("description") || error.code === "PGRST204")) {
+        // Fallback: save with only core columns if new columns don't exist yet
+        if (error && (error.message?.includes("column") || error.code === "PGRST204")) {
           const fallback = await client.from("products").insert({
             name: data.name.trim(),
             unit: data.unit,
             price: Number(data.price),
             active: data.active,
             image_url: data.imageUrl?.trim() || null,
+            description: data.description?.trim() || null,
           }).select().single();
           inserted = fallback.data;
           error = fallback.error;
@@ -4214,11 +4328,15 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
     const updatedProduct: Product = {
       id,
       name: data.name.trim(),
+      nameTamil: data.nameTamil?.trim() || undefined,
+      nameSinhala: data.nameSinhala?.trim() || undefined,
       unit: data.unit,
       price: Number(data.price),
       active: data.active,
       imageUrl: data.imageUrl?.trim() || undefined,
+      images: data.images ?? [],
       description: data.description?.trim() || undefined,
+      contents: data.contents?.trim() || undefined,
     };
     setProducts((prev) => { const updated = prev.map((p) => (p.id === id ? updatedProduct : p)); try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { } return updated; });
     addToast("success", `Sweet "${data.name}" updated`);
@@ -4227,21 +4345,26 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       try {
         let { error } = await client.from("products").update({
           name: data.name.trim(),
+          name_tamil: data.nameTamil?.trim() || null,
+          name_sinhala: data.nameSinhala?.trim() || null,
           unit: data.unit,
           price: Number(data.price),
           active: data.active,
           image_url: data.imageUrl?.trim() || null,
+          images: data.images && data.images.length > 0 ? data.images : null,
           description: data.description?.trim() || null,
+          contents: data.contents?.trim() || null,
         }).eq("id", id);
 
-        // Fallback: If Supabase table does not yet have 'description' column, update without it
-        if (error && (error.message?.includes("description") || error.code === "PGRST204")) {
+        // Fallback: update with only core columns if new columns don't exist yet
+        if (error && (error.message?.includes("column") || error.code === "PGRST204")) {
           const fallback = await client.from("products").update({
             name: data.name.trim(),
             unit: data.unit,
             price: Number(data.price),
             active: data.active,
             image_url: data.imageUrl?.trim() || null,
+            description: data.description?.trim() || null,
           }).eq("id", id);
           error = fallback.error;
         }
