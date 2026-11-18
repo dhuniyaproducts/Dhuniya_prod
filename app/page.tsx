@@ -34,45 +34,6 @@ type Product = {
 
 const money = (v: number) => `Rs. ${v.toLocaleString("en-LK")}`;
 
-const SHOWCASE_SWEETS: Product[] = [
-  {
-    id: 1,
-    name: "Ghee Musket",
-    nameTamil: "நெய் மஸ்கட்",
-    nameSinhala: "ගී මැස්කැට්",
-    unit: "kg",
-    price: 1200,
-    active: true,
-    imageUrl: "https://images.unsplash.com/photo-1599785209707-a456fc1337bb?w=800&auto=format&fit=crop&q=80",
-    description: "Traditional Ghee Musket with a rich, sweet flavour, soft chewy texture, and colourful sprinkles. A delightful treat to enjoy and share with family and friends.",
-    contents: "Wheat flour · Pure Ghee (clarified butter) · Sugar · Water · Cashew nuts · Cardamom · Sprinkles",
-  },
-  {
-    id: 2,
-    name: "Golden Milk Toffee",
-    nameTamil: "பால் டோபி",
-    nameSinhala: "කිරි ටොෆි",
-    unit: "kg",
-    price: 1450,
-    active: true,
-    imageUrl: "https://images.unsplash.com/photo-1582293041079-7814c2f12063?w=800&auto=format&fit=crop&q=80",
-    description: "Melt-in-your-mouth milk toffee crafted from pure condensed milk, golden caramel notes, and premium crunchy cashews.",
-    contents: "Pure condensed milk · Sugar · Butter · Roasted cashew nuts · Cardamom essence",
-  },
-  {
-    id: 3,
-    name: "Authentic Kalu Dodol",
-    nameTamil: "களு தொதொல்",
-    nameSinhala: "කළු දොදොල්",
-    unit: "kg",
-    price: 1100,
-    active: true,
-    imageUrl: "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800&auto=format&fit=crop&q=80",
-    description: "Traditional dark kalu dodol stirred by hand for hours with thick coconut milk, kithul treacle, and roasted cashews.",
-    contents: "Rice flour · Thick coconut milk · Kithul jaggery / treacle · Roasted cashews · Cardamom",
-  },
-];
-
 // ── Product Card (Opens Dedicated Sweet Detail Page) ───────────────────────────
 function ProductCard({ product, index }: { product: Product; index: number }) {
   const [imgErr, setImgErr] = useState(false);
@@ -359,53 +320,86 @@ function Footer() {
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function PublicPage() {
-  const [products, setProducts] = useState<Product[]>(SHOWCASE_SWEETS);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  const loadProducts = async () => {
+    setLoading(true);
+    setLoadError(false);
+
+    // 1. Immediately populate from local cache if real products were saved earlier
+    let hasCached = false;
+    try {
+      const cached = localStorage.getItem("dhuniya_products");
+      if (cached) {
+        const parsed: Product[] = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const activeOnly = parsed.filter((p) => p.active !== false);
+          if (activeOnly.length > 0) {
+            setProducts(activeOnly);
+            hasCached = true;
+          }
+        }
+      }
+    } catch {}
+
+    // 2. Fetch fresh real data from Supabase
+    try {
+      const client = getSupabase();
+      if (!client) throw new Error("Supabase client unavailable");
+
+      const { data, error } = await client
+        .from("products")
+        .select("id,name,name_tamil,name_sinhala,unit,price,active,image_url,images,description,contents")
+        .eq("active", true)
+        .order("id", { ascending: true });
+
+      if (error) throw error;
+      if (data && data.length > 0) {
+        const raw = data.map((p: any) => ({
+          id: Number(p.id),
+          name: p.name,
+          nameTamil: p.name_tamil || undefined,
+          nameSinhala: p.name_sinhala || undefined,
+          unit: p.unit,
+          price: Number(p.price),
+          active: Boolean(p.active),
+          imageUrl: p.image_url || undefined,
+          images: Array.isArray(p.images) ? p.images : (p.images ? JSON.parse(p.images) : []),
+          description: p.description || undefined,
+          contents: p.contents || undefined,
+        }));
+
+        // Deduplicate by name
+        const mapByName = new Map<string, Product>();
+        for (const item of raw) {
+          const key = item.name.trim().toLowerCase();
+          const existing = mapByName.get(key);
+          if (!existing) {
+            mapByName.set(key, item);
+          } else if ((!existing.imageUrl && item.imageUrl) || (!existing.description && item.description)) {
+            mapByName.set(key, { ...existing, ...item });
+          }
+        }
+        const cleanProducts = Array.from(mapByName.values());
+        setProducts(cleanProducts);
+        try { localStorage.setItem("dhuniya_products", JSON.stringify(cleanProducts)); } catch {}
+        setLoadError(false);
+      } else if (!hasCached) {
+        setProducts([]);
+      }
+    } catch (err) {
+      console.error("Failed to load products from database:", err);
+      if (!hasCached) {
+        setLoadError(true);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadProducts() {
-      try {
-        const client = getSupabase();
-        if (!client) return;
-
-        const { data, error } = await client
-          .from("products")
-          .select("id,name,name_tamil,name_sinhala,unit,price,active,image_url,images,description,contents")
-          .eq("active", true)
-          .order("id", { ascending: true });
-
-        if (error) throw error;
-        if (data && data.length > 0) {
-          const raw = data.map((p: any) => ({
-            id: Number(p.id),
-            name: p.name,
-            nameTamil: p.name_tamil || undefined,
-            nameSinhala: p.name_sinhala || undefined,
-            unit: p.unit,
-            price: Number(p.price),
-            active: Boolean(p.active),
-            imageUrl: p.image_url || undefined,
-            images: Array.isArray(p.images) ? p.images : (p.images ? JSON.parse(p.images) : []),
-            description: p.description || undefined,
-            contents: p.contents || undefined,
-          }));
-
-          // Deduplicate by name
-          const mapByName = new Map<string, Product>();
-          for (const item of raw) {
-            const key = item.name.trim().toLowerCase();
-            const existing = mapByName.get(key);
-            if (!existing) {
-              mapByName.set(key, item);
-            } else if ((!existing.imageUrl && item.imageUrl) || (!existing.description && item.description)) {
-              mapByName.set(key, { ...existing, ...item });
-            }
-          }
-          setProducts(Array.from(mapByName.values()));
-        }
-      } catch (err) {
-        console.error("Failed to load products:", err);
-      }
-    }
     loadProducts();
   }, []);
 
@@ -462,10 +456,33 @@ export default function PublicPage() {
             </p>
           </div>
 
-          {products.length === 0 ? (
+          {loading && products.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <div className="size-12 rounded-full border-4 border-amber-500/20 border-t-amber-500 animate-spin" />
               <p className="text-sm text-slate-400 font-medium">Loading sweet catalog…</p>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+              <div className="size-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-4">
+                <Sparkle className="size-7" />
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-white mb-1.5">
+                {loadError ? "Connection / Coverage Issue" : "Catalog Empty"}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-400 max-w-sm mb-5 leading-relaxed">
+                {loadError
+                  ? "Unable to connect to the catalog right now. Please check your mobile data / Wi-Fi coverage."
+                  : "No traditional sweets are currently active in the catalog."}
+              </p>
+              {loadError && (
+                <button
+                  type="button"
+                  onClick={() => loadProducts()}
+                  className="rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-2.5 text-xs font-bold text-white shadow-lg hover:scale-105 transition-all cursor-pointer"
+                >
+                  Tap to Retry
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">

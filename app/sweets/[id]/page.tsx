@@ -36,45 +36,6 @@ type Product = {
 
 const money = (v: number) => `Rs. ${v.toLocaleString("en-LK")}`;
 
-const FALLBACK_SWEETS: Record<number, Product> = {
-  1: {
-    id: 1,
-    name: "Ghee Musket",
-    nameTamil: "நெய் மஸ்கட்",
-    nameSinhala: "ගී මැස්කැට්",
-    unit: "kg",
-    price: 1200,
-    active: true,
-    imageUrl: "https://images.unsplash.com/photo-1599785209707-a456fc1337bb?w=800&auto=format&fit=crop&q=80",
-    description: "Traditional Ghee Musket with a rich, sweet flavour, soft chewy texture, and colourful sprinkles. A delightful treat to enjoy and share with family and friends.",
-    contents: "Wheat flour · Pure Ghee (clarified butter) · Sugar · Water · Cashew nuts · Cardamom · Sprinkles",
-  },
-  2: {
-    id: 2,
-    name: "Golden Milk Toffee",
-    nameTamil: "பால் டோபி",
-    nameSinhala: "කිරි ටොෆි",
-    unit: "kg",
-    price: 1450,
-    active: true,
-    imageUrl: "https://images.unsplash.com/photo-1582293041079-7814c2f12063?w=800&auto=format&fit=crop&q=80",
-    description: "Melt-in-your-mouth milk toffee crafted from pure condensed milk, golden caramel notes, and premium crunchy cashews.",
-    contents: "Pure condensed milk · Sugar · Butter · Roasted cashew nuts · Cardamom essence",
-  },
-  3: {
-    id: 3,
-    name: "Authentic Kalu Dodol",
-    nameTamil: "களு தொதொல்",
-    nameSinhala: "කළු දොදොල්",
-    unit: "kg",
-    price: 1100,
-    active: true,
-    imageUrl: "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800&auto=format&fit=crop&q=80",
-    description: "Traditional dark kalu dodol stirred by hand for hours with thick coconut milk, kithul treacle, and roasted cashews.",
-    contents: "Rice flour · Thick coconut milk · Kithul jaggery / treacle · Roasted cashews · Cardamom",
-  },
-};
-
 export default function SweetDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -86,62 +47,73 @@ export default function SweetDetailPage() {
   const [selectedImgIdx, setSelectedImgIdx] = useState(0);
   const [imgErr, setImgErr] = useState<Record<number, boolean>>({});
 
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      try {
-        const client = getSupabase();
-        if (client) {
-          const { data } = await client
-            .from("products")
-            .select("id,name,name_tamil,name_sinhala,unit,price,active,image_url,images,description,contents")
-            .eq("active", true)
-            .order("id", { ascending: true });
+  const loadData = async () => {
+    setLoading(true);
 
-          if (data && data.length > 0) {
-            const mapped: Product[] = data.map((p: any) => ({
-              id: Number(p.id),
-              name: p.name,
-              nameTamil: p.name_tamil || undefined,
-              nameSinhala: p.name_sinhala || undefined,
-              unit: p.unit,
-              price: Number(p.price),
-              active: Boolean(p.active),
-              imageUrl: p.image_url || undefined,
-              images: Array.isArray(p.images) ? p.images : (p.images ? JSON.parse(p.images) : []),
-              description: p.description || undefined,
-              contents: p.contents || undefined,
-            }));
-            setAllProducts(mapped);
-            const found = mapped.find((p) => p.id === productId);
-            if (found) {
-              setProduct(found);
-              setLoading(false);
-              return;
-            }
+    // 1. Immediately check real cached products from localStorage (supports instant load & poor coverage)
+    let foundInCache = false;
+    try {
+      const cached = localStorage.getItem("dhuniya_products");
+      if (cached) {
+        const list: Product[] = JSON.parse(cached);
+        if (Array.isArray(list) && list.length > 0) {
+          setAllProducts(list);
+          const match = list.find((p) => p.id === productId);
+          if (match) {
+            setProduct(match);
+            foundInCache = true;
+            setLoading(false);
           }
         }
-      } catch (err) {
-        console.error("Error loading sweet details:", err);
       }
+    } catch {}
 
-      // Check fallback
-      if (FALLBACK_SWEETS[productId]) {
-        setProduct(FALLBACK_SWEETS[productId]);
-      } else {
-        // Try localStorage cache
-        try {
-          const cached = localStorage.getItem("dhuniya_products");
-          if (cached) {
-            const list: Product[] = JSON.parse(cached);
-            const match = list.find((p) => p.id === productId);
-            if (match) setProduct(match);
+    // 2. Fetch fresh real data from Supabase
+    try {
+      const client = getSupabase();
+      if (client) {
+        const { data, error } = await client
+          .from("products")
+          .select("id,name,name_tamil,name_sinhala,unit,price,active,image_url,images,description,contents")
+          .eq("active", true)
+          .order("id", { ascending: true });
+
+        if (!error && data && data.length > 0) {
+          const mapped: Product[] = data.map((p: any) => ({
+            id: Number(p.id),
+            name: p.name,
+            nameTamil: p.name_tamil || undefined,
+            nameSinhala: p.name_sinhala || undefined,
+            unit: p.unit,
+            price: Number(p.price),
+            active: Boolean(p.active),
+            imageUrl: p.image_url || undefined,
+            images: Array.isArray(p.images) ? p.images : (p.images ? JSON.parse(p.images) : []),
+            description: p.description || undefined,
+            contents: p.contents || undefined,
+          }));
+          setAllProducts(mapped);
+          try { localStorage.setItem("dhuniya_products", JSON.stringify(mapped)); } catch {}
+
+          const found = mapped.find((p) => p.id === productId);
+          if (found) {
+            setProduct(found);
+          } else if (!foundInCache) {
+            setProduct(null);
           }
-        } catch {}
+        }
       }
+    } catch (err) {
+      console.error("Error loading sweet details from database:", err);
+      if (!foundInCache) {
+        setProduct(null);
+      }
+    } finally {
       setLoading(false);
     }
+  };
 
+  useEffect(() => {
     if (productId) {
       loadData();
     }
@@ -159,17 +131,26 @@ export default function SweetDetailPage() {
   if (!product) {
     return (
       <div className="min-h-screen bg-[#0a0600] flex flex-col items-center justify-center text-white px-4 text-center">
-        <h2 className="text-2xl font-bold mb-2">Sweet Not Found</h2>
+        <h2 className="text-2xl font-bold mb-2">Sweet Unavailable</h2>
         <p className="text-sm text-slate-400 mb-6 max-w-sm">
-          The requested traditional sweet item is unavailable or has been removed.
+          Unable to load this sweet. If you are experiencing network coverage issues, please reconnect and try again.
         </p>
-        <Link
-          href="/#sweets"
-          className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-2.5 text-sm font-bold text-white shadow-lg"
-        >
-          <ArrowLeft className="size-4" />
-          <span>Back to Catalog</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => loadData()}
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-2.5 text-sm font-bold text-white shadow-lg cursor-pointer"
+          >
+            <span>Try Again</span>
+          </button>
+          <Link
+            href="/#sweets"
+            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-6 py-2.5 text-sm font-bold text-slate-300 hover:bg-white/10"
+          >
+            <ArrowLeft className="size-4" />
+            <span>Back to Catalog</span>
+          </Link>
+        </div>
       </div>
     );
   }
