@@ -1474,6 +1474,7 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
   const [items, setItems] = useState<OrderItemFormData[]>(initialItems);
   const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
   const [showItemDialog, setShowItemDialog] = useState<boolean>(false);
+  const [showAllCustomers, setShowAllCustomers] = useState<boolean>(false);
   const [errors, setErrors] = useState<{ customer?: string; deliveryDate?: string; items?: string }>({});
 
   const selectCustomer = (name: string) => {
@@ -1567,39 +1568,55 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
 
               <div className="relative">
                 <input
-                  list="customer-suggestions"
+                  type="text"
                   value={customer}
                   onChange={(e) => selectCustomer(e.target.value)}
-                  placeholder="Type customer name or choose existing..."
+                  placeholder="e.g. Sharma Sweets, Grand Banquets"
                   autoComplete="off"
                   className={`w-full rounded-xl border px-3.5 py-2.5 text-sm font-semibold outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 transition-all ${errors.customer ? "border-rose-400 bg-rose-50/30 text-rose-900" : "border-slate-300 text-slate-900 bg-white"}`}
                 />
-                <datalist id="customer-suggestions">
-                  {normalizedCustomers.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.phone ? `${c.name} (${c.phone})` : c.name}
-                    </option>
-                  ))}
-                </datalist>
+                {customer && (
+                  <button
+                    type="button"
+                    onClick={() => { setCustomer(""); setPhone(""); setAddress(""); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                    title="Clear"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
               </div>
               {errors.customer && <p className="mt-1 text-xs text-rose-600">{errors.customer}</p>}
 
               {normalizedCustomers.length > 0 && (
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-0.5">Quick pick:</span>
-                  {normalizedCustomers.slice(0, 5).map((c) => (
-                    <button
-                      key={c.name}
-                      type="button"
-                      onClick={() => selectCustomer(c.name)}
-                      className={`text-[11px] font-medium px-2 py-0.5 rounded-lg border transition-all ${customer.toLowerCase() === c.name.toLowerCase()
-                        ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
-                        : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300"
-                        }`}
-                    >
-                      {c.name}
-                    </button>
-                  ))}
+                <div className="mt-2.5">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Quick pick customer:</span>
+                    {normalizedCustomers.length > 6 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllCustomers((v) => !v)}
+                        className="text-[11px] font-bold text-amber-700 hover:underline"
+                      >
+                        {showAllCustomers ? "Show fewer" : `View all (${normalizedCustomers.length})`}
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {(showAllCustomers ? normalizedCustomers : normalizedCustomers.slice(0, 6)).map((c) => (
+                      <button
+                        key={c.name}
+                        type="button"
+                        onClick={() => selectCustomer(c.name)}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all ${customer.toLowerCase() === c.name.toLowerCase()
+                          ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                          : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300"
+                          }`}
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
