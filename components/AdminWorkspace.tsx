@@ -537,20 +537,32 @@ function Sidebar({ active, setActive, open, setOpen, orderCount, customerCount =
 
 async function generateBillImage(order: Order, products: Product[]): Promise<{ blob: Blob; dataUrl: string }> {
   const items = getOrderItems(order);
-  const lineItems = items.map((item) => {
+  const rawLineItems = items.map((item) => {
     const prod = products.find((p) => p.id === item.productId);
     const unitPrice = item.rate ?? prod?.price ?? 0;
     const amount = item.qty * unitPrice;
     const isWhole = isWholeNumberUnit(prod?.unit);
     const displayQty = isWhole ? Math.round(Number(item.qty)) : item.qty;
     return {
+      productId: item.productId,
       name: prod?.name ?? "Sweet Item",
       unit: prod?.unit ?? "kg",
-      qty: displayQty,
+      qty: displayQty as number,
       rate: unitPrice,
       amount,
     };
   });
+  // Merge duplicate products (same productId) by summing qty & amount
+  const lineItems = rawLineItems.reduce((acc, item) => {
+    const existing = acc.find(i => i.productId === item.productId && i.name === item.name);
+    if (existing) {
+      existing.qty = existing.qty + item.qty;
+      existing.amount += item.amount;
+    } else {
+      acc.push({ ...item });
+    }
+    return acc;
+  }, [] as typeof rawLineItems);
   const total = lineItems.reduce((sum, item) => sum + item.amount, 0);
   const amtPaid = order.amountPaid ?? 0;
   const balance = Math.max(0, total - amtPaid);
@@ -742,7 +754,7 @@ async function generateBillImage(order: Order, products: Product[]): Promise<{ b
     currentY += 28;
     ctx.fillStyle = "#64748b";
     ctx.font = "14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText("Amount Paid:", width - 360, currentY);
+    ctx.fillText("Advance Paid:", width - 360, currentY);
 
     ctx.textAlign = "right";
     ctx.fillStyle = "#059669";
@@ -796,7 +808,7 @@ function Invoice({ order, products, onClose }: {
   useModalBackHandler(true, onClose);
   const [isGenerating, setIsGenerating] = useState(false);
   const items = getOrderItems(order);
-  const lineItems = items.map((item) => {
+  const rawLineItems = items.map((item) => {
     const prod = products.find((p) => p.id === item.productId);
     const unitPrice = item.rate ?? prod?.price ?? 0;
     const amount = item.qty * unitPrice;
@@ -804,13 +816,25 @@ function Invoice({ order, products, onClose }: {
     const displayQty = isWhole ? Math.round(Number(item.qty)) : item.qty;
     return {
       product: prod,
+      productId: item.productId,
       name: prod?.name ?? "Sweet Item",
       unit: prod?.unit ?? "kg",
-      qty: displayQty,
+      qty: displayQty as number,
       rate: unitPrice,
       amount,
     };
   });
+  // Merge duplicate products (same productId) by summing qty & amount
+  const lineItems = rawLineItems.reduce((acc, item) => {
+    const existing = acc.find(i => i.productId === item.productId && i.name === item.name);
+    if (existing) {
+      existing.qty = existing.qty + item.qty;
+      existing.amount += item.amount;
+    } else {
+      acc.push({ ...item });
+    }
+    return acc;
+  }, [] as typeof rawLineItems);
   const total = lineItems.reduce((sum, item) => sum + item.amount, 0);
 
   const handleSaveImage = async () => {
@@ -1014,7 +1038,7 @@ function Invoice({ order, products, onClose }: {
                 ) : amtPaid > 0 ? (
                   <>
                     <div className="flex items-center justify-between text-xs text-slate-600 pt-1 border-t border-slate-200/80">
-                      <span>Amount Paid:</span>
+                      <span>Advance Paid:</span>
                       <span className="font-bold text-emerald-700">{money(amtPaid)}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs font-bold border-t border-slate-200/80 pt-1">
@@ -1741,7 +1765,7 @@ function PaymentModal({
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Amount Paid by Customer (Rs.)
+              Advance Paid by Customer (Rs.)
             </label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rs.</span>
