@@ -536,7 +536,7 @@ async function generateBillImage(order: Order, products: Product[]): Promise<{ b
 
   const width = 900;
   const rowHeight = 44;
-  const baseHeight = 540;
+  const baseHeight = 440;
   const notesHeight = cleanNotes ? 44 : 0;
   const totalHeight = baseHeight + (lineItems.length * rowHeight) + notesHeight;
 
@@ -590,31 +590,20 @@ async function generateBillImage(order: Order, products: Product[]): Promise<{ b
   ctx.lineTo(width - 48, 134);
   ctx.stroke();
 
-  // Customer & Handover Schedule Box
+  // Customer & Bill Date (Only customer name & today's date)
   ctx.fillStyle = "#94a3b8";
   ctx.font = "bold 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   ctx.fillText("CUSTOMER NAME", 48, 162);
-  ctx.fillText("HANDOVER SCHEDULE", width - 300, 162);
+  ctx.fillText("BILL DATE", width - 240, 162);
 
   ctx.fillStyle = "#0f172a";
-  ctx.font = "bold 22px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-  ctx.fillText(order.customer, 48, 190);
+  ctx.font = "bold 24px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText(order.customer, 48, 192);
 
-  ctx.fillStyle = "#0f172a";
   ctx.font = "bold 18px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-  ctx.fillText(dateLabel(order.deliveryDate), width - 300, 190);
+  ctx.fillText(dateLabel(getTodayStr()), width - 240, 192);
 
-  ctx.fillStyle = "#64748b";
-  ctx.font = "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-  const contactParts: string[] = [];
-  if (order.phone) contactParts.push(`Phone: ${order.phone}`);
-  if (order.address) contactParts.push(order.address);
-  if (contactParts.length > 0) {
-    ctx.fillText(contactParts.join(" · "), 48, 214);
-  }
-  ctx.fillText(`Date: ${dateLabel(order.date)} · Status: ${order.status}`, width - 300, 214);
-
-  let currentY = 236;
+  let currentY = 216;
   if (cleanNotes) {
     ctx.fillStyle = "#fffbeb";
     ctx.beginPath();
@@ -849,20 +838,56 @@ function Invoice({ order, products, onClose }: {
   return (
     <div className="invoice-modal-overlay fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-2.5 sm:p-4 backdrop-blur-xs flex items-center justify-center" onClick={onClose}>
       <div className="invoice-card my-auto w-full max-w-[680px] max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        {/* Clean Header Bar */}
-        <div className="shrink-0 border-b border-slate-200 px-3.5 py-3 sm:px-6 sm:py-3.5 bg-slate-50 flex items-center justify-between gap-2">
-          <div>
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-600">Customer Bill</p>
-            <h2 className="text-base sm:text-lg font-black text-slate-900 truncate leading-tight">{order.customer}</h2>
+        {/* Fully Responsive Header Bar */}
+        <div className="shrink-0 border-b border-slate-200 p-3.5 sm:px-6 sm:py-4 bg-slate-50 space-y-2.5 sm:space-y-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-600">Customer Bill</p>
+              <h2 className="text-base sm:text-lg font-black text-slate-900 truncate leading-tight">{order.customer}</h2>
+            </div>
+
+            {/* Desktop Action Buttons + Close */}
+            <div className="hidden sm:flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isGenerating}
+                onClick={handleShareBill}
+                className="border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-bold h-8 px-3 gap-1.5 transition-colors"
+                title="Share bill image to WhatsApp or other apps"
+              >
+                <Share2 className="size-3.5 text-emerald-700" />
+                <span>Share Bill</span>
+              </Button>
+              <Button
+                size="sm"
+                disabled={isGenerating}
+                onClick={handleSaveImage}
+                className="bg-amber-600 text-white hover:bg-amber-700 text-xs font-bold h-8 px-3 gap-1.5 shadow-xs transition-colors"
+                title="Download bill image (PNG)"
+              >
+                <ImageIcon className="size-3.5" />
+                <span>{isGenerating ? "Saving..." : "Save Image"}</span>
+              </Button>
+              <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors" aria-label="Close bill">
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* Mobile Close Button (top-right) */}
+            <button onClick={onClose} className="sm:hidden rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors" aria-label="Close bill">
+              <X className="size-4" />
+            </button>
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
+
+          {/* Mobile Action Buttons (Two full-width responsive buttons, never overflows) */}
+          <div className="flex sm:hidden items-center gap-2 pt-0.5">
             <Button
               size="sm"
               variant="outline"
               disabled={isGenerating}
               onClick={handleShareBill}
-              className="border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-bold h-8 px-2.5 sm:px-3 gap-1.5 transition-colors"
-              title="Share bill image to WhatsApp or other apps"
+              className="flex-1 border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-bold h-8.5 px-2 gap-1.5 justify-center shadow-2xs"
             >
               <Share2 className="size-3.5 text-emerald-700" />
               <span>Share Bill</span>
@@ -871,66 +896,31 @@ function Invoice({ order, products, onClose }: {
               size="sm"
               disabled={isGenerating}
               onClick={handleSaveImage}
-              className="bg-amber-600 text-white hover:bg-amber-700 text-xs font-bold h-8 px-2.5 sm:px-3 gap-1.5 shadow-xs transition-colors"
-              title="Download bill image (PNG)"
+              className="flex-1 bg-amber-600 text-white hover:bg-amber-700 text-xs font-bold h-8.5 px-2 gap-1.5 shadow-2xs justify-center"
             >
               <ImageIcon className="size-3.5" />
-              <span>{isGenerating ? "Saving..." : "Save as Image"}</span>
+              <span>{isGenerating ? "Saving..." : "Save Image"}</span>
             </Button>
-            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors" aria-label="Close bill">
-              <X className="size-4" />
-            </button>
           </div>
         </div>
 
-        {/* Clean Bill Content (Only Customer, Products, and Bill Total) */}
+        {/* Clean Bill Content (Only Customer Name, Today's Date, Sweets Table, and Bill Total) */}
         <article className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-          {/* Customer Summary Line */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          {/* Customer & Date Line (NO phone, NO address, NO handover schedule, NO status) */}
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
             <div className="min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Customer</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Customer Name</span>
               <h3 className="text-lg sm:text-xl font-black text-slate-900 truncate leading-tight">{order.customer}</h3>
-              <div className="mt-1 flex items-center gap-2.5 text-xs text-slate-500 flex-wrap">
-                <span>Handover: <strong className="text-slate-800">{dateLabel(order.deliveryDate)}</strong></span>
-                {order.phone && (
-                  <a href={`tel:${order.phone}`} className="inline-flex items-center gap-1 font-bold text-amber-700 hover:underline">
-                    <Phone className="size-2.5 text-amber-600" /> {order.phone}
-                  </a>
-                )}
-                {order.address && (
-                  <span className="inline-flex items-center gap-1 text-slate-500 truncate">
-                    <MapPin className="size-2.5 text-slate-400" /> {order.address}
-                  </span>
-                )}
-              </div>
               {order.notes && parseDhuniyaData(order.notes).cleanNotes && (
-                <p className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1 inline-block">
+                <p className="mt-1 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-0.5 inline-block">
                   Note: {parseDhuniyaData(order.notes).cleanNotes}
                 </p>
               )}
             </div>
 
-            <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 shrink-0">
-              <span className="rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
-                Status: {order.status}
-              </span>
-              {(() => {
-                const amtPaid = order.amountPaid ?? 0;
-                const isFullyPaid = amtPaid >= total && total > 0;
-                return isFullyPaid ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-lg">
-                    ✓ PAID IN FULL
-                  </span>
-                ) : amtPaid > 0 ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-lg">
-                    Partial: Rs.{amtPaid.toLocaleString("en-LK")} paid
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-lg">
-                    Unpaid
-                  </span>
-                );
-              })()}
+            <div className="text-right shrink-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Date</span>
+              <p className="text-sm sm:text-base font-extrabold text-slate-900">{dateLabel(getTodayStr())}</p>
             </div>
           </div>
 
@@ -1438,19 +1428,32 @@ export type OrderFormData = {
 function ProductItemDialog({
   initial,
   products,
+  existingProductIds = [],
   onSave,
   onClose,
 }: {
   initial?: OrderItemFormData;
   products: Product[];
+  existingProductIds?: string[];
   onSave: (item: OrderItemFormData) => void;
   onClose: () => void;
 }) {
   const activeProducts = products.filter((p) => p.active);
-  const defaultProd = activeProducts[0] ?? products[0];
+
+  // Filter out sweets already in the order (unless editing this specific sweet)
+  const availableProducts = useMemo(() => {
+    return products.filter((p) => {
+      if (initial && String(initial.productId) === String(p.id)) return true;
+      return !existingProductIds.includes(String(p.id));
+    });
+  }, [products, existingProductIds, initial]);
+
+  const defaultProd = availableProducts.find((p) => p.active) ?? availableProducts[0] ?? products[0];
 
   const [productId, setProductId] = useState<string>(
-    initial?.productId ? String(initial.productId) : String(defaultProd?.id ?? "")
+    initial?.productId && availableProducts.some((p) => String(p.id) === String(initial.productId))
+      ? String(initial.productId)
+      : String(defaultProd?.id ?? "")
   );
 
   const selectedProd = products.find((p) => p.id === Number(productId)) ?? defaultProd;
@@ -1498,6 +1501,10 @@ function ProductItemDialog({
   const subtotal = numQty * effectiveRate;
 
   const handleSubmit = () => {
+    if (!productId || availableProducts.length === 0) {
+      setError("Please select a valid sweet product");
+      return;
+    }
     if (!qty || Number(qty) <= 0) {
       setError("Please enter a valid positive quantity greater than 0");
       return;
@@ -1536,17 +1543,23 @@ function ProductItemDialog({
             <label className="block text-xs font-bold text-slate-700 mb-1.5">
               Sweet Product *
             </label>
-            <select
-              value={productId}
-              onChange={(e) => handleProductChange(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
-            >
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} — {money(p.price)} / {p.unit}
-                </option>
-              ))}
-            </select>
+            {availableProducts.length === 0 ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 font-semibold">
+                All sweet products from your catalog are already added to this order.
+              </div>
+            ) : (
+              <select
+                value={productId}
+                onChange={(e) => handleProductChange(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20"
+              >
+                {availableProducts.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {money(p.price)} / {p.unit}
+                  </option>
+                ))}
+              </select>
+            )}
             <p className="mt-1 text-[11px] text-slate-500">
               Standard Rate: <strong className="text-slate-800">{money(selectedProd?.price ?? 0)}</strong> / <strong>{selectedProd?.unit ?? "kg"}</strong>
             </p>
@@ -2047,17 +2060,28 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
                   </label>
                   <p className="text-[11px] text-slate-500">Add all sweets included in this customer order</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingItemIdx(null);
-                    setShowItemDialog(true);
-                  }}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors whitespace-nowrap"
-                >
-                  <Plus className="size-3" />
-                  <span>Add Product</span>
-                </button>
+                {(() => {
+                  const allSweetsAdded = items.length >= activeProducts.length && activeProducts.length > 0;
+                  return (
+                    <button
+                      type="button"
+                      disabled={allSweetsAdded}
+                      onClick={() => {
+                        setEditingItemIdx(null);
+                        setShowItemDialog(true);
+                      }}
+                      className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-bold transition-colors whitespace-nowrap ${
+                        allSweetsAdded
+                          ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
+                          : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                      }`}
+                      title={allSweetsAdded ? "All catalog sweets already added" : "Add sweet product"}
+                    >
+                      <Plus className="size-3" />
+                      <span>{allSweetsAdded ? "All Sweets Added" : "Add Product"}</span>
+                    </button>
+                  );
+                })()}
               </div>
 
               {errors.items && <p className="text-xs text-rose-600 font-semibold">{errors.items}</p>}
@@ -2169,11 +2193,45 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
         <ProductItemDialog
           initial={editingItemIdx !== null ? items[editingItemIdx] : undefined}
           products={products}
+          existingProductIds={items
+            .filter((_, idx) => idx !== editingItemIdx)
+            .map((it) => String(it.productId))}
           onSave={(savedItem) => {
+            const targetId = String(savedItem.productId);
             if (editingItemIdx !== null) {
-              setItems((prev) => prev.map((it, i) => (i === editingItemIdx ? savedItem : it)));
+              const duplicateIdx = items.findIndex((it, idx) => idx !== editingItemIdx && String(it.productId) === targetId);
+              if (duplicateIdx !== -1) {
+                // If they changed sweet to one already in the list, merge the quantities
+                setItems((prev) => prev.map((it, idx) => {
+                  if (idx === duplicateIdx) {
+                    return {
+                      ...it,
+                      qty: String(Number(it.qty) + Number(savedItem.qty)),
+                      rate: savedItem.rate || it.rate,
+                    };
+                  }
+                  return it;
+                }).filter((_, idx) => idx !== editingItemIdx));
+              } else {
+                setItems((prev) => prev.map((it, i) => (i === editingItemIdx ? savedItem : it)));
+              }
             } else {
-              setItems((prev) => [...prev, savedItem]);
+              const existingIdx = items.findIndex((it) => String(it.productId) === targetId);
+              if (existingIdx !== -1) {
+                // Merge quantity into existing item
+                setItems((prev) => prev.map((it, idx) => {
+                  if (idx === existingIdx) {
+                    return {
+                      ...it,
+                      qty: String(Number(it.qty) + Number(savedItem.qty)),
+                      rate: savedItem.rate || it.rate,
+                    };
+                  }
+                  return it;
+                }));
+              } else {
+                setItems((prev) => [...prev, savedItem]);
+              }
             }
             setShowItemDialog(false);
             setEditingItemIdx(null);
