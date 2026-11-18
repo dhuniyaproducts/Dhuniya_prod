@@ -17,6 +17,7 @@ import {
   Edit2,
   Factory,
   FileText,
+  Image as ImageIcon,
   LayoutDashboard,
   LogOut,
   MapPin,
@@ -27,6 +28,7 @@ import {
   Plus,
   Printer,
   Search,
+  Share2,
   Sparkles,
   Trash2,
   User,
@@ -506,118 +508,435 @@ function Sidebar({ active, setActive, open, setOpen, orderCount, customerCount =
   );
 }
 
-function Invoice({ order, products, onClose }: {
-  order: Order; products: Product[]; onClose: () => void;
-}) {
+async function generateBillImage(order: Order, products: Product[]): Promise<{ blob: Blob; dataUrl: string }> {
   const items = getOrderItems(order);
   const lineItems = items.map((item) => {
     const prod = products.find((p) => p.id === item.productId);
     const unitPrice = item.rate ?? prod?.price ?? 0;
     const amount = item.qty * unitPrice;
+    const isWhole = isWholeNumberUnit(prod?.unit);
+    const displayQty = isWhole ? Math.round(Number(item.qty)) : item.qty;
+    return {
+      name: prod?.name ?? "Sweet Item",
+      unit: prod?.unit ?? "kg",
+      qty: displayQty,
+      rate: unitPrice,
+      amount,
+    };
+  });
+  const total = lineItems.reduce((sum, item) => sum + item.amount, 0);
+  const amtPaid = order.amountPaid ?? 0;
+  const balance = Math.max(0, total - amtPaid);
+  const isFullyPaid = amtPaid >= total && total > 0;
+  const cleanNotes = parseDhuniyaData(order.notes).cleanNotes;
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context unavailable");
+
+  const width = 900;
+  const rowHeight = 44;
+  const baseHeight = 540;
+  const notesHeight = cleanNotes ? 44 : 0;
+  const totalHeight = baseHeight + (lineItems.length * rowHeight) + notesHeight;
+
+  canvas.width = width;
+  canvas.height = totalHeight;
+
+  // Background
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, totalHeight);
+
+  // Top Amber Header Stripe
+  const topGrad = ctx.createLinearGradient(0, 0, width, 0);
+  topGrad.addColorStop(0, "#d97706");
+  topGrad.addColorStop(1, "#b45309");
+  ctx.fillStyle = topGrad;
+  ctx.fillRect(0, 0, width, 8);
+
+  // Dhuniya Products Official Branding
+  ctx.fillStyle = "#78350f";
+  ctx.font = "bold 34px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText("DHUNIYA PRODUCTS", 48, 62);
+
+  ctx.fillStyle = "#b45309";
+  ctx.font = "bold 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText("EASTERN TRADITIONAL SWEETS · REG: KDS/1597", 48, 88);
+
+  ctx.fillStyle = "#64748b";
+  ctx.font = "14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText("Mobile: 0756656135 · 138, France City, Maruthamunai", 48, 112);
+
+  // Bill Badge on top right
+  ctx.fillStyle = "#fef3c7";
+  ctx.beginPath();
+  ctx.roundRect(width - 240, 36, 192, 34, 8);
+  ctx.fill();
+  ctx.strokeStyle = "#fde68a";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = "#92400e";
+  ctx.font = "bold 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("CUSTOMER INVOICE", width - 240 + 96, 58);
+  ctx.textAlign = "left";
+
+  // Divider
+  ctx.strokeStyle = "#e2e8f0";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(48, 134);
+  ctx.lineTo(width - 48, 134);
+  ctx.stroke();
+
+  // Customer & Handover Schedule Box
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "bold 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText("CUSTOMER NAME", 48, 162);
+  ctx.fillText("HANDOVER SCHEDULE", width - 300, 162);
+
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "bold 22px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText(order.customer, 48, 190);
+
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "bold 18px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText(dateLabel(order.deliveryDate), width - 300, 190);
+
+  ctx.fillStyle = "#64748b";
+  ctx.font = "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  const contactParts: string[] = [];
+  if (order.phone) contactParts.push(`Phone: ${order.phone}`);
+  if (order.address) contactParts.push(order.address);
+  if (contactParts.length > 0) {
+    ctx.fillText(contactParts.join(" · "), 48, 214);
+  }
+  ctx.fillText(`Date: ${dateLabel(order.date)} · Status: ${order.status}`, width - 300, 214);
+
+  let currentY = 236;
+  if (cleanNotes) {
+    ctx.fillStyle = "#fffbeb";
+    ctx.beginPath();
+    ctx.roundRect(48, currentY, width - 96, 32, 6);
+    ctx.fill();
+    ctx.strokeStyle = "#fef3c7";
+    ctx.stroke();
+
+    ctx.fillStyle = "#92400e";
+    ctx.font = "12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(`Special Note: ${cleanNotes}`, 58, currentY + 21);
+    currentY += 44;
+  }
+
+  // Items Table Header
+  currentY += 10;
+  ctx.fillStyle = "#f1f5f9";
+  ctx.beginPath();
+  ctx.roundRect(48, currentY, width - 96, 36, 6);
+  ctx.fill();
+
+  ctx.fillStyle = "#475569";
+  ctx.font = "bold 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText("#", 64, currentY + 23);
+  ctx.fillText("SWEET PRODUCT", 110, currentY + 23);
+
+  ctx.textAlign = "right";
+  ctx.fillText("QUANTITY", width - 320, currentY + 23);
+  ctx.fillText("RATE", width - 180, currentY + 23);
+  ctx.fillText("AMOUNT", width - 68, currentY + 23);
+  ctx.textAlign = "left";
+
+  currentY += 36;
+
+  // Items Rows
+  lineItems.forEach((item, idx) => {
+    if (idx % 2 === 1) {
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(48, currentY, width - 96, rowHeight);
+    }
+
+    ctx.strokeStyle = "#f1f5f9";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(48, currentY + rowHeight);
+    ctx.lineTo(width - 48, currentY + rowHeight);
+    ctx.stroke();
+
+    ctx.fillStyle = "#64748b";
+    ctx.font = "bold 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(String(idx + 1), 64, currentY + 27);
+
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "bold 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(item.name, 110, currentY + 27);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#334155";
+    ctx.font = "bold 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(`${item.qty} ${item.unit}`, width - 320, currentY + 27);
+
+    ctx.fillStyle = "#64748b";
+    ctx.font = "14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(money(item.rate), width - 180, currentY + 27);
+
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "bold 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(money(item.amount), width - 68, currentY + 27);
+    ctx.textAlign = "left";
+
+    currentY += rowHeight;
+  });
+
+  // Grand Total & Payment Summary
+  currentY += 20;
+  ctx.strokeStyle = "#0f172a";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(width - 360, currentY);
+  ctx.lineTo(width - 48, currentY);
+  ctx.stroke();
+
+  currentY += 28;
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "bold 16px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText("Grand Total:", width - 360, currentY);
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#b45309";
+  ctx.font = "bold 26px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText(money(total), width - 48, currentY + 2);
+  ctx.textAlign = "left";
+
+  if (isFullyPaid) {
+    currentY += 34;
+    ctx.fillStyle = "#ecfdf5";
+    ctx.beginPath();
+    ctx.roundRect(width - 360, currentY - 18, 312, 34, 6);
+    ctx.fill();
+    ctx.strokeStyle = "#a7f3d0";
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#047857";
+    ctx.font = "bold 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("✓ PAID IN FULL", width - 360 + 156, currentY + 4);
+    ctx.textAlign = "left";
+  } else if (amtPaid > 0) {
+    currentY += 28;
+    ctx.fillStyle = "#64748b";
+    ctx.font = "14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("Amount Paid:", width - 360, currentY);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#059669";
+    ctx.font = "bold 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText(money(amtPaid), width - 48, currentY);
+    ctx.textAlign = "left";
+
+    currentY += 26;
+    ctx.fillStyle = "#be123c";
+    ctx.font = "bold 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("Balance Due:", width - 360, currentY);
+
+    ctx.textAlign = "right";
+    ctx.fillText(money(balance), width - 48, currentY);
+    ctx.textAlign = "left";
+  } else {
+    currentY += 26;
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#64748b";
+    ctx.font = "italic 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("Payment Due on Receipt", width - 48, currentY);
+    ctx.textAlign = "left";
+  }
+
+  // Footer Note
+  const footerY = totalHeight - 26;
+  ctx.strokeStyle = "#e2e8f0";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(48, footerY - 18);
+  ctx.lineTo(width - 48, footerY - 18);
+  ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "italic 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText("Thank you for choosing Dhuniya Products! Sweetening your special moments.", width / 2, footerY);
+  ctx.textAlign = "left";
+
+  const dataUrl = canvas.toDataURL("image/png");
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Canvas blob failed"))), "image/png");
+  });
+
+  return { blob, dataUrl };
+}
+
+function Invoice({ order, products, onClose }: {
+  order: Order; products: Product[]; onClose: () => void;
+}) {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const items = getOrderItems(order);
+  const lineItems = items.map((item) => {
+    const prod = products.find((p) => p.id === item.productId);
+    const unitPrice = item.rate ?? prod?.price ?? 0;
+    const amount = item.qty * unitPrice;
+    const isWhole = isWholeNumberUnit(prod?.unit);
+    const displayQty = isWhole ? Math.round(Number(item.qty)) : item.qty;
     return {
       product: prod,
       name: prod?.name ?? "Sweet Item",
       unit: prod?.unit ?? "kg",
-      qty: item.qty,
+      qty: displayQty,
       rate: unitPrice,
       amount,
     };
   });
   const total = lineItems.reduce((sum, item) => sum + item.amount, 0);
 
+  const handleSaveImage = async () => {
+    setIsGenerating(true);
+    try {
+      const { dataUrl } = await generateBillImage(order, products);
+      const safeName = order.customer.trim().replace(/[^a-zA-Z0-9]/g, "_");
+      const fileName = `Dhuniya-Bill-${safeName}.png`;
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error("Failed to generate bill image:", err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleShareBill = async () => {
+    setIsGenerating(true);
+    try {
+      const { blob, dataUrl } = await generateBillImage(order, products);
+      const safeName = order.customer.trim().replace(/[^a-zA-Z0-9]/g, "_");
+      const fileName = `Dhuniya-Bill-${safeName}.png`;
+      const file = new File([blob], fileName, { type: "image/png" });
+
+      if (typeof navigator !== "undefined" && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: `Dhuniya Bill - ${order.customer}`,
+          text: `Customer Bill for ${order.customer} · Total: ${money(total)}`,
+          files: [file],
+        });
+      } else {
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        console.error("Failed to share bill image:", err);
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
-    <div className="invoice-modal-overlay fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-2.5 sm:p-4 backdrop-blur-xs flex items-center justify-center">
-      <style dangerouslySetInnerHTML={{
-        __html: `
-        @media print {
-          @page { size: portrait; margin: 10mm; }
-          html, body { background: #ffffff !important; color: #0f172a !important; margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; overflow: visible !important; }
-          aside, header, main, nav, .print-hide, .toast-container { display: none !important; }
-          .invoice-modal-overlay { position: static !important; display: block !important; padding: 0 !important; margin: 0 !important; background: transparent !important; overflow: visible !important; height: auto !important; min-height: 0 !important; }
-          .invoice-card { border: none !important; box-shadow: none !important; margin: 0 !important; padding: 0 !important; max-width: 100% !important; border-radius: 0 !important; overflow: visible !important; height: auto !important; max-height: none !important; }
-          #printable-invoice { position: static !important; display: block !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; page-break-inside: avoid !important; break-inside: avoid !important; height: auto !important; max-height: none !important; overflow: visible !important; }
-        }
-      ` }} />
-      <div className="invoice-card my-auto w-full max-w-[760px] max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
-        <div className="shrink-0 border-b border-slate-200 px-3.5 py-3 sm:px-6 sm:py-4 bg-slate-50 flex items-center justify-between print:hidden gap-2">
+    <div className="invoice-modal-overlay fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 p-2.5 sm:p-4 backdrop-blur-xs flex items-center justify-center" onClick={onClose}>
+      <div className="invoice-card my-auto w-full max-w-[680px] max-h-[92vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        {/* Clean Header Bar */}
+        <div className="shrink-0 border-b border-slate-200 px-3.5 py-3 sm:px-6 sm:py-3.5 bg-slate-50 flex items-center justify-between gap-2">
           <div>
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-600">Official Bill</p>
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">Customer Invoice</h2>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-600">Customer Bill</p>
+            <h2 className="text-base sm:text-lg font-black text-slate-900 truncate leading-tight">{order.customer}</h2>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <Button variant="outline" size="sm" onClick={() => window.print()} className="border-slate-300 text-slate-700 text-xs h-8 px-2 sm:px-3">
-              <Printer className="size-3.5" /> <span className="hidden sm:inline">Print Bill</span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isGenerating}
+              onClick={handleShareBill}
+              className="border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-bold h-8 px-2.5 sm:px-3 gap-1.5 transition-colors"
+              title="Share bill image to WhatsApp or other apps"
+            >
+              <Share2 className="size-3.5 text-emerald-700" />
+              <span>Share Bill</span>
             </Button>
-            <Button size="sm" onClick={() => window.print()} className="bg-amber-600 text-white hover:bg-amber-700 text-xs h-8 px-2 sm:px-3">
-              <Download className="size-3.5" /> <span className="hidden sm:inline">Download PDF</span>
+            <Button
+              size="sm"
+              disabled={isGenerating}
+              onClick={handleSaveImage}
+              className="bg-amber-600 text-white hover:bg-amber-700 text-xs font-bold h-8 px-2.5 sm:px-3 gap-1.5 shadow-xs transition-colors"
+              title="Download bill image (PNG)"
+            >
+              <ImageIcon className="size-3.5" />
+              <span>{isGenerating ? "Saving..." : "Save as Image"}</span>
             </Button>
-            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700" aria-label="Close invoice">
+            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors" aria-label="Close bill">
               <X className="size-4" />
             </button>
           </div>
         </div>
-        <article id="printable-invoice" className="flex-1 overflow-y-auto p-4 sm:p-8 print:p-0 print:overflow-visible">
-          <div className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-4 print:pb-3 sm:flex-row">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <img src="/logo.jpg" alt="Dhuniya Products" className="size-9 rounded-xl object-contain border border-slate-200" />
-                <span className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Dhuniya Products</span>
-              </div>
-              <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-amber-700">Eastern Traditional Sweets</p>
-              <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                Registration: KDS/1597 · Mobile: 0756656135<br />
-                138, France City, Maruthamunai
-              </p>
-            </div>
-            <div className="text-left sm:text-right">
-              <span className="inline-block rounded-md bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Customer Invoice</span>
-              <p className="mt-1 text-base sm:text-lg font-bold text-slate-900">{order.customer}</p>
-              <p className="mt-0.5 text-xs text-slate-500">Date: {dateLabel(order.date)}</p>
-            </div>
-          </div>
 
-          <div className="grid gap-3 sm:gap-6 border-b border-slate-200 py-3.5 print:py-3 sm:grid-cols-2">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Billed To</p>
-              <p className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{order.customer}</p>
-              {order.phone && (
-                <p className="mt-0.5 text-xs text-slate-600 flex items-center gap-1.5">
-                  <Phone className="size-3 text-slate-400 shrink-0" />
-                  <a href={`tel:${order.phone}`} className="text-amber-700 hover:underline font-medium">{order.phone}</a>
-                </p>
-              )}
-              {order.address && (
-                <p className="mt-0.5 text-xs text-slate-500 flex items-start gap-1.5">
-                  <MapPin className="size-3 text-slate-400 mt-0.5 shrink-0" />
-                  <span>{order.address}</span>
-                </p>
-              )}
+        {/* Clean Bill Content (Only Customer, Products, and Bill Total) */}
+        <article className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+          {/* Customer Summary Line */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Customer</span>
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 truncate leading-tight">{order.customer}</h3>
+              <div className="mt-1 flex items-center gap-2.5 text-xs text-slate-500 flex-wrap">
+                <span>Handover: <strong className="text-slate-800">{dateLabel(order.deliveryDate)}</strong></span>
+                {order.phone && (
+                  <a href={`tel:${order.phone}`} className="inline-flex items-center gap-1 font-bold text-amber-700 hover:underline">
+                    <Phone className="size-2.5 text-amber-600" /> {order.phone}
+                  </a>
+                )}
+                {order.address && (
+                  <span className="inline-flex items-center gap-1 text-slate-500 truncate">
+                    <MapPin className="size-2.5 text-slate-400" /> {order.address}
+                  </span>
+                )}
+              </div>
               {order.notes && parseDhuniyaData(order.notes).cleanNotes && (
-                <p className="mt-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 inline-block">
+                <p className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1 inline-block">
                   Note: {parseDhuniyaData(order.notes).cleanNotes}
                 </p>
               )}
             </div>
-            <div className="sm:text-right">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Handover Schedule</p>
-              <p className="mt-0.5 text-base sm:text-lg font-bold text-slate-900">{dateLabel(order.deliveryDate)}</p>
-              <p className="text-xs text-slate-500">Order Status: <span className="font-semibold text-slate-800">{order.status}</span></p>
+
+            <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 shrink-0">
+              <span className="rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+                Status: {order.status}
+              </span>
               {(() => {
                 const amtPaid = order.amountPaid ?? 0;
                 const isFullyPaid = amtPaid >= total && total > 0;
                 return isFullyPaid ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">✓ PAID IN FULL</span>
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-lg">
+                    ✓ PAID IN FULL
+                  </span>
                 ) : amtPaid > 0 ? (
-                  <p className="text-xs text-amber-700 font-semibold">Partial: Rs.{amtPaid.toLocaleString('en-LK')} paid</p>
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-lg">
+                    Partial: Rs.{amtPaid.toLocaleString("en-LK")} paid
+                  </span>
                 ) : (
-                  <p className="text-xs text-slate-400">Payment Due on Receipt</p>
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-lg">
+                    Unpaid
+                  </span>
                 );
               })()}
             </div>
           </div>
 
-          {/* Mobile Item Breakdown */}
-          <div className="mt-4 sm:hidden print:hidden space-y-2">
+          {/* Mobile Ordered Products Card View */}
+          <div className="sm:hidden space-y-2">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Ordered Sweets ({lineItems.length})</p>
             {lineItems.map((item, idx) => (
               <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-1.5">
                 <div className="flex items-start justify-between gap-3">
@@ -632,66 +951,65 @@ function Invoice({ order, products, onClose }: {
             ))}
           </div>
 
-          {/* Desktop & Print Table */}
-          <div className="hidden sm:block print:block mt-4 print:mt-3">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="pb-2.5">Sweet Product</th>
-                  <th className="pb-2.5 text-right">Quantity</th>
-                  <th className="pb-2.5 text-right">Rate</th>
-                  <th className="pb-2.5 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {lineItems.map((item, idx) => (
-                  <tr key={idx} className="border-b border-slate-100">
-                    <td className="py-2.5 font-semibold text-slate-900">{item.name}</td>
-                    <td className="py-2.5 text-right font-medium text-slate-700">{item.qty} {item.unit}</td>
-                    <td className="py-2.5 text-right text-slate-700">{money(item.rate)}</td>
-                    <td className="py-2.5 text-right font-bold text-slate-900">{money(item.amount)}</td>
+          {/* Desktop Table View */}
+          <div className="hidden sm:block">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Ordered Sweets ({lineItems.length})</p>
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-3.5 py-2.5">Sweet Product</th>
+                    <th className="px-3.5 py-2.5 text-right">Quantity</th>
+                    <th className="px-3.5 py-2.5 text-right">Rate</th>
+                    <th className="px-3.5 py-2.5 text-right">Amount</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {lineItems.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/50">
+                      <td className="px-3.5 py-2.5 font-bold text-slate-900">{item.name}</td>
+                      <td className="px-3.5 py-2.5 text-right font-medium text-slate-700">{item.qty} {item.unit}</td>
+                      <td className="px-3.5 py-2.5 text-right text-slate-600">{money(item.rate)}</td>
+                      <td className="px-3.5 py-2.5 text-right font-black text-slate-900">{money(item.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          {/* Grand Total + Payment Summary */}
-          <div className="mt-4 print:mt-3 flex justify-end">
-            <div className="w-full sm:max-w-[280px] border-t-2 border-slate-900 pt-2.5 space-y-1.5">
+          {/* Grand Total & Payment Summary */}
+          <div className="flex justify-end pt-2">
+            <div className="w-full sm:max-w-[300px] rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-2">
               <div className="flex items-center justify-between text-sm sm:text-base font-bold text-slate-900">
                 <span>Grand Total:</span>
-                <span className="text-xl sm:text-2xl text-amber-600">{money(total)}</span>
+                <span className="text-xl sm:text-2xl font-black text-amber-600">{money(total)}</span>
               </div>
               {(() => {
                 const amtPaid = order.amountPaid ?? 0;
                 const balance = Math.max(0, total - amtPaid);
                 const isFullyPaid = amtPaid >= total && total > 0;
                 return isFullyPaid ? (
-                  <div className="mt-1 rounded-xl bg-emerald-50 border border-emerald-300 px-3 py-2 text-center">
-                    <p className="text-sm font-black text-emerald-800 tracking-wider">✓ PAID IN FULL</p>
+                  <div className="rounded-lg bg-emerald-100/70 border border-emerald-300 px-3 py-1.5 text-center">
+                    <p className="text-xs font-black text-emerald-800 tracking-wider">✓ PAID IN FULL</p>
                   </div>
                 ) : amtPaid > 0 ? (
                   <>
-                    <div className="flex items-center justify-between text-xs text-slate-600">
+                    <div className="flex items-center justify-between text-xs text-slate-600 pt-1 border-t border-slate-200/80">
                       <span>Amount Paid:</span>
                       <span className="font-bold text-emerald-700">{money(amtPaid)}</span>
                     </div>
-                    <div className="flex items-center justify-between text-xs font-bold border-t border-slate-200 pt-1.5">
+                    <div className="flex items-center justify-between text-xs font-bold border-t border-slate-200/80 pt-1">
                       <span className="text-rose-700">Balance Due:</span>
-                      <span className="text-rose-700 text-sm">{money(balance)}</span>
+                      <span className="text-rose-700 text-sm font-black">{money(balance)}</span>
                     </div>
                   </>
                 ) : (
-                  <p className="text-xs text-slate-500 text-right">Payment Due on Receipt</p>
+                  <p className="text-xs text-slate-500 text-right pt-1 border-t border-slate-200/80">Payment Due on Receipt</p>
                 );
               })()}
             </div>
           </div>
-
-          <p className="mt-5 print:mt-4 border-t border-slate-200 pt-3 text-center text-xs text-slate-400">
-            Thank you for choosing Dhuniya Products. We take pride in authentic eastern sweets.
-          </p>
         </article>
       </div>
     </div>
