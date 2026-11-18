@@ -992,11 +992,10 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
             {/* Desktop Line-by-Line Table View */}
             <div className="hidden sm:block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
+                <table className="w-full text-left text-sm">
                   <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     <tr>
                       <th className="px-4 py-3">Sweet Product (A → Z)</th>
-                      <th className="px-4 py-3">Unit</th>
                       <th className="px-4 py-3">Standard Rate</th>
                       <th className="px-4 py-3">Active Production Demand</th>
                       <th className="px-4 py-3">Status</th>
@@ -1032,12 +1031,11 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-2.5 font-medium text-slate-600 text-xs">{p.unit}</td>
-                          <td className="px-4 py-2.5 font-bold text-slate-900 text-sm">
+                          <td className="px-4 py-2.5 font-bold text-slate-900 text-sm whitespace-nowrap">
                             {money(p.price)}
                             <span className="ml-1 text-[11px] font-normal text-slate-400">/ {p.unit}</span>
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-4 py-2.5 whitespace-nowrap">
                             {activeOrders.length > 0 ? (
                               <div>
                                 <p className="font-bold text-slate-900 text-xs">{displayDemand} {p.unit}</p>
@@ -1050,13 +1048,13 @@ function ProductsPage({ products, orders, onAdd, onEdit, onDelete, onViewProduct
                               <span className="text-xs text-slate-400">No active orders</span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-4 py-2.5 whitespace-nowrap">
                             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${p.active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"}`}>
                               <span className={`size-1.5 rounded-full ${p.active ? "bg-emerald-500" : "bg-slate-400"}`} />
                               {p.active ? "Active" : "Archived"}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5 text-right">
+                          <td className="px-4 py-2.5 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1.5">
                               <button onClick={() => setEditProduct(p)} className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors" title="Edit sweet">
                                 <Edit2 className="size-3.5" />
@@ -1873,10 +1871,68 @@ function OrderModal({ initial, products, customers = [], initialCustomer, onSave
   );
 }
 
-function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate, onEdit, onDelete, onManagePayment }: {
-  order: Order; products: Product[]; customerLookup?: Map<string, Customer>; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void; onManagePayment: (o: Order) => void;
+function OrderItemsModal({ order, products, onClose }: {
+  order: Order;
+  products: Product[];
+  onClose: () => void;
 }) {
-  const [showItemsPopup, setShowItemsPopup] = useState(false);
+  const items = getOrderItems(order);
+  const total = getOrderTotal(order, products);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-3 sm:p-4" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 bg-slate-50">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Ordered Sweets ({items.length})</p>
+            <h3 className="text-sm font-bold text-slate-900 truncate">{order.customer}</h3>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 transition-colors">
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+          {items.map((item, idx) => {
+            const prod = products.find((p) => p.id === item.productId);
+            const r = item.rate ?? prod?.price ?? 0;
+            const isWhole = isWholeNumberUnit(prod?.unit);
+            const displayQty = isWhole ? Math.round(Number(item.qty)) : item.qty;
+            return (
+              <div key={idx} className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50/50">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="size-5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold flex items-center justify-center shrink-0">
+                    {idx + 1}
+                  </span>
+                  <span className="text-xs font-bold text-slate-900 truncate">{prod?.name ?? "Sweet"}</span>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-xs font-bold text-amber-700">{displayQty} {prod?.unit ?? "kg"}</span>
+                  <span className="text-[11px] text-slate-400 block">{money(item.qty * r)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="border-t border-slate-200 px-4 py-3 flex items-center justify-between bg-amber-50/60">
+          <span className="text-xs font-bold uppercase tracking-wider text-amber-800">Total Bill</span>
+          <span className="text-base font-black text-amber-950">{money(total)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate, onEdit, onDelete, onManagePayment, onViewItems }: {
+  order: Order;
+  products: Product[];
+  customerLookup?: Map<string, Customer>;
+  onStatusChange: (id: string, s: string) => void;
+  onGenerate: (o: Order) => void;
+  onEdit: (o: Order) => void;
+  onDelete: (id: string) => void;
+  onManagePayment: (o: Order) => void;
+  onViewItems: (o: Order) => void;
+}) {
   const items = getOrderItems(order);
   const total = getOrderTotal(order, products);
   const badge = getHandoverBadge(order.deliveryDate);
@@ -1884,122 +1940,118 @@ function OrderCard({ order, products, customerLookup, onStatusChange, onGenerate
   const phone = order.phone || info?.phone;
 
   return (
-    <>
-      <div className="rounded-xl border border-slate-200/90 bg-white shadow-sm hover:border-amber-300 transition-all overflow-hidden">
-        {/* Compact single-row header */}
-        <div className="flex items-center gap-2 px-3 py-2.5">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40">
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs hover:border-amber-300 transition-all space-y-2.5">
+      {/* Row 1: Avatar + Customer info + Amount & Payment Badge */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 font-bold text-xs border border-amber-300/40">
             {order.customer.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <h4 className="font-bold text-slate-900 text-sm truncate leading-tight">{order.customer}</h4>
-              {badge && <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${badge.style}`}>{badge.label}</span>}
+              {badge && (
+                <span className={`inline-flex items-center rounded-md border px-1.5 py-0.2 text-[9px] font-bold ${badge.style}`}>
+                  {badge.label}
+                </span>
+              )}
             </div>
-            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              <span className="text-[10px] text-slate-500">{dateLabel(order.deliveryDate)}</span>
+            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 flex-wrap">
+              <span>{dateLabel(order.deliveryDate)}</span>
               {phone && (
-                <a href={`tel:${phone}`} className="text-[10px] font-bold text-amber-700 hover:underline flex items-center gap-0.5">
+                <a href={`tel:${phone}`} className="font-semibold text-amber-700 hover:underline flex items-center gap-0.5">
                   <Phone className="size-2.5" />{phone}
                 </a>
               )}
             </div>
           </div>
-          <div className="shrink-0 flex items-center gap-1.5">
-            <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
-            <span className="text-xs font-black text-amber-800">{money(total)}</span>
-          </div>
         </div>
 
-        {/* Items pill + actions row */}
-        <div className="flex items-center gap-1.5 px-3 pb-2.5 pt-0 border-t border-slate-100 mt-0 pt-2">
-          <button
-            onClick={() => setShowItemsPopup(true)}
-            className="inline-flex items-center gap-1 rounded-lg bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-800 transition-colors"
-          >
-            <Package className="size-3" />
-            {items.length} item{items.length !== 1 ? "s" : ""}
-          </button>
-          <StatusDropdown value={order.status} onChange={(v) => onStatusChange(order.id, v)} />
-          <div className="flex items-center gap-1 ml-auto">
-            <button
-              onClick={() => onManagePayment(order)}
-              className="h-7 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-[11px] font-bold px-2 transition-colors"
-              title="Manage payment"
-            >
-              💳 Pay
-            </button>
-            <Button size="sm" variant="outline" onClick={() => onGenerate(order)} className="h-7 border-slate-200 text-slate-700 hover:bg-slate-50 text-[11px] font-bold px-2 gap-1">
-              <FileText className="size-3" /> Bill
-            </Button>
-            <button onClick={() => onEdit(order)} className="flex h-7 items-center gap-1 rounded-lg border border-slate-200 px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
-              <Edit2 className="size-3" />
-            </button>
-            <button onClick={() => onDelete(order.id)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors">
-              <Trash2 className="size-3.5" />
-            </button>
+        <div className="text-right shrink-0">
+          <p className="text-sm font-extrabold text-slate-900 leading-tight">{money(total)}</p>
+          <div className="mt-0.5">
+            <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
           </div>
         </div>
       </div>
 
-      {/* Items popup overlay */}
-      {showItemsPopup && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-950/50 backdrop-blur-xs p-4" onClick={() => setShowItemsPopup(false)}>
-          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 bg-slate-50">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-amber-600">Order Items</p>
-                <h3 className="text-sm font-bold text-slate-900">{order.customer}</h3>
-              </div>
-              <button onClick={() => setShowItemsPopup(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200"><X className="size-4" /></button>
-            </div>
-            <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-              {items.map((item, idx) => {
-                const prod = products.find((p) => p.id === item.productId);
-                const r = item.rate ?? prod?.price ?? 0;
-                const isWhole = isWholeNumberUnit(prod?.unit);
-                const displayQty = isWhole ? Math.round(Number(item.qty)) : item.qty;
-                return (
-                  <div key={idx} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="size-5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
-                      <span className="text-sm font-semibold text-slate-900 truncate">{prod?.name ?? "Sweet"}</span>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-sm font-bold text-amber-700">{displayQty} {prod?.unit ?? "kg"}</span>
-                      <span className="text-xs text-slate-500 block">{money(item.qty * r)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="border-t border-slate-200 px-4 py-3 flex items-center justify-between bg-amber-50">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-700">Total</span>
-              <span className="text-base font-black text-amber-900">{money(total)}</span>
-            </div>
-          </div>
+      {/* Row 2: Items button + Status dropdown + Action buttons */}
+      <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-slate-100 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onViewItems(order)}
+            className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200/80 px-2 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors shrink-0 whitespace-nowrap"
+          >
+            <Package className="size-3 text-amber-600" />
+            <span>{items.length} item{items.length !== 1 ? "s" : ""}</span>
+          </button>
+          <StatusDropdown value={order.status} onChange={(v) => onStatusChange(order.id, v)} />
         </div>
-      )}
-    </>
+
+        <div className="flex items-center gap-1 shrink-0 ml-auto">
+          <button
+            type="button"
+            onClick={() => onManagePayment(order)}
+            className="h-7 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-bold px-2 flex items-center gap-1 transition-colors whitespace-nowrap"
+            title="Manage payment"
+          >
+            💳 Pay
+          </button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onGenerate(order)}
+            className="h-7 border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold px-2 gap-1 whitespace-nowrap"
+          >
+            <FileText className="size-3" /> Bill
+          </Button>
+          <button
+            type="button"
+            onClick={() => onEdit(order)}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+            title="Edit order"
+          >
+            <Edit2 className="size-3" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(order.id)}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-colors"
+            title="Delete order"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function OrdersTable({ orders, products, customerLookup, onStatusChange, onGenerate, onEdit, onDelete, onManagePayment }: {
-  orders: Order[]; products: Product[]; customerLookup?: Map<string, Customer>; onStatusChange: (id: string, s: string) => void; onGenerate: (o: Order) => void; onEdit: (o: Order) => void; onDelete: (id: string) => void; onManagePayment: (o: Order) => void;
+function OrdersTable({ orders, products, customerLookup, onStatusChange, onGenerate, onEdit, onDelete, onManagePayment, onViewItems }: {
+  orders: Order[];
+  products: Product[];
+  customerLookup?: Map<string, Customer>;
+  onStatusChange: (id: string, s: string) => void;
+  onGenerate: (o: Order) => void;
+  onEdit: (o: Order) => void;
+  onDelete: (id: string) => void;
+  onManagePayment: (o: Order) => void;
+  onViewItems: (o: Order) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[960px] text-left text-sm">
+        <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
             <tr>
-              <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Sweets & Qty</th>
-              <th className="px-4 py-3">Handover</th>
-              <th className="px-4 py-3">Amount</th>
-              <th className="px-4 py-3">Payment</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-3.5 py-3">Customer</th>
+              <th className="px-3 py-3">Ordered Sweets</th>
+              <th className="px-3 py-3">Handover</th>
+              <th className="px-3 py-3">Amount</th>
+              <th className="px-3 py-3">Payment</th>
+              <th className="px-3 py-3">Status</th>
+              <th className="px-3.5 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -2009,71 +2061,61 @@ function OrdersTable({ orders, products, customerLookup, onStatusChange, onGener
               const badge = getHandoverBadge(order.deliveryDate);
               const info = customerLookup?.get(order.customer.trim().toLowerCase());
               const phone = order.phone || info?.phone;
-              const address = order.address || info?.address;
 
               return (
                 <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="px-4 py-2.5">
+                  <td className="px-3.5 py-2.5">
                     <div className="flex items-center gap-2.5">
                       <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 font-bold text-xs">
                         {order.customer.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-bold text-slate-900 text-sm leading-tight">{order.customer}</p>
-                        <div className="flex items-center gap-2 mt-0.5 text-xs">
-                          {phone && (
-                            <a href={`tel:${phone}`} className="inline-flex items-center gap-0.5 font-semibold text-amber-700 hover:underline">
-                              <Phone className="size-2.5" />{phone}
-                            </a>
-                          )}
-                          {order.notes && parseDhuniyaData(order.notes).cleanNotes && (
-                            <span className="italic text-slate-400 truncate max-w-[140px] text-[11px]">
-                              {parseDhuniyaData(order.notes).cleanNotes}
-                            </span>
-                          )}
-                        </div>
+                        <p className="font-bold text-slate-900 text-sm leading-tight truncate">{order.customer}</p>
+                        {phone && (
+                          <a href={`tel:${phone}`} className="inline-flex items-center gap-0.5 font-semibold text-amber-700 hover:underline text-[11px] mt-0.5">
+                            <Phone className="size-2.5" />{phone}
+                          </a>
+                        )}
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-2.5">
-                    <div className="space-y-0.5 max-w-[220px]">
-                      {items.map((item, idx) => {
-                        const prod = products.find((p) => p.id === item.productId);
-                        const isWhole = isWholeNumberUnit(prod?.unit);
-                        const displayQty = isWhole ? Math.round(Number(item.qty)) : item.qty;
-                        return (
-                          <div key={idx} className="flex items-center gap-1.5 text-xs">
-                            <span className="font-semibold text-slate-800 truncate">{prod?.name ?? "Sweet"}</span>
-                            <span className="text-slate-400 shrink-0">{displayQty} {prod?.unit ?? "kg"}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                  <td className="px-3 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => onViewItems(order)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200/80 bg-amber-50/70 px-2.5 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-300 transition-colors whitespace-nowrap"
+                    >
+                      <Package className="size-3.5 text-amber-600" />
+                      <span>{items.length} sweet{items.length !== 1 ? "s" : ""}</span>
+                      <ChevronDown className="size-3 text-amber-600/70" />
+                    </button>
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-3 py-2.5">
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-1">
-                        <Calendar className="size-3 text-amber-600" />
-                        <span className="font-bold text-xs text-slate-900">{dateLabel(order.deliveryDate)}</span>
+                        <Calendar className="size-3 text-amber-600 shrink-0" />
+                        <span className="font-bold text-xs text-slate-900 whitespace-nowrap">{dateLabel(order.deliveryDate)}</span>
                       </div>
-                      {badge && <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${badge.style}`}>{badge.label}</span>}
+                      {badge && <span className={`inline-flex items-center rounded-md border px-1.5 py-0.2 text-[9px] font-bold ${badge.style}`}>{badge.label}</span>}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 font-bold text-sm text-slate-900">{money(total)}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-3 py-2.5 font-bold text-sm text-slate-900 whitespace-nowrap">{money(total)}</td>
+                  <td className="px-3 py-2.5">
                     <PaymentBadge amountPaid={order.amountPaid ?? 0} total={total} />
                   </td>
-                  <td className="px-4 py-2.5"><StatusDropdown value={order.status} onChange={(v) => onStatusChange(order.id, v)} /></td>
-                  <td className="px-4 py-2.5 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
+                  <td className="px-3 py-2.5">
+                    <StatusDropdown value={order.status} onChange={(v) => onStatusChange(order.id, v)} />
+                  </td>
+                  <td className="px-3.5 py-2.5 text-right">
+                    <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => onManagePayment(order)}
-                        className="rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors"
+                        className="rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors whitespace-nowrap"
                         title="Manage payment"
                       >
                         💳 Pay
                       </button>
-                      <Button size="sm" variant="outline" onClick={() => onGenerate(order)} className="h-7 border-amber-200 bg-amber-50/70 text-amber-800 hover:bg-amber-100 font-semibold text-xs px-2">
+                      <Button size="sm" variant="outline" onClick={() => onGenerate(order)} className="h-7 border-amber-200 bg-amber-50/70 text-amber-800 hover:bg-amber-100 font-semibold text-xs px-2 whitespace-nowrap">
                         <FileText className="size-3" /> Bill
                       </Button>
                       <button onClick={() => onEdit(order)} className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors" title="Edit">
@@ -2103,6 +2145,7 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<Order | null>(null);
+  const [viewingItemsOrder, setViewingItemsOrder] = useState<Order | null>(null);
   const [selectedCustomerForNewOrder, setSelectedCustomerForNewOrder] = useState<string | null>(initialCustomer);
   const [query, setQuery] = useState("");
   const [filterProductId, setFilterProductId] = useState<string>(initialProductFilter ? String(initialProductFilter) : "All");
@@ -2358,11 +2401,11 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
                   <div className="block sm:hidden space-y-3.5">
                     {group.orders.map((order) => {
                       // multi-product ready
-                      return <OrderCard key={order.id} order={order} products={products} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} onManagePayment={setPaymentOrder} />;
+                      return <OrderCard key={order.id} order={order} products={products} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} onManagePayment={setPaymentOrder} onViewItems={setViewingItemsOrder} />;
                     })}
                   </div>
                   <div className="hidden sm:block">
-                    <OrdersTable orders={group.orders} products={products} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} onManagePayment={setPaymentOrder} />
+                    <OrdersTable orders={group.orders} products={products} customerLookup={customerLookup} onStatusChange={onStatusChange} onGenerate={onGenerate} onEdit={setEditOrder} onDelete={setDeleteId} onManagePayment={setPaymentOrder} onViewItems={setViewingItemsOrder} />
                   </div>
                 </section>
               );
@@ -2370,6 +2413,14 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
           </div>
         )}
       </div>
+
+      {viewingItemsOrder !== null && (
+        <OrderItemsModal
+          order={viewingItemsOrder}
+          products={products}
+          onClose={() => setViewingItemsOrder(null)}
+        />
+      )}
 
       {(showModal || editOrder) && (
         <OrderModal
@@ -2801,6 +2852,113 @@ function CustomerModal({ initial, onSave, onClose }: {
   );
 }
 
+function CustomerDetailsModal({ customer, stats, onCreateOrder, onEdit, onClose }: {
+  customer: Customer;
+  stats?: { totalOrders: number; activeOrders: number; totalKg: number; lastDate: string };
+  onCreateOrder: (name: string) => void;
+  onEdit: (c: Customer) => void;
+  onClose: () => void;
+}) {
+  const initials = customer.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center" onClick={onClose}>
+      <div className="my-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3.5 bg-slate-50">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-100 to-amber-100 text-amber-900 font-bold text-xs border border-amber-300/40">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 block">Customer Profile</span>
+              <h3 className="text-base font-bold text-slate-900 truncate leading-tight">{customer.name}</h3>
+            </div>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 transition-colors">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="p-4 sm:p-5 space-y-3.5">
+          {/* Contact & Location Info */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Mobile Phone</p>
+              {customer.phone ? (
+                <a href={`tel:${customer.phone}`} className="inline-flex items-center gap-1.5 text-sm font-bold text-amber-700 hover:underline mt-0.5">
+                  <Phone className="size-3.5 text-amber-600" />
+                  <span>{customer.phone}</span>
+                </a>
+              ) : (
+                <p className="text-xs text-slate-400 italic mt-0.5">No phone number recorded</p>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-200/70">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Delivery Address / Location</p>
+              {customer.address ? (
+                <p className="text-xs font-semibold text-slate-700 flex items-start gap-1.5 mt-0.5">
+                  <MapPin className="size-3.5 text-amber-600 mt-0.5 shrink-0" />
+                  <span>{customer.address}</span>
+                </p>
+              ) : (
+                <p className="text-xs text-slate-400 italic mt-0.5">No location recorded</p>
+              )}
+            </div>
+
+            {customer.notes && (
+              <div className="pt-2 border-t border-slate-200/70">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Notes & Preferences</p>
+                <p className="text-xs text-slate-600 italic bg-amber-50/70 border border-amber-200/60 rounded-lg p-2.5 mt-1">
+                  &ldquo;{customer.notes}&rdquo;
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Stats summary */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-2xs">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Orders</p>
+              <p className="text-xl font-black text-slate-900 mt-0.5">{stats?.totalOrders ?? 0}</p>
+              <p className="text-[10px] text-slate-400">{stats?.activeOrders ? `${stats.activeOrders} active` : "all delivered"}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-2xs">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Volume</p>
+              <p className="text-xl font-black text-amber-700 mt-0.5">{(stats?.totalKg ?? 0).toFixed(1)} <span className="text-xs font-bold">kg</span></p>
+              <p className="text-[10px] text-slate-400">{stats?.lastDate ? `Last: ${dateLabel(stats.lastDate)}` : "No orders"}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2.5 border-t border-slate-200 px-4 py-3 bg-slate-50">
+          <button
+            onClick={() => {
+              onClose();
+              onCreateOrder(customer.name);
+            }}
+            className="flex-1 rounded-xl bg-amber-600 py-2.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-2xs flex items-center justify-center gap-1.5"
+          >
+            <Plus className="size-3.5" />
+            <span>Place Order</span>
+          </button>
+          <button
+            onClick={() => {
+              onClose();
+              onEdit(customer);
+            }}
+            className="rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors flex items-center gap-1.5"
+          >
+            <Edit2 className="size-3.5" />
+            <span>Edit</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CustomersPage({
   customers,
   orders,
@@ -2823,6 +2981,7 @@ function CustomersPage({
   const [showModal, setShowModal] = useState(false);
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [detailsCustomer, setDetailsCustomer] = useState<Customer | null>(null);
   const [query, setQuery] = useState("");
 
   // Customer order stats
@@ -2961,54 +3120,56 @@ function CustomersPage({
           </div>
         ) : (
           <>
-            {/* Mobile Line-by-Line (Visible on mobile screens) */}
+            {/* Mobile Line-by-Line List View */}
             <div className="mt-4 block sm:hidden overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs divide-y divide-slate-100">
               {filtered.map((c) => {
                 const stats = customerStats.get(c.name.trim());
                 const initials = c.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
                 return (
-                  <div key={c.id ?? c.name} className="flex items-center gap-2.5 px-3 py-3 hover:bg-slate-50/80 transition-colors">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-100 to-amber-100 text-amber-900 font-bold text-xs border border-amber-300/40">
-                      {initials}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-slate-900 text-sm truncate leading-tight">{c.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        {c.phone ? (
-                          <a href={`tel:${c.phone}`} className="text-[11px] font-semibold text-amber-700 hover:underline flex items-center gap-0.5">
-                            <Phone className="size-3" />{c.phone}
-                          </a>
-                        ) : (
-                          <span className="text-[11px] text-slate-400 italic">No phone</span>
-                        )}
-                        {stats && stats.totalOrders > 0 && (
-                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
-                            {stats.totalOrders} order{stats.totalOrders !== 1 ? "s" : ""}
-                          </span>
-                        )}
+                  <div key={c.id ?? c.name} className="flex items-center justify-between gap-2.5 px-3.5 py-2.5 hover:bg-slate-50/80 transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => setDetailsCustomer(c)}
+                      className="flex items-center gap-2.5 min-w-0 flex-1 text-left group"
+                    >
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-100 to-amber-100 text-amber-900 font-bold text-xs border border-amber-300/40">
+                        {initials}
                       </div>
-                    </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-slate-900 text-sm truncate leading-tight group-hover:text-amber-700 transition-colors">{c.name}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {stats && stats.totalOrders > 0 ? (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-1.5 py-0.2 rounded-md">
+                              {stats.totalOrders} order{stats.totalOrders !== 1 ? "s" : ""}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">New Customer</span>
+                          )}
+                          <span className="text-[10px] text-slate-400 group-hover:text-amber-600">· Details ↗</span>
+                        </div>
+                      </div>
+                    </button>
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => onCreateOrder(c.name)}
-                        className="rounded-lg bg-amber-50 border border-amber-200 px-2 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-100 transition-colors"
+                        className="rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors whitespace-nowrap"
                         title="Place order"
                       >
                         + Order
                       </button>
                       <button
                         onClick={() => { setEditCustomer(c); setShowModal(true); }}
-                        className="rounded-lg p-1.5 text-slate-400 hover:text-amber-700 hover:bg-slate-100"
-                        title="Edit"
+                        className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-amber-700 hover:bg-slate-100 transition-colors"
+                        title="Edit Customer"
                       >
-                        <Edit2 className="size-4" />
+                        <Edit2 className="size-3.5" />
                       </button>
                       <button
                         onClick={() => setDeleteTarget(c)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                        title="Delete"
+                        className="rounded-lg border border-slate-200 p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        title="Delete Customer"
                       >
-                        <Trash2 className="size-4" />
+                        <Trash2 className="size-3.5" />
                       </button>
                     </div>
                   </div>
@@ -3016,16 +3177,14 @@ function CustomersPage({
               })}
             </div>
 
-            {/* Desktop Table (Visible on sm and larger) */}
-            <div className="mt-5 hidden sm:block overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
+            {/* Desktop / Tablet Line-by-Line Table View */}
+            <div className="mt-4 hidden sm:block overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
               <table className="w-full text-left text-sm text-slate-600">
                 <thead className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   <tr>
-                    <th className="px-6 py-3.5">Customer</th>
-                    <th className="px-6 py-3.5">Contact Phone</th>
-                    <th className="px-6 py-3.5">Address / Location</th>
-                    <th className="px-6 py-3.5">Order History</th>
-                    <th className="px-6 py-3.5 text-right">Actions</th>
+                    <th className="px-5 py-3">Customer</th>
+                    <th className="px-5 py-3">Order Activity</th>
+                    <th className="px-5 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -3034,40 +3193,25 @@ function CustomersPage({
                     const initials = c.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
                     return (
                       <tr key={c.id ?? c.name} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
+                        <td className="px-5 py-3">
+                          <button
+                            type="button"
+                            onClick={() => setDetailsCustomer(c)}
+                            className="flex items-center gap-3 text-left group"
+                          >
                             <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-100 to-amber-100 text-amber-900 font-bold text-xs border border-amber-300/40">
                               {initials}
                             </div>
                             <div className="min-w-0">
-                              <span className="font-bold text-slate-900 block truncate">{c.name}</span>
-                              {c.notes && (
-                                <span className="text-xs text-slate-400 block truncate mt-0.5 italic">{c.notes}</span>
-                              )}
+                              <span className="font-bold text-slate-900 block truncate group-hover:text-amber-700 transition-colors text-sm">{c.name}</span>
+                              <span className="text-[11px] text-slate-400 group-hover:text-amber-600 transition-colors flex items-center gap-1">
+                                <span>Click to view details</span>
+                                <ArrowRight className="size-2.5" />
+                              </span>
                             </div>
-                          </div>
+                          </button>
                         </td>
-                        <td className="px-6 py-4">
-                          {c.phone ? (
-                            <a href={`tel:${c.phone}`} className="inline-flex items-center gap-1.5 font-semibold text-slate-800 hover:text-amber-700 hover:underline">
-                              <Phone className="size-3.5 text-slate-400" />
-                              <span>{c.phone}</span>
-                            </a>
-                          ) : (
-                            <span className="text-slate-400 text-xs italic">— No phone</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          {c.address ? (
-                            <span className="inline-flex items-center gap-1.5 text-slate-700">
-                              <MapPin className="size-3.5 text-slate-400 shrink-0" />
-                              <span className="truncate max-w-[200px]">{c.address}</span>
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 text-xs italic">— No location</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
+                        <td className="px-5 py-3">
                           {stats && stats.totalOrders > 0 ? (
                             <div>
                               <span className="font-bold text-slate-900">{stats.totalOrders} order{stats.totalOrders !== 1 ? "s" : ""}</span>
@@ -3077,28 +3221,28 @@ function CustomersPage({
                             <span className="text-xs font-medium text-slate-400">No orders yet</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-5 py-3 text-right">
                           <div className="inline-flex items-center gap-1.5">
                             <button
                               onClick={() => onCreateOrder(c.name)}
-                              className="rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors"
+                              className="rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors whitespace-nowrap"
                               title="Create order for this customer"
                             >
                               + Order
                             </button>
                             <button
                               onClick={() => { setEditCustomer(c); setShowModal(true); }}
-                              className="rounded-lg p-1.5 text-slate-400 hover:text-amber-700 hover:bg-slate-100 transition-colors"
+                              className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:text-amber-700 hover:bg-slate-100 transition-colors"
                               title="Edit Customer"
                             >
-                              <Edit2 className="size-4" />
+                              <Edit2 className="size-3.5" />
                             </button>
                             <button
                               onClick={() => setDeleteTarget(c)}
-                              className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                              className="rounded-lg border border-slate-200 p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                               title="Delete Customer"
                             >
-                              <Trash2 className="size-4" />
+                              <Trash2 className="size-3.5" />
                             </button>
                           </div>
                         </td>
@@ -3111,6 +3255,19 @@ function CustomersPage({
           </>
         )}
       </div>
+
+      {detailsCustomer && (
+        <CustomerDetailsModal
+          customer={detailsCustomer}
+          stats={customerStats.get(detailsCustomer.name.trim())}
+          onCreateOrder={onCreateOrder}
+          onEdit={(c) => {
+            setEditCustomer(c);
+            setShowModal(true);
+          }}
+          onClose={() => setDetailsCustomer(null)}
+        />
+      )}
 
       {showModal && (
         <CustomerModal
