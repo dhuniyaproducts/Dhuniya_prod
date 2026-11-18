@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { optimizeImageUrl } from "@/lib/cloudinary";
 import {
@@ -15,6 +15,11 @@ import {
   Clock,
   Sparkle,
   ZoomIn,
+  MessageCircle,
+  Plus,
+  Minus,
+  Check,
+  ShoppingBag,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -34,9 +39,154 @@ type Product = {
 
 const money = (v: number) => `Rs. ${v.toLocaleString("en-LK")}`;
 
-// ── Product Card (Opens Dedicated Sweet Detail Page) ───────────────────────────
+// ── Interactive Golden Ember Particles (Hero Background) ──────────────────────
+function GoldenEmberCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animId: number;
+    let isVisible = true;
+
+    // Resize canvas
+    const handleResize = () => {
+      if (!canvas) return;
+      canvas.width = canvas.parentElement?.clientWidth || window.innerWidth;
+      canvas.height = canvas.parentElement?.clientHeight || window.innerHeight;
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    // Particle definition
+    interface Particle {
+      x: number;
+      y: number;
+      size: number;
+      speedY: number;
+      speedX: number;
+      opacity: number;
+      fadeSpeed: number;
+      color: string;
+      wobble: number;
+      wobbleSpeed: number;
+    }
+
+    const colors = [
+      "251, 191, 36", // amber-400
+      "245, 158, 11", // amber-500
+      "253, 230, 138", // amber-200
+      "249, 115, 22", // orange-500
+    ];
+
+    const particleCount = typeof window !== "undefined" && window.innerWidth < 640 ? 30 : 65;
+    const particles: Particle[] = [];
+
+    for (let i = 0; i < particleCount; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2.5 + 0.8,
+        speedY: Math.random() * 0.7 + 0.2,
+        speedX: (Math.random() - 0.5) * 0.4,
+        opacity: Math.random() * 0.7 + 0.2,
+        fadeSpeed: Math.random() * 0.006 + 0.002,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        wobble: Math.random() * Math.PI * 2,
+        wobbleSpeed: Math.random() * 0.03 + 0.01,
+      });
+    }
+
+    // Mouse interactivity
+    let mouse = { x: -1000, y: -1000 };
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      mouse.x = e.clientX - rect.left;
+      mouse.y = e.clientY - rect.top;
+    };
+    const handleMouseLeave = () => {
+      mouse.x = -1000;
+      mouse.y = -1000;
+    };
+    canvas.addEventListener("mousemove", handleMouseMove);
+    canvas.addEventListener("mouseleave", handleMouseLeave);
+
+    // Intersection observer to stop animation when scrolled out of view (saves battery)
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisible = entry.isIntersecting;
+        if (isVisible) render();
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(canvas);
+
+    // Animation loop
+    const render = () => {
+      if (!isVisible) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let p of particles) {
+        p.y -= p.speedY;
+        p.wobble += p.wobbleSpeed;
+        p.x += Math.sin(p.wobble) * 0.5 + p.speedX;
+
+        // Mouse repelling interaction
+        const dx = p.x - mouse.x;
+        const dy = p.y - mouse.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 100) {
+          const force = (100 - dist) / 100;
+          p.x += (dx / dist) * force * 3;
+          p.y += (dy / dist) * force * 3;
+        }
+
+        // Wrap around top
+        if (p.y < -10) {
+          p.y = canvas.height + 10;
+          p.x = Math.random() * canvas.width;
+        }
+        if (p.x < -10) p.x = canvas.width + 10;
+        if (p.x > canvas.width + 10) p.x = -10;
+
+        // Draw glowing ember
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${p.color}, ${p.opacity})`;
+        ctx.shadowBlur = p.size * 4;
+        ctx.shadowColor = `rgba(${p.color}, 0.8)`;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      animId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", handleResize);
+      canvas.removeEventListener("mousemove", handleMouseMove);
+      canvas.removeEventListener("mouseleave", handleMouseLeave);
+      observer.disconnect();
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-1" />;
+}
+
+// ── Interactive 3D Tilt Card Component ─────────────────────────────────────────
 function ProductCard({ product, index }: { product: Product; index: number }) {
   const [imgErr, setImgErr] = useState(false);
+  const cardRef = useRef<HTMLAnchorElement | null>(null);
+  const [rotate, setRotate] = useState({ x: 0, y: 0 });
+  const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
+
   const allImages = [product.imageUrl, ...(product.images ?? [])].filter(Boolean) as string[];
   const hasMultiple = allImages.length > 1;
 
@@ -46,13 +196,54 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const optimizedSrc = product.imageUrl ? optimizeImageUrl(product.imageUrl, 600) : "";
+  const optimizedSrc = product.imageUrl ? optimizeImageUrl(product.imageUrl, 550) : "";
+
+  // 3D perspective mouse tilt calculation
+  const handleMouseMove = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const card = cardRef.current;
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    const rotX = -((y - centerY) / centerY) * 7;
+    const rotY = ((x - centerX) / centerX) * 7;
+
+    setRotate({ x: rotX, y: rotY });
+    setGlare({
+      x: (x / rect.width) * 100,
+      y: (y / rect.height) * 100,
+      opacity: 0.18,
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setRotate({ x: 0, y: 0 });
+    setGlare((prev) => ({ ...prev, opacity: 0 }));
+  };
 
   return (
     <Link
+      ref={cardRef}
       href={`/sweets/${product.id}`}
-      className="group relative flex flex-col rounded-2xl sm:rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-transparent backdrop-blur-md hover:border-amber-400/60 hover:shadow-2xl hover:shadow-amber-500/20 transition-all duration-300 text-left w-full"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        transform: `perspective(1000px) rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) translateZ(${rotate.x || rotate.y ? "6px" : "0px"})`,
+        transition: rotate.x === 0 && rotate.y === 0 ? "transform 0.5s ease-out, box-shadow 0.5s ease-out" : "none",
+      }}
+      className="group relative flex flex-col rounded-2xl sm:rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-transparent backdrop-blur-md hover:border-amber-400/60 hover:shadow-2xl hover:shadow-amber-500/25 text-left w-full cursor-pointer transition-colors"
     >
+      {/* Specular glare overlay that tracks cursor */}
+      <div
+        className="absolute inset-0 pointer-events-none z-20 rounded-2xl sm:rounded-3xl transition-opacity duration-300"
+        style={{
+          background: `radial-gradient(circle at ${glare.x}% ${glare.y}%, rgba(251, 191, 36, ${glare.opacity}) 0%, transparent 60%)`,
+        }}
+      />
+
       <div className="relative aspect-[4/3] sm:h-56 md:h-60 overflow-hidden bg-gradient-to-br from-amber-950/80 to-[#120800]">
         {optimizedSrc && !imgErr ? (
           <img
@@ -74,15 +265,15 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent pointer-events-none" />
 
-        {/* Price */}
+        {/* Price badge */}
         <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-2.5 sm:px-3.5 py-0.5 sm:py-1 text-[11px] sm:text-xs font-black text-white shadow-md shadow-black/50">
           {money(product.price)} <span className="font-normal text-[9px] sm:text-[11px] text-amber-100">/ {product.unit}</span>
         </div>
 
-        {/* Top right: multi-image count badge or Fresh */}
-        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex gap-1">
+        {/* Top badges */}
+        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex gap-1 z-10">
           {hasMultiple && (
-            <div className="rounded-full bg-black/75 border border-amber-400/40 px-2 py-0.5 text-[9px] font-bold text-amber-300 backdrop-blur-md flex items-center gap-1">
+            <div className="rounded-full bg-black/75 border border-amber-400/40 px-2 py-0.5 text-[9px] font-bold text-amber-300 backdrop-blur-md flex items-center gap-1 shadow-sm">
               <ZoomIn className="size-2.5" /> {allImages.length}
             </div>
           )}
@@ -91,9 +282,9 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
           </div>
         </div>
 
-        {/* View Details hover overlay */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <div className="bg-black/60 backdrop-blur-md rounded-full px-4 py-2 text-xs font-bold text-white border border-white/20 flex items-center gap-1.5 shadow-xl">
+        {/* View Details hover indicator */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 pointer-events-none">
+          <div className="bg-black/65 backdrop-blur-md rounded-full px-4 py-2 text-xs font-bold text-white border border-amber-400/40 flex items-center gap-1.5 shadow-2xl">
             <ZoomIn className="size-3.5 text-amber-400" /> View Details &amp; Photos
           </div>
         </div>
@@ -134,7 +325,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
               <Star key={s} className="size-2.5 sm:size-3 fill-amber-400 text-amber-400" />
             ))}
           </div>
-          <span className="text-amber-400 font-bold text-[10px] sm:text-xs flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+          <span className="text-amber-400 font-bold text-[10px] sm:text-xs flex items-center gap-0.5 group-hover:translate-x-1.5 transition-transform">
             View Sweet →
           </span>
         </div>
@@ -143,13 +334,169 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
   );
 }
 
-// ── Hero Section (Clean Headings Without Tri-Language) ─────────────────────────
+// ── Interactive Sweet Order Estimator / Calculator Widget ─────────────────────
+function SweetOrderEstimator({ products }: { products: Product[] }) {
+  if (products.length === 0) return null;
+
+  const [selectedId, setSelectedId] = useState<number>(products[0]?.id || 0);
+  const [qty, setQty] = useState<number>(2);
+
+  const selectedProduct = products.find((p) => p.id === selectedId) || products[0];
+
+  const unit = selectedProduct?.unit || "kg";
+  const unitPrice = selectedProduct?.price || 0;
+  const totalPrice = qty * unitPrice;
+
+  const presets = unit === "box" ? [1, 2, 5, 10] : unit === "pcs" ? [10, 25, 50, 100] : [1, 2, 5, 10];
+
+  const whatsappMessage = encodeURIComponent(
+    `Hello Dhuniya Products! 👋\nI would like to place an order for:\n• ${selectedProduct?.name}: ${qty} ${unit} (Total: ${money(totalPrice)})\n\nPlease let me know the availability and handover schedule. Thank you!`
+  );
+
+  return (
+    <section className="py-12 sm:py-20 px-3 sm:px-6 relative bg-gradient-to-b from-[#0a0600] via-[#150a01] to-[#0a0600]">
+      <div className="max-w-4xl mx-auto">
+        <div className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-[#1b0d01] via-[#120800] to-[#0a0600] p-5 sm:p-10 shadow-2xl shadow-amber-950/40 relative overflow-hidden">
+          {/* Subtle background glow */}
+          <div className="absolute -top-24 -right-24 size-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10">
+            <div className="text-center mb-8">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-1 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-300 mb-2">
+                <Sparkles className="size-3 text-amber-400" />
+                <span>Live Sweet Estimator</span>
+              </span>
+              <h3 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+                Calculate &amp; Order in 1 Tap
+              </h3>
+              <p className="mt-1 text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
+                Select your favourite sweet and quantity to check your total and order instantly on WhatsApp.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+              {/* Controls */}
+              <div className="space-y-4">
+                {/* Select Sweet */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    Choose Sweet Item
+                  </label>
+                  <select
+                    value={selectedId}
+                    onChange={(e) => {
+                      setSelectedId(Number(e.target.value));
+                      setQty(unit === "pcs" ? 25 : 2);
+                    }}
+                    className="w-full rounded-2xl border border-white/20 bg-black/60 px-4 py-3 text-sm font-bold text-white outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
+                  >
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                        {p.name} ({money(p.price)} / {p.unit})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Quantity Stepper */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    Select Quantity ({unit})
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setQty((q) => Math.max(1, q - (unit === "pcs" ? 5 : 1)))}
+                      className="flex size-11 items-center justify-center rounded-xl border border-white/20 bg-white/5 text-white hover:bg-white/10 hover:border-amber-400 active:scale-95 transition-all cursor-pointer"
+                      title="Decrease"
+                    >
+                      <Minus className="size-4" />
+                    </button>
+                    <div className="flex-1 rounded-xl border border-white/20 bg-black/50 py-2.5 text-center">
+                      <span className="text-xl sm:text-2xl font-black text-amber-300">
+                        {qty} <span className="text-sm font-bold text-slate-400">{unit}</span>
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setQty((q) => q + (unit === "pcs" ? 5 : 1))}
+                      className="flex size-11 items-center justify-center rounded-xl border border-white/20 bg-white/5 text-white hover:bg-white/10 hover:border-amber-400 active:scale-95 transition-all cursor-pointer"
+                      title="Increase"
+                    >
+                      <Plus className="size-4" />
+                    </button>
+                  </div>
+
+                  {/* Preset Quick Chips */}
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    {presets.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setQty(preset)}
+                        className={`rounded-lg px-3 py-1 text-xs font-bold border transition-all cursor-pointer ${
+                          qty === preset
+                            ? "border-amber-400 bg-amber-500 text-black shadow-md shadow-amber-500/30 font-black"
+                            : "border-white/15 bg-white/5 text-slate-300 hover:border-white/30 hover:bg-white/10"
+                        }`}
+                      >
+                        {preset} {unit}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Price Summary Box */}
+              <div className="rounded-2xl border border-amber-500/40 bg-gradient-to-br from-black/80 to-amber-950/30 p-5 sm:p-6 text-center space-y-4 shadow-xl">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Estimated Total</p>
+                  <div className="text-3xl sm:text-4xl font-black text-white mt-1">
+                    <span className="text-amber-400">{money(totalPrice)}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {qty} {unit} of {selectedProduct?.name} @ {money(unitPrice)}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-white/10 flex flex-col gap-2.5">
+                  <a
+                    href={`https://wa.me/94756656135?text=${whatsappMessage}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 py-3 px-4 text-sm font-bold text-white shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
+                  >
+                    <MessageCircle className="size-4 text-white" />
+                    <span>Order this on WhatsApp →</span>
+                  </a>
+
+                  <a
+                    href="tel:0756656135"
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-white/5 py-2.5 px-4 text-xs font-bold text-slate-300 hover:bg-white/10 hover:border-amber-400 hover:text-amber-300 transition-all"
+                  >
+                    <Phone className="size-3.5" />
+                    <span>Call Directly: 0756656135</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Hero Section ───────────────────────────────────────────────────────────────
 function HeroSection() {
   return (
     <section className="relative min-h-[75vh] sm:min-h-[90vh] flex items-center justify-center overflow-hidden bg-[#0a0600] pt-16 pb-10 sm:pt-28 sm:pb-20">
       <div className="absolute inset-0 bg-gradient-to-b from-[#180d01] via-[#0f0700] to-[#0a0600]" />
       <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-gradient-to-br from-amber-500/20 via-orange-600/15 to-transparent rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-96 h-96 bg-amber-600/10 rounded-full blur-[100px] pointer-events-none" />
+
+      {/* Floating Golden Embers Interactive Canvas */}
+      <GoldenEmberCanvas />
 
       <div
         className="absolute inset-0 opacity-[0.04] pointer-events-none"
@@ -160,19 +507,19 @@ function HeroSection() {
       />
 
       <div className="relative z-10 text-center px-4 max-w-5xl mx-auto hero-fade-in">
-        <div className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 sm:px-4 sm:py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider sm:tracking-[0.2em] text-amber-300 mb-4 sm:mb-8 backdrop-blur-md">
+        <div className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 sm:px-4 sm:py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider sm:tracking-[0.2em] text-amber-300 mb-4 sm:mb-8 backdrop-blur-md animate-float-gentle">
           <Sparkles className="size-3 sm:size-3.5 text-amber-400" />
           <span>Authentic Eastern Heritage · Maruthamunai</span>
         </div>
 
         <h1 className="text-3xl sm:text-6xl md:text-8xl font-black tracking-tight text-white leading-[1.08] sm:leading-[1.02] mb-3 sm:mb-6">
           <span>Dhuniya</span>{" "}
-          <span className="bg-gradient-to-r from-amber-300 via-amber-500 to-orange-400 bg-clip-text text-transparent">
+          <span className="gold-shimmer-text">
             Products
           </span>
         </h1>
 
-        {/* Clean subtitle without tri-language clutter */}
+        {/* Clean subtitle */}
         <div className="inline-block mb-3 sm:mb-5">
           <p className="text-xs sm:text-2xl md:text-3xl font-extrabold uppercase tracking-[0.16em] sm:tracking-[0.25em] text-amber-200">
             Eastern Traditional Sweet
@@ -191,7 +538,7 @@ function HeroSection() {
             className="group flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-2.5 sm:px-8 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-105 transition-all duration-300 w-full sm:w-auto"
           >
             <span>Explore Sweet Catalog</span>
-            <ArrowRight className="size-3.5 sm:size-4 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight className="size-3.5 sm:size-4 group-hover:translate-x-1.5 transition-transform" />
           </a>
           <a
             href="tel:0756656135"
@@ -211,7 +558,7 @@ function HeroSection() {
           ].map(({ label, icon: Icon }) => (
             <div
               key={label}
-              className="flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl border border-white/10 bg-white/5 py-2 px-2 sm:py-3 sm:px-3 backdrop-blur-sm"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl border border-white/10 bg-white/5 py-2 px-2 sm:py-3 sm:px-3 backdrop-blur-sm hover:border-amber-400/40 transition-colors"
             >
               <Icon className="size-3.5 sm:size-4 text-amber-400 shrink-0" />
               <span className="text-[11px] sm:text-xs font-semibold text-slate-300 truncate">{label}</span>
@@ -323,6 +670,7 @@ export default function PublicPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string>("All");
 
   const loadProducts = async () => {
     setLoading(true);
@@ -371,7 +719,7 @@ export default function PublicPage() {
           contents: p.contents || undefined,
         }));
 
-        // Deduplicate by name
+        // Deduplicate by name and merge richest attributes
         const mapByName = new Map<string, Product>();
         for (const item of raw) {
           const key = item.name.trim().toLowerCase();
@@ -383,7 +731,7 @@ export default function PublicPage() {
               ...existing,
               ...item,
               imageUrl: item.imageUrl || existing.imageUrl,
-              images: (item.images && item.images.length > 0) ? item.images : existing.images,
+              images: item.images && item.images.length > 0 ? item.images : existing.images,
               description: item.description || existing.description,
               contents: item.contents || existing.contents,
               nameTamil: item.nameTamil || existing.nameTamil,
@@ -411,6 +759,21 @@ export default function PublicPage() {
   useEffect(() => {
     loadProducts();
   }, []);
+
+  // Filter products by category
+  const filteredProducts = useMemo(() => {
+    if (activeFilter === "All") return products;
+    if (activeFilter === "Musket") {
+      return products.filter((p) => p.name.toLowerCase().includes("musket") || p.name.toLowerCase().includes("halwa"));
+    }
+    if (activeFilter === "Boxes & Packs") {
+      return products.filter((p) => p.unit === "box" || p.unit === "pcs" || p.name.toLowerCase().includes("box"));
+    }
+    if (activeFilter === "By kg") {
+      return products.filter((p) => p.unit === "kg");
+    }
+    return products;
+  }, [products, activeFilter]);
 
   return (
     <div className="bg-[#0a0600] text-white min-h-screen selection:bg-amber-500 selection:text-black">
@@ -450,7 +813,7 @@ export default function PublicPage() {
         <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
 
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-10 sm:mb-16">
+          <div className="text-center mb-8 sm:mb-12">
             <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-400">
               Freshly Prepared Catalog
             </span>
@@ -463,6 +826,31 @@ export default function PublicPage() {
             <p className="mt-2 sm:mt-4 text-slate-400 text-xs sm:text-base max-w-xl mx-auto">
               Prepared to order with pure ghee, whole milk, and eastern culinary traditions. Tap any sweet to see full details and photos.
             </p>
+
+            {/* Interactive Category Filter Tabs */}
+            {products.length > 0 && (
+              <div className="flex items-center justify-center gap-2 mt-6 sm:mt-8 flex-wrap">
+                {[
+                  { id: "All", label: "All Sweets" },
+                  { id: "Musket", label: "Musket Halwas" },
+                  { id: "By kg", label: "By Weight (kg)" },
+                  { id: "Boxes & Packs", label: "Boxes & Packs" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveFilter(tab.id)}
+                    className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                      activeFilter === tab.id
+                        ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 scale-105"
+                        : "border border-white/15 bg-white/5 text-slate-300 hover:border-white/30 hover:bg-white/10"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {loading && products.length === 0 ? (
@@ -495,17 +883,16 @@ export default function PublicPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {products.map((product, i) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  index={i}
-                />
+              {filteredProducts.map((product, i) => (
+                <ProductCard key={product.id} product={product} index={i} />
               ))}
             </div>
           )}
         </div>
       </section>
+
+      {/* Interactive Quick Sweet Estimator Widget */}
+      {products.length > 0 && <SweetOrderEstimator products={products} />}
 
       <ContactSection />
       <Footer />
