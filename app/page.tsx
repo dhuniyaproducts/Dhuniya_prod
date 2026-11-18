@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { optimizeImageUrl } from "@/lib/cloudinary";
 import {
@@ -14,9 +14,6 @@ import {
   Heart,
   Clock,
   Sparkle,
-  X,
-  ChevronLeft,
-  ChevronRight,
   ZoomIn,
 } from "lucide-react";
 import Link from "next/link";
@@ -40,217 +37,60 @@ const money = (v: number) => `Rs. ${v.toLocaleString("en-LK")}`;
 const SHOWCASE_SWEETS: Product[] = [
   {
     id: 1,
-    name: "Musket Halwa",
+    name: "Ghee Musket",
+    nameTamil: "நெய் மஸ்கட்",
+    nameSinhala: "ගී මැස්කැට්",
     unit: "kg",
     price: 1200,
     active: true,
     imageUrl: "https://images.unsplash.com/photo-1599785209707-a456fc1337bb?w=800&auto=format&fit=crop&q=80",
-    description: "Rich, slow-cooked musket halwa prepared with pure ghee, whole milk, and fragrant spices in authentic eastern tradition.",
+    description: "Traditional Ghee Musket with a rich, sweet flavour, soft chewy texture, and colourful sprinkles. A delightful treat to enjoy and share with family and friends.",
+    contents: "Wheat flour · Pure Ghee (clarified butter) · Sugar · Water · Cashew nuts · Cardamom · Sprinkles",
   },
   {
     id: 2,
     name: "Golden Milk Toffee",
+    nameTamil: "பால் டோபி",
+    nameSinhala: "කිරි ටොෆි",
     unit: "kg",
     price: 1450,
     active: true,
     imageUrl: "https://images.unsplash.com/photo-1582293041079-7814c2f12063?w=800&auto=format&fit=crop&q=80",
     description: "Melt-in-your-mouth milk toffee crafted from pure condensed milk, golden caramel notes, and premium crunchy cashews.",
+    contents: "Pure condensed milk · Sugar · Butter · Roasted cashew nuts · Cardamom essence",
   },
   {
     id: 3,
     name: "Authentic Kalu Dodol",
+    nameTamil: "களு தொதொல்",
+    nameSinhala: "කළු දොදොල්",
     unit: "kg",
     price: 1100,
     active: true,
     imageUrl: "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800&auto=format&fit=crop&q=80",
     description: "Traditional dark kalu dodol stirred by hand for hours with thick coconut milk, kithul treacle, and roasted cashews.",
+    contents: "Rice flour · Thick coconut milk · Kithul jaggery / treacle · Roasted cashews · Cardamom",
   },
 ];
 
-// ── Sweet Detail Modal ─────────────────────────────────────────────────────────
-function SweetModal({ product, onClose }: { product: Product; onClose: () => void }) {
-  const allImages = [product.imageUrl, ...(product.images ?? [])].filter(Boolean) as string[];
-  const [imgIdx, setImgIdx] = useState(0);
-  const [imgErr, setImgErr] = useState<Record<number, boolean>>({});
-
-  const prev = useCallback(() => setImgIdx((i) => (i - 1 + allImages.length) % allImages.length), [allImages.length]);
-  const next = useCallback(() => setImgIdx((i) => (i + 1) % allImages.length), [allImages.length]);
-
-  // Close on Escape / back swipe
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  // Push history state so Android back closes the modal
-  useEffect(() => {
-    history.pushState({ modal: true }, "");
-    const onPop = () => onClose();
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [onClose]);
-
-  const initials = product.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-  const currentSrc = allImages[imgIdx] ? optimizeImageUrl(allImages[imgIdx], 900) : "";
-
-  return (
-    <div
-      className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4"
-      onClick={onClose}
-    >
-      <div
-        className="relative w-full sm:max-w-2xl max-h-[95dvh] sm:max-h-[90vh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#120800] border border-white/15 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 z-10 flex size-8 items-center justify-center rounded-full bg-black/70 border border-white/20 text-white hover:bg-black transition-colors"
-        >
-          <X className="size-4" />
-        </button>
-
-        {/* Image Gallery */}
-        <div className="relative shrink-0 aspect-[16/9] sm:aspect-[16/9] bg-[#0a0600] overflow-hidden">
-          {currentSrc && !imgErr[imgIdx] ? (
-            <img
-              src={currentSrc}
-              alt={`${product.name} ${imgIdx + 1}`}
-              className="w-full h-full object-cover"
-              onError={() => setImgErr((prev) => ({ ...prev, [imgIdx]: true }))}
-            />
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center">
-              <div className="size-20 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center">
-                <span className="text-3xl font-black text-amber-300">{initials}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#120800]/90 via-transparent to-transparent pointer-events-none" />
-
-          {/* Price badge */}
-          <div className="absolute bottom-3 left-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-1 text-sm font-black text-white shadow-lg">
-            {money(product.price)} <span className="font-normal text-xs text-amber-100">/ {product.unit}</span>
-          </div>
-
-          {/* Gallery nav */}
-          {allImages.length > 1 && (
-            <>
-              <button
-                onClick={prev}
-                className="absolute left-2 top-1/2 -translate-y-1/2 flex size-8 items-center justify-center rounded-full bg-black/60 border border-white/20 text-white hover:bg-black/80 transition-colors"
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-              <button
-                onClick={next}
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex size-8 items-center justify-center rounded-full bg-black/60 border border-white/20 text-white hover:bg-black/80 transition-colors"
-              >
-                <ChevronRight className="size-4" />
-              </button>
-
-              {/* Dots */}
-              <div className="absolute bottom-3 right-3 flex gap-1.5">
-                {allImages.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setImgIdx(i)}
-                    className={`size-1.5 rounded-full transition-all ${i === imgIdx ? "bg-amber-400 w-4" : "bg-white/40"}`}
-                  />
-                ))}
-              </div>
-
-              {/* Thumbnail strip */}
-              <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-1.5 px-3">
-                {allImages.map((url, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setImgIdx(i)}
-                    className={`size-10 rounded-lg overflow-hidden border-2 transition-all shrink-0 ${i === imgIdx ? "border-amber-400" : "border-white/20 opacity-60 hover:opacity-90"}`}
-                  >
-                    <img src={optimizeImageUrl(url, 80)} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
-          {/* Name in 3 languages */}
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black text-white leading-tight">{product.name}</h2>
-            {(product.nameTamil || product.nameSinhala) && (
-              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5">
-                {product.nameTamil && (
-                  <span className="text-sm font-bold text-amber-400">{product.nameTamil}</span>
-                )}
-                {product.nameSinhala && (
-                  <span className="text-sm font-semibold text-orange-300">{product.nameSinhala}</span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Description */}
-          {product.description && (
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-amber-500/70 mb-1.5">About this sweet</p>
-              <p className="text-sm text-slate-300 leading-relaxed">{product.description}</p>
-            </div>
-          )}
-
-          {/* Contents / Ingredients */}
-          {product.contents && (
-            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-amber-400 mb-1.5">Ingredients & Contents</p>
-              <p className="text-sm text-slate-300 leading-relaxed">{product.contents}</p>
-            </div>
-          )}
-
-          {/* Rating row */}
-          <div className="flex items-center justify-between pt-1 border-t border-white/10">
-            <div className="flex items-center gap-1">
-              {[1, 2, 3, 4, 5].map((s) => (
-                <Star key={s} className="size-3.5 fill-amber-400 text-amber-400" />
-              ))}
-              <span className="ml-1.5 text-xs font-semibold text-slate-400">5.0 · Heritage Recipe</span>
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500/70">Fresh Daily</span>
-          </div>
-
-          {/* CTA */}
-          <a
-            href="tel:0756656135"
-            className="flex items-center justify-center gap-2 w-full rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.02] transition-all duration-200"
-          >
-            <Phone className="size-4" />
-            Order this Sweet · 0756656135
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Product Card ───────────────────────────────────────────────────────────────
-function ProductCard({ product, index, onClick }: { product: Product; index: number; onClick: () => void }) {
+// ── Product Card (Opens Dedicated Sweet Detail Page) ───────────────────────────
+function ProductCard({ product, index }: { product: Product; index: number }) {
   const [imgErr, setImgErr] = useState(false);
   const allImages = [product.imageUrl, ...(product.images ?? [])].filter(Boolean) as string[];
   const hasMultiple = allImages.length > 1;
 
-  const initials = product.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  const initials = product.name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
   const optimizedSrc = product.imageUrl ? optimizeImageUrl(product.imageUrl, 600) : "";
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group relative flex flex-col rounded-2xl sm:rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-transparent backdrop-blur-md hover:border-amber-400/60 hover:shadow-2xl hover:shadow-amber-500/20 transition-all duration-300 cursor-pointer text-left w-full"
+    <Link
+      href={`/sweets/${product.id}`}
+      className="group relative flex flex-col rounded-2xl sm:rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-transparent backdrop-blur-md hover:border-amber-400/60 hover:shadow-2xl hover:shadow-amber-500/20 transition-all duration-300 text-left w-full"
     >
       <div className="relative aspect-[4/3] sm:h-56 md:h-60 overflow-hidden bg-gradient-to-br from-amber-950/80 to-[#120800]">
         {optimizedSrc && !imgErr ? (
@@ -278,10 +118,10 @@ function ProductCard({ product, index, onClick }: { product: Product; index: num
           {money(product.price)} <span className="font-normal text-[9px] sm:text-[11px] text-amber-100">/ {product.unit}</span>
         </div>
 
-        {/* Top right: image count or Fresh badge */}
+        {/* Top right: multi-image count badge or Fresh */}
         <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex gap-1">
           {hasMultiple && (
-            <div className="rounded-full bg-black/70 border border-amber-400/40 px-2 py-0.5 text-[9px] font-bold text-amber-300 backdrop-blur-md flex items-center gap-1">
+            <div className="rounded-full bg-black/75 border border-amber-400/40 px-2 py-0.5 text-[9px] font-bold text-amber-300 backdrop-blur-md flex items-center gap-1">
               <ZoomIn className="size-2.5" /> {allImages.length}
             </div>
           )}
@@ -290,51 +130,59 @@ function ProductCard({ product, index, onClick }: { product: Product; index: num
           </div>
         </div>
 
-        {/* View detail hint on hover */}
+        {/* View Details hover overlay */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <div className="bg-black/50 backdrop-blur-sm rounded-full px-4 py-2 text-xs font-bold text-white border border-white/20 flex items-center gap-1.5">
-            <ZoomIn className="size-3.5" /> View Details
+          <div className="bg-black/60 backdrop-blur-md rounded-full px-4 py-2 text-xs font-bold text-white border border-white/20 flex items-center gap-1.5 shadow-xl">
+            <ZoomIn className="size-3.5 text-amber-400" /> View Details &amp; Photos
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col flex-1 p-3 sm:p-5">
+      <div className="flex flex-col flex-1 p-3.5 sm:p-5">
+        {/* Sweet Name in English */}
         <h3 className="text-sm sm:text-lg font-bold text-white group-hover:text-amber-300 transition-colors leading-snug line-clamp-1">
           {product.name}
         </h3>
 
-        {/* Tamil / Sinhala names */}
+        {/* Sweet Name in Tamil and Sinhala */}
         {(product.nameTamil || product.nameSinhala) && (
-          <div className="flex flex-wrap gap-x-2 mt-0.5">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             {product.nameTamil && (
-              <span className="text-[11px] font-semibold text-amber-400/80 line-clamp-1">{product.nameTamil}</span>
+              <span className="text-[11px] sm:text-xs font-bold text-amber-400/90 truncate">
+                {product.nameTamil}
+              </span>
+            )}
+            {product.nameTamil && product.nameSinhala && (
+              <span className="text-amber-500/40 text-[10px]">•</span>
             )}
             {product.nameSinhala && (
-              <span className="text-[11px] font-semibold text-orange-300/70 line-clamp-1">{product.nameSinhala}</span>
+              <span className="text-[11px] sm:text-xs font-semibold text-orange-300/80 truncate">
+                {product.nameSinhala}
+              </span>
             )}
           </div>
         )}
 
-        <p className="mt-1 sm:mt-2 text-[11px] sm:text-xs text-slate-300/80 leading-relaxed flex-1 line-clamp-2">
+        <p className="mt-1.5 sm:mt-2 text-[11px] sm:text-xs text-slate-300/80 leading-relaxed flex-1 line-clamp-2">
           {product.description?.trim() || "Authentic eastern recipe made fresh with premium ingredients in Maruthamunai."}
         </p>
 
-        <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between text-xs">
+        <div className="mt-2.5 pt-2.5 border-t border-white/10 flex items-center justify-between text-xs">
           <div className="flex items-center gap-0.5 sm:gap-1">
             {[1, 2, 3, 4, 5].map((s) => (
               <Star key={s} className="size-2.5 sm:size-3 fill-amber-400 text-amber-400" />
             ))}
           </div>
-          <span className="text-amber-400/80 font-semibold text-[9px] sm:text-[10px] uppercase tracking-wider">
-            Heritage ›
+          <span className="text-amber-400 font-bold text-[10px] sm:text-xs flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+            View Sweet →
           </span>
         </div>
       </div>
-    </button>
+    </Link>
   );
 }
 
-// ── Hero ───────────────────────────────────────────────────────────────────────
+// ── Hero Section (Clean Headings Without Tri-Language) ─────────────────────────
 function HeroSection() {
   return (
     <section className="relative min-h-[75vh] sm:min-h-[90vh] flex items-center justify-center overflow-hidden bg-[#0a0600] pt-16 pb-10 sm:pt-28 sm:pb-20">
@@ -363,22 +211,12 @@ function HeroSection() {
           </span>
         </h1>
 
-        {/* 3-language subtitle */}
+        {/* Clean subtitle without tri-language clutter */}
         <div className="inline-block mb-3 sm:mb-5">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-3">
-            <p className="text-xs sm:text-2xl md:text-3xl font-extrabold uppercase tracking-[0.16em] sm:tracking-[0.25em] text-amber-200">
-              Eastern Traditional Sweet
-            </p>
-            <span className="hidden sm:block text-amber-500/40 font-thin text-xl">|</span>
-            <p className="text-xs sm:text-lg font-bold text-amber-400/80" style={{ fontFamily: "inherit" }}>
-              கிழக்கு பாரம்பரிய இனிப்பு
-            </p>
-            <span className="hidden sm:block text-amber-500/40 font-thin text-xl">|</span>
-            <p className="text-xs sm:text-lg font-bold text-orange-300/70" style={{ fontFamily: "inherit" }}>
-              නැගෙනහිර සාම්ප්‍රදායික රසකැවිලි
-            </p>
-          </div>
-          <div className="h-0.5 w-16 sm:w-full bg-gradient-to-r from-transparent via-amber-400/60 to-transparent mx-auto mt-2 sm:mt-3 rounded-full" />
+          <p className="text-xs sm:text-2xl md:text-3xl font-extrabold uppercase tracking-[0.16em] sm:tracking-[0.25em] text-amber-200">
+            Eastern Traditional Sweet
+          </p>
+          <div className="h-0.5 w-16 sm:w-28 bg-gradient-to-r from-amber-400 to-orange-500 mx-auto mt-2 sm:mt-3 rounded-full" />
         </div>
 
         <p className="text-slate-300 text-xs sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-10 px-2 sm:px-0">
@@ -424,7 +262,7 @@ function HeroSection() {
   );
 }
 
-// ── Contact ────────────────────────────────────────────────────────────────────
+// ── Contact Section ────────────────────────────────────────────────────────────
 function ContactSection() {
   return (
     <section id="contact" className="py-12 sm:py-28 px-2.5 sm:px-4 bg-gradient-to-b from-[#0a0600] to-[#120800] relative">
@@ -522,7 +360,6 @@ function Footer() {
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function PublicPage() {
   const [products, setProducts] = useState<Product[]>(SHOWCASE_SWEETS);
-  const [selected, setSelected] = useState<Product | null>(null);
 
   useEffect(() => {
     async function loadProducts() {
@@ -574,7 +411,7 @@ export default function PublicPage() {
 
   return (
     <div className="bg-[#0a0600] text-white min-h-screen selection:bg-amber-500 selection:text-black">
-      {/* Nav */}
+      {/* Fixed Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-3 sm:px-8 py-2.5 sm:py-4 bg-black/80 backdrop-blur-xl border-b border-white/10">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="flex size-8 sm:size-10 items-center justify-center rounded-lg sm:rounded-xl overflow-hidden bg-white/10 p-0.5 border border-white/15 shadow-md shadow-amber-500/20 shrink-0">
@@ -615,20 +452,13 @@ export default function PublicPage() {
               Freshly Prepared Catalog
             </span>
 
-            {/* Section heading in 3 languages */}
-            <div className="mt-2 sm:mt-3">
-              <h2 className="text-2xl sm:text-5xl font-black text-white tracking-tight">
-                Our Traditional Sweets
-              </h2>
-              <div className="flex items-center justify-center gap-2 sm:gap-4 mt-1.5 flex-wrap">
-                <span className="text-xs sm:text-sm font-bold text-amber-400/80">எங்கள் பாரம்பரிய இனிப்புகள்</span>
-                <span className="text-amber-600/40 text-xs">•</span>
-                <span className="text-xs sm:text-sm font-semibold text-orange-300/70">අපේ සාම්ප්‍රදායික රසකැවිලි</span>
-              </div>
-            </div>
+            {/* Clean Section Heading */}
+            <h2 className="mt-2 sm:mt-3 text-2xl sm:text-5xl font-black text-white tracking-tight">
+              Our Traditional Sweets
+            </h2>
 
             <p className="mt-2 sm:mt-4 text-slate-400 text-xs sm:text-base max-w-xl mx-auto">
-              Prepared to order with pure ghee, whole milk, and eastern culinary traditions. Tap any sweet to see full details.
+              Prepared to order with pure ghee, whole milk, and eastern culinary traditions. Tap any sweet to see full details and photos.
             </p>
           </div>
 
@@ -644,7 +474,6 @@ export default function PublicPage() {
                   key={product.id}
                   product={product}
                   index={i}
-                  onClick={() => setSelected(product)}
                 />
               ))}
             </div>
@@ -654,11 +483,6 @@ export default function PublicPage() {
 
       <ContactSection />
       <Footer />
-
-      {/* Sweet Detail Modal */}
-      {selected && (
-        <SweetModal product={selected} onClose={() => setSelected(null)} />
-      )}
     </div>
   );
 }

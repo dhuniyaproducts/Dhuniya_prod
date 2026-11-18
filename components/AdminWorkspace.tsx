@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
 import CloudinaryUpload from "@/components/CloudinaryUpload";
@@ -1116,6 +1116,57 @@ function ProductModal({ initial, onSave, onClose }: {
   });
   const [errors, setErrors] = useState<Partial<ProductFormData>>({});
 
+  // Multi-image gallery upload state
+  const [galleryUploading, setGalleryUploading] = useState<{ name: string; progress: "uploading" | "done" | "error" }[]>([]);
+  const [galleryDragOver, setGalleryDragOver] = useState(false);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
+
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+  const uploadFilesToGallery = async (files: File[]) => {
+    if (!cloudName || !uploadPreset) return;
+    const validFiles = files.filter((f) => f.type.startsWith("image/") && f.size <= 10 * 1024 * 1024);
+    if (validFiles.length === 0) return;
+
+    // Add placeholders immediately
+    setGalleryUploading((prev) => [
+      ...prev,
+      ...validFiles.map((f) => ({ name: f.name, progress: "uploading" as const })),
+    ]);
+
+    // Upload all in parallel
+    await Promise.all(
+      validFiles.map(async (file) => {
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          fd.append("upload_preset", uploadPreset);
+          fd.append("folder", "dhuniya-products");
+          const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+            method: "POST", body: fd,
+          });
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          // Add to form images
+          setForm((prev) => ({ ...prev, images: [...(prev.images ?? []), data.secure_url as string] }));
+          setGalleryUploading((prev) =>
+            prev.map((p) => p.name === file.name && p.progress === "uploading" ? { ...p, progress: "done" } : p)
+          );
+        } catch {
+          setGalleryUploading((prev) =>
+            prev.map((p) => p.name === file.name && p.progress === "uploading" ? { ...p, progress: "error" } : p)
+          );
+        }
+      })
+    );
+
+    // Clean up completed placeholders after a short delay
+    setTimeout(() => {
+      setGalleryUploading((prev) => prev.filter((p) => p.progress !== "done"));
+    }, 1500);
+  };
+
   const validate = () => {
     const e: Partial<ProductFormData> = {};
     if (!form.name.trim()) e.name = "Name is required";
@@ -1127,10 +1178,6 @@ function ProductModal({ initial, onSave, onClose }: {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
     onSave(form);
-  };
-
-  const addGalleryImage = (url: string) => {
-    setForm((prev) => ({ ...prev, images: [...(prev.images ?? []), url] }));
   };
 
   const removeGalleryImage = (idx: number) => {
@@ -1247,35 +1294,99 @@ function ProductModal({ initial, onSave, onClose }: {
             />
           </div>
 
-          {/* Extra gallery images */}
+          {/* Extra gallery images with multi-upload support */}
           <div>
-            <label className="mb-1.5 block text-xs font-bold text-slate-700">
-              Extra Gallery Images <span className="font-normal text-slate-400">({(form.images ?? []).length} added)</span>
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Extra Gallery Images <span className="font-normal text-slate-400">({(form.images ?? []).length} added)</span>
+              </label>
+              {(form.images ?? []).length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, images: [] }))}
+                  className="text-[11px] font-semibold text-rose-600 hover:underline"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
 
             {(form.images ?? []).length > 0 && (
-              <div className="mb-2 grid grid-cols-3 gap-2">
+              <div className="mb-2.5 grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {(form.images ?? []).map((url, i) => (
-                  <div key={i} className="relative rounded-lg overflow-hidden border border-slate-200 aspect-square">
+                  <div key={i} className="group relative rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50">
                     <img src={url} alt="" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removeGalleryImage(i)}
-                      className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-rose-600 text-white text-[10px] hover:bg-rose-700 shadow-sm"
+                      className="absolute top-1 right-1 flex size-6 items-center justify-center rounded-full bg-rose-600 text-white hover:bg-rose-700 shadow-sm transition-colors"
+                      title="Remove image"
                     >
-                      <X className="size-3" />
+                      <X className="size-3.5" />
                     </button>
+                    <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 text-[9px] font-bold text-white">
+                      #{i + 1}
+                    </span>
                   </div>
                 ))}
               </div>
             )}
 
-            <CloudinaryUpload
-              value=""
-              onChange={(url) => { addGalleryImage(url); }}
-              onClear={() => {}}
-            />
-            <p className="mt-1 text-[11px] text-slate-400">Each upload adds to gallery. Click × on thumbnail to remove.</p>
+            {/* Active uploading progress list */}
+            {galleryUploading.length > 0 && (
+              <div className="mb-2.5 space-y-1.5">
+                {galleryUploading.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 border border-amber-200/80 px-3 py-1.5 text-xs">
+                    <span className="truncate text-slate-700 font-medium">{item.name}</span>
+                    <span className="shrink-0 font-bold text-amber-700">
+                      {item.progress === "uploading" ? "Uploading…" : item.progress === "done" ? "✓ Done" : "✕ Failed"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Drag & drop multi-file picker */}
+            <div
+              onClick={() => galleryInputRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setGalleryDragOver(true); }}
+              onDragLeave={() => setGalleryDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setGalleryDragOver(false);
+                if (e.dataTransfer.files?.length) {
+                  uploadFilesToGallery(Array.from(e.dataTransfer.files));
+                }
+              }}
+              className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-5 cursor-pointer transition-all duration-200 ${
+                galleryDragOver
+                  ? "border-amber-500 bg-amber-50"
+                  : "border-slate-300 hover:border-amber-400 hover:bg-amber-50/40"
+              }`}
+            >
+              <div className="flex size-10 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+                <PackagePlus className="size-5" />
+              </div>
+              <div className="text-center">
+                <p className="text-xs font-bold text-slate-700">
+                  Click to select multiple images or drag &amp; drop
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Select multiple photos at once (PNG, JPG, WebP)</p>
+              </div>
+              <input
+                ref={galleryInputRef}
+                type="file"
+                multiple
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.length) {
+                    uploadFilesToGallery(Array.from(e.target.files));
+                    e.target.value = "";
+                  }
+                }}
+              />
+            </div>
           </div>
 
           {/* Active Status */}
