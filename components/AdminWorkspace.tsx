@@ -381,7 +381,34 @@ function PageHeader({ title, onMenu, action }: { title: string; onMenu?: () => v
   );
 }
 
+function useModalBackHandler(isOpen: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const modalStateKey = "modal_" + Math.random().toString(36).substring(2, 9);
+    try {
+      window.history.pushState({ [modalStateKey]: true }, "");
+    } catch {}
+
+    const handlePopState = () => {
+      onClose();
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      try {
+        if (window.history.state && window.history.state[modalStateKey]) {
+          window.history.back();
+        }
+      } catch {}
+    };
+  }, [isOpen, onClose]);
+}
+
 function ConfirmDialog({ title, message, onConfirm, onCancel }: { title: string; message: string; onConfirm: () => void; onCancel: () => void }) {
+  useModalBackHandler(true, onCancel);
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-4">
       <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
@@ -766,6 +793,7 @@ async function generateBillImage(order: Order, products: Product[]): Promise<{ b
 function Invoice({ order, products, onClose }: {
   order: Order; products: Product[]; onClose: () => void;
 }) {
+  useModalBackHandler(true, onClose);
   const [isGenerating, setIsGenerating] = useState(false);
   const items = getOrderItems(order);
   const lineItems = items.map((item) => {
@@ -1014,6 +1042,7 @@ function ProductModal({ initial, onSave, onClose }: {
   onSave: (data: ProductFormData) => void;
   onClose: () => void;
 }) {
+  useModalBackHandler(true, onClose);
   const [form, setForm] = useState<ProductFormData>({
     name: initial?.name ?? "",
     unit: initial?.unit ?? "kg",
@@ -1438,6 +1467,7 @@ function ProductItemDialog({
   onSave: (item: OrderItemFormData) => void;
   onClose: () => void;
 }) {
+  useModalBackHandler(true, onClose);
   const activeProducts = products.filter((p) => p.active);
 
   // Filter out sweets already in the order (unless editing this specific sweet)
@@ -1652,6 +1682,7 @@ function PaymentModal({
   onSave: (orderId: string, amountPaid: number) => void;
   onClose: () => void;
 }) {
+  useModalBackHandler(true, onClose);
   const total = getOrderTotal(order, products);
   const [amountPaid, setAmountPaid] = useState<string>(
     order.amountPaid !== undefined ? String(order.amountPaid) : ""
@@ -1859,6 +1890,7 @@ function CustomerDropdown({ value, customers, onChange, hasError }: {
 function OrderModal({ initial, products, customers = [], initialCustomer, onSave, onClose }: {
   initial?: Order; products: Product[]; customers?: (Customer | string)[]; initialCustomer?: string | null; onSave: (data: OrderFormData) => void; onClose: () => void;
 }) {
+  useModalBackHandler(true, onClose);
   const activeProducts = products.filter((p) => p.active);
   const normalizedCustomers = useMemo(() => {
     return customers.map((c) => (typeof c === "string" ? { name: c, phone: undefined, address: undefined } : c));
@@ -2253,6 +2285,7 @@ function OrderItemsModal({ order, products, customerLookup, onClose }: {
   customerLookup?: Map<string, Customer>;
   onClose: () => void;
 }) {
+  useModalBackHandler(true, onClose);
   const items = getOrderItems(order);
   const total = getOrderTotal(order, products);
   const info = customerLookup?.get(order.customer.trim().toLowerCase());
@@ -3258,6 +3291,7 @@ function CustomerModal({ initial, onSave, onClose }: {
   onSave: (data: CustomerFormData) => void;
   onClose: () => void;
 }) {
+  useModalBackHandler(true, onClose);
   const [form, setForm] = useState<CustomerFormData>({
     name: initial?.name ?? "",
     phone: initial?.phone ?? "",
@@ -3354,6 +3388,7 @@ function CustomerDetailsModal({ customer, stats, onCreateOrder, onEdit, onClose 
   onEdit: (c: Customer) => void;
   onClose: () => void;
 }) {
+  useModalBackHandler(true, onClose);
   const initials = customer.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
   return (
