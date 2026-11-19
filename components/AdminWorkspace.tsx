@@ -4165,6 +4165,14 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         return;
       }
 
+      // Purge any legacy localStorage cache keys so only live Supabase data is ever used
+      try {
+        localStorage.removeItem("dhuniya_orders");
+        localStorage.removeItem("dhuniya_products");
+        localStorage.removeItem("dhuniya_customers");
+        localStorage.removeItem("dhuniya_customers_v2");
+      } catch { }
+
       // Strictly verify authentication before querying business data
       try {
         const {
@@ -4226,7 +4234,6 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
             a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
           );
           setProducts(deduplicatedProducts);
-          try { localStorage.setItem("dhuniya_products", JSON.stringify(deduplicatedProducts)); } catch { }
         } else {
           setProducts([]);
         }
@@ -4234,16 +4241,6 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
         if (ordErr) throw ordErr;
         let loadedOrders: Order[] = [];
         if (ordData && ordData.length > 0) {
-          // Read local cache to merge payment or multi-items if remote columns were missing
-          let cachedOrdersMap = new Map<string, Order>();
-          try {
-            const lo = localStorage.getItem("dhuniya_orders");
-            if (lo) {
-              const parsed: Order[] = JSON.parse(lo);
-              parsed.forEach((o) => cachedOrdersMap.set(o.id, o));
-            }
-          } catch {}
-
           loadedOrders = ordData.map((o: any) => {
             const parsedMeta = parseDhuniyaData(o.notes);
             let parsedItems: OrderItem[] = [];
@@ -4271,13 +4268,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
               })).filter((it: OrderItem) => Boolean(it.productId && it.qty));
             }
 
-            // 3. Fallback to cached order
-            const cached = cachedOrdersMap.get(o.id);
-            if (parsedItems.length === 0 && cached?.items && cached.items.length > 0) {
-              parsedItems = cached.items;
-            }
-
-            // 4. Legacy single product
+            // 3. Legacy single product fallback
             if (parsedItems.length === 0 && o.product_id) {
               parsedItems = [{
                 productId: Number(o.product_id),
@@ -4288,13 +4279,10 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
             const amountPaid = o.amount_paid != null
               ? Number(o.amount_paid)
-              : (parsedMeta.amountPaid != null
-                  ? Number(parsedMeta.amountPaid)
-                  : (cached?.amountPaid != null ? Number(cached.amountPaid) : 0));
+              : (parsedMeta.amountPaid != null ? Number(parsedMeta.amountPaid) : 0);
 
             const paymentStatus = (o.payment_status
               || parsedMeta.paymentStatus
-              || cached?.paymentStatus
               || (amountPaid > 0 ? "Partial" : "Unpaid")) as Order["paymentStatus"];
 
             const consolidatedItems = consolidateOrderItems(parsedItems);
@@ -4310,34 +4298,17 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
               rate: consolidatedItems[0]?.rate ?? (o.rate ? Number(o.rate) : undefined),
               status: o.status,
               notes: parsedMeta.cleanNotes,
-              phone: o.phone || cached?.phone || undefined,
-              address: o.address || cached?.address || undefined,
+              phone: o.phone || undefined,
+              address: o.address || undefined,
               amountPaid,
               paymentStatus,
             };
           });
-
-          // Supabase is the authoritative source — do NOT merge localStorage here.
-          // Previously this block re-inserted deleted orders from localStorage cache.
-          // localStorage is now only used as a fallback when Supabase is unreachable.
-
-          setOrders(loadedOrders);
-          try { localStorage.setItem("dhuniya_orders", JSON.stringify(loadedOrders)); } catch {}
-        } else {
-          try {
-            const lo = localStorage.getItem("dhuniya_orders");
-            if (lo) {
-              loadedOrders = JSON.parse(lo).map((o: Order) => ({
-                ...o,
-                items: consolidateOrderItems(getOrderItems(o)),
-                notes: parseDhuniyaData(o.notes).cleanNotes,
-              }));
-              setOrders(loadedOrders);
-            }
-          } catch { }
         }
 
-        // Load customers from Supabase table + existing orders + local storage
+        setOrders(loadedOrders);
+
+        // Load customers from Supabase only
         let remoteCust: Customer[] = [];
         try {
           const { data: cData } = await client.from("customers").select("id,name,phone,address,notes,created_at").order("name");
@@ -4364,36 +4335,10 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           } catch { }
         }
 
-        const existingNames = new Set(remoteCust.map((c) => c.name.toLowerCase()));
-        const orderCust: Customer[] = [];
-        for (const o of loadedOrders) {
-          const name = o.customer?.trim();
-          if (name && !existingNames.has(name.toLowerCase())) {
-            existingNames.add(name.toLowerCase());
-            orderCust.push({ id: `order-${name}`, name });
-          }
-        }
-
-        let localCust: Customer[] = [];
-        try {
-          const lc = localStorage.getItem("dhuniya_customers_v2");
-          if (lc) localCust = JSON.parse(lc);
-        } catch { }
-
-        for (const c of localCust) {
-          if (c.name && !existingNames.has(c.name.trim().toLowerCase())) {
-            existingNames.add(c.name.trim().toLowerCase());
-            orderCust.push(c);
-          }
-        }
-
-        const combinedCustomers = [...remoteCust, ...orderCust].sort((a, b) => a.name.localeCompare(b.name));
-        setCustomers(combinedCustomers);
-        try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(combinedCustomers)); } catch { }
+        setCustomers(remoteCust.sort((a, b) => a.name.localeCompare(b.name)));
       } catch (err: any) {
         console.error("Error loading Supabase data:", err);
-        addToast("error", `Supabase connection note: ${err.message || "Using local storage"}`);
-        try { const lp = localStorage.getItem("dhuniya_products"); if (lp) setProducts(JSON.parse(lp)); const lo = localStorage.getItem("dhuniya_orders"); if (lo) setOrders(JSON.parse(lo)); } catch { }
+        addToast("error", `Failed to load data from database: ${err.message || "Check your connection"}`);
       } finally { setIsLoading(false); }
     }
     loadData();
@@ -4424,7 +4369,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       description: data.description?.trim() || undefined,
       contents: data.contents?.trim() || undefined,
     };
-    setProducts((prev) => { const updated = [...prev, newProduct]; try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { } return updated; });
+    setProducts((prev) => [...prev, newProduct]);
     addToast("success", `Sweet "${data.name}" added`);
     const client = getSupabase();
     if (client) {
@@ -4484,7 +4429,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       description: data.description?.trim() || undefined,
       contents: data.contents?.trim() || undefined,
     };
-    setProducts((prev) => { const updated = prev.map((p) => (p.id === id ? updatedProduct : p)); try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { } return updated; });
+    setProducts((prev) => prev.map((p) => (p.id === id ? updatedProduct : p)));
     addToast("success", `Sweet "${data.name}" updated`);
     const client = getSupabase();
     if (client) {
@@ -4529,7 +4474,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       deleteCloudinaryImage(target.imageUrl);
     }
 
-    setProducts((prev) => { const updated = prev.filter((p) => p.id !== id); try { localStorage.setItem("dhuniya_products", JSON.stringify(updated)); } catch { } return updated; });
+    setProducts((prev) => prev.filter((p) => p.id !== id));
     addToast("info", `Deleted "${target?.name ?? "Sweet"}"`);
     const client = getSupabase();
     if (client) {
@@ -4568,7 +4513,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       amountPaid: 0,
       paymentStatus: "Unpaid",
     };
-    setOrders((prev) => { const updated = [newOrder, ...prev]; try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
+    setOrders((prev) => [newOrder, ...prev]);
 
     // Auto-save customer name, phone, address for dropdown & directory reuse
     const custName = data.customer.trim();
@@ -4598,7 +4543,6 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           };
           updated = [...prev, newC].sort((a, b) => a.name.localeCompare(b.name));
         }
-        try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
         return updated;
       });
 
@@ -4728,7 +4672,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       amountPaid: prevAmountPaid,
       paymentStatus: newPaymentStatus,
     };
-    setOrders((prev) => { const updated = prev.map((o) => (o.id === id ? updatedOrder : o)); try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
+    setOrders((prev) => prev.map((o) => (o.id === id ? updatedOrder : o)));
 
     // Auto-save customer name, phone, address for dropdown reuse
     const custName = data.customer.trim();
@@ -4758,7 +4702,6 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           };
           updated = [...prev, newC].sort((a, b) => a.name.localeCompare(b.name));
         }
-        try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
         return updated;
       });
 
@@ -4874,7 +4817,6 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
     setCustomers((prev) => {
       const updated = [...prev, newCustomer].sort((a, b) => a.name.localeCompare(b.name));
-      try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
       return updated;
     });
     addToast("success", `Customer "${trimmed}" saved`);
@@ -4917,7 +4859,6 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
           }
           : c
       ).sort((a, b) => a.name.localeCompare(b.name));
-      try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
       return updated;
     });
     addToast("success", `Customer "${trimmed}" updated`);
@@ -4925,11 +4866,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
   const deleteCustomer = async (id: number | string, name: string) => {
     const prevCustomers = [...customers];
-    setCustomers((prev) => {
-      const updated = prev.filter((c) => c.id !== id && c.name !== name);
-      try { localStorage.setItem("dhuniya_customers_v2", JSON.stringify(updated)); } catch { }
-      return updated;
-    });
+    setCustomers((prev) => prev.filter((c) => c.id !== id && c.name !== name));
 
     const client = getSupabase();
     if (client) {
@@ -4949,7 +4886,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
   const deleteOrder = async (id: string) => {
     const prevOrders = [...orders];
-    setOrders((prev) => { const updated = prev.filter((o) => o.id !== id); try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
+    setOrders((prev) => prev.filter((o) => o.id !== id));
     addToast("info", "Order deleted");
     const client = getSupabase();
     if (client) {
@@ -4960,7 +4897,7 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
 
   const updateStatus = async (id: string, status: string) => {
     const prevOrders = [...orders];
-    setOrders((prev) => { const updated = prev.map((o) => (o.id === id ? { ...o, status } : o)); try { localStorage.setItem("dhuniya_orders", JSON.stringify(updated)); } catch { } return updated; });
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
     addToast("success", `Order ${id} status set to "${status}"`);
     const client = getSupabase();
     if (client) {
@@ -4980,9 +4917,6 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
       o.id === id ? { ...o, amountPaid, paymentStatus } : o
     );
     setOrders(updatedOrders);
-    try {
-      localStorage.setItem("dhuniya_orders", JSON.stringify(updatedOrders));
-    } catch {}
 
     addToast("success", `Payment of ${money(amountPaid)} recorded for ${target.customer}`);
 
