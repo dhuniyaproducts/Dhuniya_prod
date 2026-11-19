@@ -4317,17 +4317,9 @@ export default function AdminWorkspace({ initialTab = "Dashboard" }: { initialTa
             };
           });
 
-          // Merge any locally created orders that might not be in Supabase yet
-          const remoteIds = new Set(loadedOrders.map((o) => o.id));
-          for (const [id, cached] of cachedOrdersMap.entries()) {
-            if (!remoteIds.has(id)) {
-              loadedOrders.push({
-                ...cached,
-                items: consolidateOrderItems(getOrderItems(cached)),
-                notes: parseDhuniyaData(cached.notes).cleanNotes,
-              });
-            }
-          }
+          // Supabase is the authoritative source — do NOT merge localStorage here.
+          // Previously this block re-inserted deleted orders from localStorage cache.
+          // localStorage is now only used as a fallback when Supabase is unreachable.
 
           setOrders(loadedOrders);
           try { localStorage.setItem("dhuniya_orders", JSON.stringify(loadedOrders)); } catch {}
