@@ -129,10 +129,32 @@ export const getOrderTotal = (o: Order, products: Product[]): number => {
   }, 0);
 };
 
-export const isWholeNumberUnit = (unit?: string): boolean => {
+export const isPcsUnit = (unit?: string): boolean => {
   if (!unit) return false;
   const u = unit.trim().toLowerCase();
-  return ["pcs", "box", "piece", "pieces", "boxes"].includes(u);
+  return ["pcs", "piece", "pieces"].includes(u);
+};
+
+export const isBoxUnit = (unit?: string): boolean => {
+  if (!unit) return false;
+  const u = unit.trim().toLowerCase();
+  return ["box", "boxes"].includes(u);
+};
+
+export const isGramUnit = (unit?: string): boolean => {
+  if (!unit) return false;
+  const u = unit.trim().toLowerCase();
+  return ["g", "gram", "grams"].includes(u);
+};
+
+export const isKgUnit = (unit?: string): boolean => {
+  if (!unit) return true;
+  const u = unit.trim().toLowerCase();
+  return ["kg", "kilogram", "kilograms"].includes(u);
+};
+
+export const isWholeNumberUnit = (unit?: string): boolean => {
+  return isPcsUnit(unit) || isBoxUnit(unit);
 };
 
 export const getOrderTotalKg = (o: Order, products?: Product[]): number => {
@@ -140,10 +162,29 @@ export const getOrderTotalKg = (o: Order, products?: Product[]): number => {
   return items.reduce((sum, item) => {
     if (products) {
       const prod = products.find((p) => p.id === item.productId);
-      if (prod && isWholeNumberUnit(prod.unit)) return sum;
-      if (prod && prod.unit && prod.unit.toLowerCase() !== "kg") return sum;
+      if (prod) {
+        if (isGramUnit(prod.unit)) {
+          return sum + ((Number(item.qty) || 0) / 1000);
+        }
+        if (!isKgUnit(prod.unit)) {
+          return sum;
+        }
+      }
     }
     return sum + (Number(item.qty) || 0);
+  }, 0);
+};
+
+export const getOrderTotalBoxes = (o: Order, products?: Product[]): number => {
+  const items = getOrderItems(o);
+  return items.reduce((sum, item) => {
+    if (products) {
+      const prod = products.find((p) => p.id === item.productId);
+      if (prod && isBoxUnit(prod.unit)) {
+        return sum + Math.round(Number(item.qty) || 0);
+      }
+    }
+    return sum;
   }, 0);
 };
 
@@ -152,7 +193,7 @@ export const getOrderTotalPcs = (o: Order, products?: Product[]): number => {
   return items.reduce((sum, item) => {
     if (products) {
       const prod = products.find((p) => p.id === item.productId);
-      if (prod && isWholeNumberUnit(prod.unit)) {
+      if (prod && isPcsUnit(prod.unit)) {
         return sum + Math.round(Number(item.qty) || 0);
       }
     }
@@ -2973,6 +3014,7 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
   }), [filtered, quickTab, todayStr]);
 
   const totalFilteredKg = useMemo(() => displayedOrders.reduce((sum, o) => sum + getOrderTotalKg(o, products), 0), [displayedOrders, products]);
+  const totalFilteredBoxes = useMemo(() => displayedOrders.reduce((sum, o) => sum + getOrderTotalBoxes(o, products), 0), [displayedOrders, products]);
   const totalFilteredPcs = useMemo(() => displayedOrders.reduce((sum, o) => sum + getOrderTotalPcs(o, products), 0), [displayedOrders, products]);
   const getProduct = (id: number) => products.find((p) => p.id === id);
 
@@ -3079,7 +3121,12 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
             <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-amber-200/60">
               <div className="text-left sm:text-right">
                 <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Demand</p>
-                <p className="text-xl sm:text-2xl font-black text-amber-600">{totalFilteredKg.toFixed(2)} <span className="text-xs font-normal text-slate-600">{activeFilteredProduct.unit}</span></p>
+                <p className="text-xl sm:text-2xl font-black text-amber-600">
+                  {isWholeNumberUnit(activeFilteredProduct.unit)
+                    ? (isBoxUnit(activeFilteredProduct.unit) ? totalFilteredBoxes : totalFilteredPcs)
+                    : totalFilteredKg.toFixed(2)}{" "}
+                  <span className="text-xs font-normal text-slate-600">{activeFilteredProduct.unit}</span>
+                </p>
               </div>
               <button onClick={() => { setFilterProductId("All"); onClearProductFilter?.(); }} className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs">
                 <X className="size-3.5" /> Show All
@@ -3138,6 +3185,7 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
           <div className="mt-6 space-y-7">
             {groupedOrders.map((group) => {
               const groupKg = group.orders.reduce((sum, o) => sum + getOrderTotalKg(o, products), 0);
+              const groupBoxes = group.orders.reduce((sum, o) => sum + getOrderTotalBoxes(o, products), 0);
               const groupPcs = group.orders.reduce((sum, o) => sum + getOrderTotalPcs(o, products), 0);
               const isPastOrCompleted = group.key === "past" || group.key === "status-Completed";
               const isCollapsed = quickTab === "completed" ? false : (collapsedGroups[group.key] ?? isPastOrCompleted);
@@ -3174,10 +3222,13 @@ function OrdersPage({ orders, products, customers = [], initialCustomer = null, 
                           {groupKg > 0 && (
                             <strong className={`font-extrabold mr-1.5 ${style.totalKg}`}>{groupKg.toFixed(2)} kg</strong>
                           )}
+                          {groupBoxes > 0 && (
+                            <strong className="text-amber-700 font-extrabold mr-1.5">{groupBoxes} {groupBoxes === 1 ? "box" : "boxes"}</strong>
+                          )}
                           {groupPcs > 0 && (
                             <strong className="text-blue-700 font-extrabold">{groupPcs} pcs</strong>
                           )}
-                          {groupKg === 0 && groupPcs === 0 && (
+                          {groupKg === 0 && groupBoxes === 0 && groupPcs === 0 && (
                             <strong className="text-slate-400 font-semibold">0 kg</strong>
                           )}
                         </span>
@@ -3290,6 +3341,7 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
   const activeOrders = orders.filter((o) => !["Completed", "Cancelled"].includes(o.status));
   const totalKg = activeOrders.reduce((sum, o) => sum + getOrderTotalKg(o, products), 0);
+  const totalBoxes = activeOrders.reduce((sum, o) => sum + getOrderTotalBoxes(o, products), 0);
   const totalPcs = activeOrders.reduce((sum, o) => sum + getOrderTotalPcs(o, products), 0);
   const activeProductCount = products.filter((p) => p.active).length;
 
@@ -3333,8 +3385,13 @@ function Dashboard({ orders, products, customers: allCustomersList = [], setActi
             <div className="mt-2 sm:mt-2.5 flex items-baseline gap-1.5 flex-wrap">
               <span className="text-xl sm:text-3xl font-black text-slate-900">{totalKg.toFixed(2)}</span>
               <span className="text-[10px] sm:text-xs font-bold text-amber-600">kg active</span>
+              {totalBoxes > 0 && (
+                <span className="text-xs sm:text-sm font-bold text-amber-800 bg-amber-100/80 px-1.5 py-0.5 rounded-md">
+                  + {totalBoxes} {totalBoxes === 1 ? "box" : "boxes"}
+                </span>
+              )}
               {totalPcs > 0 && (
-                <span className="text-xs sm:text-sm font-bold text-slate-500">
+                <span className="text-xs sm:text-sm font-bold text-blue-800 bg-blue-100/80 px-1.5 py-0.5 rounded-md">
                   + {totalPcs} pcs
                 </span>
               )}
