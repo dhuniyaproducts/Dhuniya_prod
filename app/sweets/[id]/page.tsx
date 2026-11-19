@@ -53,25 +53,15 @@ export default function SweetDetailPage() {
   const loadData = async () => {
     setLoading(true);
 
-    // 1. Immediately check real cached products from localStorage (supports instant load & poor coverage)
-    let foundInCache = false;
+    // Purge legacy cache keys if any exist in the browser
     try {
-      const cached = localStorage.getItem("dhuniya_products");
-      if (cached) {
-        const list: Product[] = JSON.parse(cached);
-        if (Array.isArray(list) && list.length > 0) {
-          setAllProducts(list);
-          const match = list.find((p) => p.id === productId);
-          if (match) {
-            setProduct(match);
-            foundInCache = true;
-            setLoading(false);
-          }
-        }
-      }
+      localStorage.removeItem("dhuniya_products");
+      localStorage.removeItem("dhuniya_orders");
+      localStorage.removeItem("dhuniya_customers");
+      localStorage.removeItem("dhuniya_customers_v2");
     } catch {}
 
-    // 2. Fetch fresh real data from Supabase
+    // Fetch live data directly from Supabase
     try {
       const client = getSupabase();
       if (client) {
@@ -96,21 +86,20 @@ export default function SweetDetailPage() {
             contents: p.contents || undefined,
           }));
           setAllProducts(mapped);
-          try { localStorage.setItem("dhuniya_products", JSON.stringify(mapped)); } catch {}
 
           const found = mapped.find((p) => p.id === productId);
           if (found) {
             setProduct(found);
-          } else if (!foundInCache) {
+          } else {
             setProduct(null);
           }
+        } else {
+          setProduct(null);
         }
       }
     } catch (err) {
       console.error("Error loading sweet details from database:", err);
-      if (!foundInCache) {
-        setProduct(null);
-      }
+      setProduct(null);
     } finally {
       setLoading(false);
     }

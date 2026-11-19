@@ -41,7 +41,7 @@ function GoldenEmberCanvas() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
 
     let animId: number;
@@ -56,7 +56,6 @@ function GoldenEmberCanvas() {
     handleResize();
     window.addEventListener("resize", handleResize);
 
-    // Particle definition
     interface Particle {
       x: number;
       y: number;
@@ -64,7 +63,6 @@ function GoldenEmberCanvas() {
       speedY: number;
       speedX: number;
       opacity: number;
-      fadeSpeed: number;
       color: string;
       wobble: number;
       wobbleSpeed: number;
@@ -77,49 +75,36 @@ function GoldenEmberCanvas() {
       "249, 115, 22", // orange-500
     ];
 
-    const particleCount = typeof window !== "undefined" && window.innerWidth < 640 ? 30 : 65;
+    // High performance particle count: 12 on mobile, 25 on desktop
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+    const particleCount = isMobile ? 12 : 25;
     const particles: Particle[] = [];
 
     for (let i = 0; i < particleCount; i++) {
       particles.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        size: Math.random() * 2.5 + 0.8,
-        speedY: Math.random() * 0.7 + 0.2,
-        speedX: (Math.random() - 0.5) * 0.4,
-        opacity: Math.random() * 0.7 + 0.2,
-        fadeSpeed: Math.random() * 0.006 + 0.002,
+        size: Math.random() * 2 + 0.8,
+        speedY: Math.random() * 0.5 + 0.2,
+        speedX: (Math.random() - 0.5) * 0.3,
+        opacity: Math.random() * 0.6 + 0.2,
         color: colors[Math.floor(Math.random() * colors.length)],
         wobble: Math.random() * Math.PI * 2,
-        wobbleSpeed: Math.random() * 0.03 + 0.01,
+        wobbleSpeed: Math.random() * 0.02 + 0.01,
       });
     }
 
-    // Mouse interactivity
-    let mouse = { x: -1000, y: -1000 };
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      mouse.x = e.clientX - rect.left;
-      mouse.y = e.clientY - rect.top;
-    };
-    const handleMouseLeave = () => {
-      mouse.x = -1000;
-      mouse.y = -1000;
-    };
-    canvas.addEventListener("mousemove", handleMouseMove);
-    canvas.addEventListener("mouseleave", handleMouseLeave);
-
-    // Intersection observer to stop animation when scrolled out of view (saves battery)
+    // Intersection observer stops loop when hero is scrolled out of view
     const observer = new IntersectionObserver(
       ([entry]) => {
         isVisible = entry.isIntersecting;
         if (isVisible) render();
       },
-      { threshold: 0.1 }
+      { threshold: 0.05 }
     );
     observer.observe(canvas);
 
-    // Animation loop
+    // 60 FPS GPU-accelerated loop with ZERO software blur
     const render = () => {
       if (!isVisible) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -127,17 +112,7 @@ function GoldenEmberCanvas() {
       for (let p of particles) {
         p.y -= p.speedY;
         p.wobble += p.wobbleSpeed;
-        p.x += Math.sin(p.wobble) * 0.5 + p.speedX;
-
-        // Mouse repelling interaction
-        const dx = p.x - mouse.x;
-        const dy = p.y - mouse.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 100) {
-          const force = (100 - dist) / 100;
-          p.x += (dx / dist) * force * 3;
-          p.y += (dy / dist) * force * 3;
-        }
+        p.x += Math.sin(p.wobble) * 0.4 + p.speedX;
 
         // Wrap around top
         if (p.y < -10) {
@@ -147,15 +122,16 @@ function GoldenEmberCanvas() {
         if (p.x < -10) p.x = canvas.width + 10;
         if (p.x > canvas.width + 10) p.x = -10;
 
-        // Draw glowing ember
-        ctx.save();
+        // Fast GPU-friendly double-pass glow (no CPU shadowBlur)
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${p.color}, ${p.opacity * 0.25})`;
+        ctx.fill();
+
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${p.color}, ${p.opacity})`;
-        ctx.shadowBlur = p.size * 4;
-        ctx.shadowColor = `rgba(${p.color}, 0.8)`;
         ctx.fill();
-        ctx.restore();
       }
 
       animId = requestAnimationFrame(render);
@@ -166,8 +142,6 @@ function GoldenEmberCanvas() {
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener("resize", handleResize);
-      canvas.removeEventListener("mousemove", handleMouseMove);
-      canvas.removeEventListener("mouseleave", handleMouseLeave);
       observer.disconnect();
     };
   }, []);
@@ -175,12 +149,9 @@ function GoldenEmberCanvas() {
   return <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-1" />;
 }
 
-// ── Interactive 3D Tilt Card Component ─────────────────────────────────────────
+// ── High Performance Product Card Component ──────────────────────────────────
 function ProductCard({ product, index }: { product: Product; index: number }) {
   const [imgErr, setImgErr] = useState(false);
-  const cardRef = useRef<HTMLAnchorElement | null>(null);
-  const [rotate, setRotate] = useState({ x: 0, y: 0 });
-  const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
 
   const allImages = [product.imageUrl, ...(product.images ?? [])].filter(Boolean) as string[];
   const hasMultiple = allImages.length > 1;
@@ -193,66 +164,27 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
     .toUpperCase();
   const optimizedSrc = product.imageUrl ? optimizeImageUrl(product.imageUrl, 550) : "";
 
-  // 3D perspective mouse tilt calculation
-  const handleMouseMove = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    const card = cardRef.current;
-    if (!card) return;
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-
-    const rotX = -((y - centerY) / centerY) * 7;
-    const rotY = ((x - centerX) / centerX) * 7;
-
-    setRotate({ x: rotX, y: rotY });
-    setGlare({
-      x: (x / rect.width) * 100,
-      y: (y / rect.height) * 100,
-      opacity: 0.18,
-    });
-  };
-
-  const handleMouseLeave = () => {
-    setRotate({ x: 0, y: 0 });
-    setGlare((prev) => ({ ...prev, opacity: 0 }));
-  };
-
   return (
     <Link
-      ref={cardRef}
       href={`/sweets/${product.id}`}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
       style={{
-        transform: `perspective(1000px) rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) translateZ(${rotate.x || rotate.y ? "6px" : "0px"})`,
-        transition: rotate.x === 0 && rotate.y === 0 ? "transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease-out" : "none",
-        animationDelay: `${Math.min(index * 0.08, 0.6)}s`,
+        animationDelay: `${Math.min(index * 0.05, 0.35)}s`,
       }}
-      className="animate-fade-in-up group relative flex flex-col rounded-2xl sm:rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-transparent backdrop-blur-md hover:border-amber-400/60 hover:shadow-2xl hover:shadow-amber-500/25 hover:-translate-y-1.5 text-left w-full cursor-pointer transition-all duration-300"
+      className="animate-fade-in-up group relative flex flex-col rounded-2xl sm:rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-transparent backdrop-blur-md hover:border-amber-400/60 hover:shadow-2xl hover:shadow-amber-500/20 hover:-translate-y-1.5 text-left w-full cursor-pointer transition-all duration-300 ease-out will-change-transform"
     >
-      {/* Specular glare overlay that tracks cursor */}
-      <div
-        className="absolute inset-0 pointer-events-none z-20 rounded-2xl sm:rounded-3xl transition-opacity duration-300"
-        style={{
-          background: `radial-gradient(circle at ${glare.x}% ${glare.y}%, rgba(251, 191, 36, ${glare.opacity}) 0%, transparent 60%)`,
-        }}
-      />
-
       <div className="relative h-28 sm:h-56 md:h-60 overflow-hidden bg-gradient-to-br from-amber-950/80 to-[#120800]">
         {optimizedSrc && !imgErr ? (
           <img
             src={optimizedSrc}
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out will-change-transform"
             onError={() => setImgErr(true)}
             loading={index < 4 ? "eager" : "lazy"}
             decoding="async"
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 text-center">
-            <div className="size-12 sm:size-20 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform duration-500">
+            <div className="size-12 sm:size-20 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-105 transition-transform duration-300">
               <span className="text-lg sm:text-3xl font-black text-amber-300">{initials}</span>
             </div>
             <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-amber-400/80">Dhuniya</p>
@@ -261,7 +193,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent pointer-events-none" />
 
-        {/* Price badge with subtle hover transition */}
+        {/* Price badge */}
         <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-2.5 sm:px-3.5 py-0.5 sm:py-1 text-[11px] sm:text-xs font-black text-white shadow-md shadow-black/50 group-hover:scale-105 transition-transform duration-300">
           {money(product.price)} <span className="font-normal text-[9px] sm:text-[11px] text-amber-100">/ {product.unit}</span>
         </div>
@@ -278,7 +210,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
           </div>
         </div>
 
-        {/* View Details hover indicator with smooth transition */}
+        {/* View Details hover indicator */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-300 z-10 pointer-events-none">
           <div className="bg-black/75 backdrop-blur-md rounded-full px-4 py-2 text-xs font-bold text-white border border-amber-400/40 flex items-center gap-1.5 shadow-2xl">
             <ZoomIn className="size-3.5 text-amber-400" /> View Details &amp; Photos
@@ -355,7 +287,7 @@ function SlideInView({
           observer.unobserve(el);
         }
       },
-      { threshold: 0.15, rootMargin: "0px 0px -30px 0px" }
+      { threshold: 0.1, rootMargin: "0px 0px -20px 0px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -363,17 +295,16 @@ function SlideInView({
 
   const getTransform = () => {
     if (isVisible) return "translate-x-0 translate-y-0 opacity-100";
-    if (direction === "up") return "translate-y-8 opacity-0";
-    if (direction === "left") return "-translate-x-8 opacity-0";
-    if (direction === "right") return "translate-x-8 opacity-0";
-    return "translate-y-8 opacity-0";
+    if (direction === "left") return "-translate-x-4 opacity-0";
+    if (direction === "right") return "translate-x-4 opacity-0";
+    return "translate-y-4 opacity-0";
   };
 
   return (
     <div
       ref={ref}
       style={{ transitionDelay: `${delay}ms` }}
-      className={`transition-all duration-700 ease-out ${getTransform()} ${className}`}
+      className={`transition-[opacity,transform] duration-500 ease-out will-change-[opacity,transform] ${getTransform()} ${className}`}
     >
       {children}
     </div>
@@ -607,23 +538,15 @@ export default function PublicPage() {
     setLoading(true);
     setLoadError(false);
 
-    // 1. Immediately populate from local cache if real products were saved earlier
-    let hasCached = false;
+    // Purge any legacy localStorage cache keys so only live Supabase data is ever used
     try {
-      const cached = localStorage.getItem("dhuniya_products");
-      if (cached) {
-        const parsed: Product[] = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const activeOnly = parsed.filter((p) => p.active !== false);
-          if (activeOnly.length > 0) {
-            setProducts(activeOnly);
-            hasCached = true;
-          }
-        }
-      }
+      localStorage.removeItem("dhuniya_products");
+      localStorage.removeItem("dhuniya_orders");
+      localStorage.removeItem("dhuniya_customers");
+      localStorage.removeItem("dhuniya_customers_v2");
     } catch {}
 
-    // 2. Fetch fresh real data from Supabase
+    // Fetch fresh real data purely from Supabase
     try {
       const client = getSupabase();
       if (!client) throw new Error("Supabase client unavailable");
@@ -672,16 +595,13 @@ export default function PublicPage() {
         }
         const cleanProducts = Array.from(mapByName.values());
         setProducts(cleanProducts);
-        try { localStorage.setItem("dhuniya_products", JSON.stringify(cleanProducts)); } catch {}
         setLoadError(false);
-      } else if (!hasCached) {
+      } else {
         setProducts([]);
       }
     } catch (err) {
       console.error("Failed to load products from database:", err);
-      if (!hasCached) {
-        setLoadError(true);
-      }
+      setLoadError(true);
     } finally {
       setLoading(false);
     }

@@ -177,15 +177,18 @@
   animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes amberPulseGlow {
+@keyframes gentlePulse {
   0%, 100% {
-    box-shadow: 0 4px 20px -2px rgba(245, 158, 11, 0.3);
+    transform: scale(1);
+    filter: brightness(1);
   }
   50% {
-    box-shadow: 0 6px 28px 2px rgba(245, 158, 11, 0.55);
+    transform: scale(1.02);
+    filter: brightness(1.08);
   }
 }
 
 .animate-pulse-glow {
-  animation: amberPulseGlow 3s ease-in-out infinite;
+  animation: gentlePulse 3s ease-in-out infinite;
+  box-shadow: 0 4px 20px -2px rgba(245, 158, 11, 0.4);
 }
